@@ -268,7 +268,7 @@ function fetchScriptJSON(url) {
   });
 }
 
-const CACHE_KEY   = 'thedrive_cache_v1';
+const CACHE_KEY   = 'thedrive_cache_v2';
 const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
 
 function saveCache(data) {
@@ -302,8 +302,8 @@ function applyDriveData(rawData, csvRows) {
     allMovies.forEach(m => {
       const match = findDriveMatch(m.title, driveMap);
       const posterKey = normalize(m.title);
-      m.available  = !!match;
-      m.driveLink  = match ? match.link : null;
+      m.available  = !!match && typeof match === 'object';
+      m.driveLink  = (match && typeof match === 'object') ? match.link : null;
       m.poster     = posterMap[posterKey] || null;
     });
     patchGridCards();
