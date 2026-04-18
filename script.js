@@ -50,8 +50,8 @@ const DEMO_DRIVE = {
 // ─── STATE ───────────────────────────────────────────────────
 let allMovies = [];     // merged final array
 let filtered  = [];     // after search/filter
-let currentView = 'table';
-let currentSort = 'title-asc';
+let currentView = 'grid';
+let currentSort = 'imdb-desc';
 let isDemoMode  = false;
 let posterMap   = {};   // normalized title → poster URL
 
@@ -643,5 +643,15 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
 (function init() {
   const modal = $('config-modal');
   if (modal) modal.classList.add('hidden');
+
+  // Set default view to grid
+  tableView.classList.remove('active');
+  gridView.classList.add('active');
+  $('btn-table').classList.remove('active');
+  $('btn-grid').classList.add('active');
+
+  // Set default sort to IMDb descending
+  sortBy.value = 'imdb-desc';
+
   loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL);
 })();
