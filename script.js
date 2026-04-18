@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz73RVEEH-A8i3zvvNEX5qFtnTA6OHNxDenT5BKvrKc-l387QGcAz_Znp8T1EFXzkh1/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw6v5I5NagnyMJFNF6jnsrOS2kdvZo5EUO-_PQBNBwSgOmr3NVtJe_-Sqh_kuvgVa4k/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
@@ -54,6 +54,43 @@ let currentView = 'grid';
 let currentSort = 'imdb-desc';
 let isDemoMode  = false;
 let posterMap   = {};   // normalized title → poster URL
+
+// ─── REQUEST COUNTS ──────────────────────────────────────────
+// Counts come from the server (Apps Script PropertiesService).
+// We keep a local in-memory cache so re-renders don't flicker.
+let requestCounts = {}; // normalized title → count (populated after loadData)
+
+function getRequestCount(title) {
+  return requestCounts[normalize(title)] || 0;
+}
+
+async function postRequest(title) {
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    // Fallback: local-only if no script URL configured
+    const key = normalize(title);
+    requestCounts[key] = (requestCounts[key] || 0) + 1;
+    return requestCounts[key];
+  }
+  try {
+    const res = await fetch(DRIVE_SCRIPT_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    const data = await res.json();
+    if (data.count !== undefined) {
+      requestCounts[normalize(title)] = data.count;
+      return data.count;
+    }
+  } catch(e) {
+    console.warn('Request POST failed, using local count', e);
+  }
+  // Fallback: increment locally if POST failed
+  const key = normalize(title);
+  requestCounts[key] = (requestCounts[key] || 0) + 1;
+  return requestCounts[key];
+}
 
 // ─── DOM REFS ─────────────────────────────────────────────────
 const $  = id => document.getElementById(id);
@@ -290,6 +327,10 @@ function loadCache() {
 function applyDriveData(rawData, csvRows) {
   const rawMovies = rawData.movies || rawData;
   posterMap = rawData.posters || {};
+  // Merge in server-side request counts
+  if (rawData.requests) {
+    requestCounts = Object.assign(requestCounts, rawData.requests);
+  }
   const videoMimeTypes = ['video/', 'application/octet-stream'];
   const driveMap = Object.fromEntries(
     Object.entries(rawMovies).filter(([, val]) =>
@@ -530,6 +571,12 @@ function renderTable() {
           ? `<a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener">▶ WATCH</a>`
           : `<span class="no-link">—</span>`}
       </td>
+      <td>
+        <button class="request-btn" data-title="${escHtml(m.title)}">
+          <span class="request-icon">＋</span> REQUEST
+          <span class="request-count">${getRequestCount(m.title) || ''}</span>
+        </button>
+      </td>
     `;
     frag.appendChild(tr);
   });
@@ -571,6 +618,10 @@ function renderGrid() {
           ? `<a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener">▶</a>`
           : ''}
       </div>
+      <button class="request-btn request-btn--card" data-title="${escHtml(m.title)}">
+        <span class="request-icon">＋</span> REQUEST
+        <span class="request-count">${getRequestCount(m.title) || ''}</span>
+      </button>
     `;
     frag.appendChild(card);
   });
@@ -642,6 +693,27 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
     gridView.classList.toggle('active', v === 'grid');
     renderCurrentView();
   });
+});
+
+// Request button (event delegation on main content)
+$('main-content').addEventListener('click', async e => {
+  const btn = e.target.closest('.request-btn');
+  if (!btn) return;
+
+  // Disable immediately to prevent double-clicks
+  btn.disabled = true;
+
+  const title = btn.dataset.title;
+  const newCount = await postRequest(title);
+
+  // Update all request buttons for this title across both views
+  document.querySelectorAll(`.request-btn[data-title="${CSS.escape(title)}"]`).forEach(b => {
+    b.disabled = false;
+    b.querySelector('.request-count').textContent = newCount;
+    b.classList.add('request-btn--fired');
+    setTimeout(() => b.classList.remove('request-btn--fired'), 600);
+  });
+  showToast(`📌 Requested: ${title}`);
 });
 
 // ─── INIT ─────────────────────────────────────────────────────
