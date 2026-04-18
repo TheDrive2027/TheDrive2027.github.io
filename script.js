@@ -296,10 +296,81 @@ function applyDriveData(rawData, csvRows) {
       !val.mimeType || videoMimeTypes.some(t => val.mimeType.startsWith(t))
     )
   );
-  allMovies = mergeData(csvRows, driveMap, posterMap);
-  render();
-  populateResFilter();
-  updateCounts();
+
+  // If allMovies is already populated (CSV rendered), patch in place instead of full re-render
+  if (allMovies.length > 0) {
+    allMovies.forEach(m => {
+      const match = findDriveMatch(m.title, driveMap);
+      const posterKey = normalize(m.title);
+      m.available  = !!match;
+      m.driveLink  = match ? match.link : null;
+      m.poster     = posterMap[posterKey] || null;
+    });
+    patchGridCards();
+    updateCounts();
+  } else {
+    allMovies = mergeData(csvRows, driveMap, posterMap);
+    render();
+    populateResFilter();
+    updateCounts();
+  }
+}
+
+/** Update only the availability, link, and poster on already-rendered grid cards */
+function patchGridCards() {
+  // Update allMovies data model for table view (re-render table in background)
+  applyFilters();
+
+  // Patch grid cards in-place by title lookup
+  const cardMap = {};
+  movieGrid.querySelectorAll('.movie-card').forEach(card => {
+    const titleEl = card.querySelector('.card-title');
+    if (titleEl) cardMap[normalize(titleEl.textContent)] = card;
+  });
+
+  allMovies.forEach(m => {
+    const card = cardMap[normalize(m.title)];
+    if (!card) return;
+
+    // Update status pill
+    const pill = card.querySelector('.status-pill');
+    if (pill) {
+      pill.className = `status-pill ${m.available ? 'status-available' : 'status-missing'}`;
+      pill.textContent = m.available ? 'AVAILABLE' : 'NOT UPLOADED';
+    }
+
+    // Update watch link
+    const footer = card.querySelector('.card-footer');
+    if (footer) {
+      const existing = footer.querySelector('.drive-link');
+      if (m.driveLink && !existing) {
+        const a = document.createElement('a');
+        a.className = 'drive-link';
+        a.href = m.driveLink;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = '▶';
+        footer.appendChild(a);
+      } else if (!m.driveLink && existing) {
+        existing.remove();
+      } else if (m.driveLink && existing) {
+        existing.href = m.driveLink;
+      }
+    }
+
+    // Inject poster if not already present
+    if (m.poster && !card.querySelector('.card-poster')) {
+      const div = document.createElement('div');
+      div.className = 'card-poster';
+      const img = document.createElement('img');
+      img.src = m.poster;
+      img.alt = m.title;
+      img.loading = 'lazy';
+      img.onload = () => img.classList.add('loaded');
+      div.appendChild(img);
+      card.insertBefore(div, card.firstChild);
+    }
+  });
 }
 
 async function loadData(sheetURL, scriptURL) {
