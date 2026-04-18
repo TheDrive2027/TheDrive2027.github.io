@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // Apps Script web app URL — paste yours here after deploying Code.gs
-const DRIVE_SCRIPT_URL = 'YOUR_APPS_SCRIPT_EXEC_URL_HERE';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzxOcJVP9BCmStCwFF_ocjUx11fD-3V27_IVm_DNtoytzwWmKj955v--6pfKwdTNGzF/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
