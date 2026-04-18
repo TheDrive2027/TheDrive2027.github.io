@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CINEMATHEQUE — Movie Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ░░ NOISE OVERLAY ░░ -->
+  <div class="noise"></div>
+
+  <!-- ░░ HEADER ░░ -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-mark">▶</span>
+        <span class="logo-text">CINEMATHEQUE</span>
+      </div>
+      <div class="header-meta">
+        <span id="movie-count">— films</span>
+        <span class="dot">·</span>
+        <span id="available-count">— available</span>
+      </div>
+    </div>
+    <div class="scan-bar" id="scan-bar">
+      <span class="scan-label">SCANNING DRIVE</span>
+      <div class="scan-track"><div class="scan-fill" id="scan-fill"></div></div>
+    </div>
+  </header>
+
+  <!-- ░░ CONTROLS ░░ -->
+  <section class="controls-section">
+    <div class="controls-inner">
+
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Search titles…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="clear-search" id="clear-search" title="Clear">✕</button>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">RESOLUTION</label>
+        <select id="filter-resolution">
+          <option value="">All</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">STATUS</label>
+        <select id="filter-status">
+          <option value="">All</option>
+          <option value="Available">Available</option>
+          <option value="Not Uploaded">Not Uploaded</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label class="filter-label">SORT BY</label>
+        <select id="sort-by">
+          <option value="title-asc">Title A→Z</option>
+          <option value="title-desc">Title Z→A</option>
+          <option value="imdb-desc">IMDb ↓</option>
+          <option value="imdb-asc">IMDb ↑</option>
+          <option value="year-desc">Year ↓</option>
+          <option value="year-asc">Year ↑</option>
+          <option value="size-desc">Size ↓</option>
+          <option value="size-asc">Size ↑</option>
+        </select>
+      </div>
+
+      <!-- View toggle -->
+      <div class="view-toggle" role="group" aria-label="View mode">
+        <button class="toggle-btn active" id="btn-table" title="Table view" data-view="table">
+          ☰
+        </button>
+        <button class="toggle-btn" id="btn-grid" title="Grid view" data-view="grid">
+          ⊞
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ░░ RESULTS SUMMARY ░░ -->
+  <div class="results-summary" id="results-summary"></div>
+
+  <!-- ░░ MAIN CONTENT ░░ -->
+  <main class="main-content" id="main-content">
+
+    <!-- TABLE VIEW -->
+    <div id="table-view" class="view-panel active">
+      <div class="table-scroll">
+        <table id="movie-table">
+          <thead>
+            <tr>
+              <th class="th-num">#</th>
+              <th class="th-title sortable" data-sort="title-asc">TITLE</th>
+              <th class="th-res">RES</th>
+              <th class="th-rating">RATING</th>
+              <th class="th-year sortable" data-sort="year-desc">YEAR</th>
+              <th class="th-size sortable" data-sort="size-desc">SIZE</th>
+              <th class="th-imdb sortable" data-sort="imdb-desc">IMDb</th>
+              <th class="th-status">STATUS</th>
+              <th class="th-link">LINK</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="table-empty" hidden>
+        <span class="empty-icon">◻</span>
+        <p>No films match your search.</p>
+      </div>
+    </div>
+
+    <!-- GRID VIEW -->
+    <div id="grid-view" class="view-panel">
+      <div class="movie-grid" id="movie-grid"></div>
+      <div class="empty-state" id="grid-empty" hidden>
+        <span class="empty-icon">◻</span>
+        <p>No films match your search.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ░░ TOAST ░░ -->
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
