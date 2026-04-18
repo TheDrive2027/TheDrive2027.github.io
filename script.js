@@ -187,8 +187,18 @@ function resClass(res) {
   const r = String(res).toUpperCase();
   if (r.includes('4K') || r.includes('2160')) return 'res-4k';
   if (r.includes('1080')) return 'res-1080';
-  if (r.includes('720')) return 'res-720';
+  if (r.includes('720') || r.includes('576')) return 'res-720';
   return 'res-other';
+}
+
+/** Maturity rating CSS class */
+function ratingClass(rating) {
+  const r = String(rating || '').toUpperCase().replace(/[\s-]/g, '');
+  if (r === 'G')    return 'rating-g';
+  if (r === 'PG')   return 'rating-pg';
+  if (r === 'PG13') return 'rating-pg13';
+  if (r === 'R')    return 'rating-r';
+  return '';
 }
 
 /** Show toast notification */
@@ -447,7 +457,7 @@ function renderTable() {
       <td class="td-num">${i + 1}</td>
       <td class="td-title">${escHtml(m.title)}</td>
       <td class="td-res"><span class="${resClass(m.resolution)}">${escHtml(m.resolution) || '—'}</span></td>
-      <td class="td-rating">${escHtml(m.maturityRating) || '—'}</td>
+      <td class="td-rating"><span class="${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span></td>
       <td class="td-year">${escHtml(m.year)}</td>
       <td class="td-size">${escHtml(m.fileSize) || '—'}</td>
       <td class="td-imdb"><span class="${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span></td>
@@ -486,7 +496,7 @@ function renderGrid() {
       <div class="card-meta">
         <span class="card-year">${escHtml(m.year)}</span>
         <span class="card-sep">·</span>
-        <span class="card-rating">${escHtml(m.maturityRating) || '—'}</span>
+        <span class="card-rating ${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span>
       </div>
       <div class="card-row">
         <span class="card-imdb ${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span>
