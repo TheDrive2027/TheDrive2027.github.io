@@ -14,8 +14,8 @@
   --border:     #252530;
   --border2:    #32323f;
   --text:       #e8e8f0;
-  --text-muted: #7070888;
-  --text-dim:   #50505e;
+  --text-muted: #9090a8;
+  --text-dim:   #78788f;
   --accent:     #e8c547;        /* warm gold */
   --accent2:    #c4a030;
   --green:      #3ecf74;
@@ -386,10 +386,15 @@ tbody tr:hover td { background: var(--surface2); }
   font-weight: 500;
 }
 
-.res-4k   { color: #7eb8f7; }
-.res-1080 { color: #a78bfa; }
-.res-720  { color: #94a3b8; }
-.res-other { color: var(--text-dim); }
+.res-4k   { color: #c084fc; }
+.res-1080 { color: #3ecf74; }
+.res-720  { color: #e8c547; }
+.res-other { color: #f04f4f; }
+
+.rating-g   { color: #3ecf74; }
+.rating-pg  { color: #3ecf74; }
+.rating-pg13 { color: #e8c547; }
+.rating-r   { color: #f04f4f; }
 
 .td-rating {
   font-family: var(--font-mono);
