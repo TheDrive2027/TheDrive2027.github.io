@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRsqWSVvOrpXXC8h3phQMOvcYIt4a1N4YII6SxQ8iEwzlVYm96l-PYiHsBmiNHiINt3w/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwysnUe2e5z46GM387Yh7RkHYmjkRRsjtmuY68rWnPErl_KvFwFk1awNUj6dlnu15KhKw/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
@@ -53,6 +53,7 @@ let filtered  = [];     // after search/filter
 let currentView = 'table';
 let currentSort = 'title-asc';
 let isDemoMode  = false;
+let posterMap   = {};   // normalized title → poster URL
 
 // ─── DOM REFS ─────────────────────────────────────────────────
 const $  = id => document.getElementById(id);
@@ -287,8 +288,11 @@ async function loadData(sheetURL, scriptURL) {
   const driveURL = scriptURL && scriptURL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE' ? scriptURL : null;
   if (driveURL) {
     try {
-      driveMap = await fetchScriptJSON(driveURL);
-      if (driveMap && driveMap.error) throw new Error(driveMap.error);
+      const driveData = await fetchScriptJSON(driveURL);
+      if (driveData && driveData.error) throw new Error(driveData.error);
+      // Support both old flat format and new { movies, posters } format
+      driveMap = driveData.movies || driveData;
+      posterMap = driveData.posters || {};
       setProgress(80);
     } catch (e) {
       showToast('⚠ Could not load Drive data. Check the Script URL & deployment.');
@@ -299,7 +303,7 @@ async function loadData(sheetURL, scriptURL) {
   }
 
   // ── 3. Merge ──
-  allMovies = mergeData(csvRows, driveMap);
+  allMovies = mergeData(csvRows, driveMap, posterMap);
   setProgress(100);
   setTimeout(() => scanBar.classList.add('hidden'), 600);
   render();
@@ -307,7 +311,7 @@ async function loadData(sheetURL, scriptURL) {
   updateCounts();
 }
 
-function mergeData(rows, driveMap) {
+function mergeData(rows, driveMap, posterMap = {}) {
   // Normalize column names: handles "Title", "title", "Movie Title", etc.
   const mapped = rows.map(row => {
     const title       = row.title || row.movie_title || row['movie title'] || '';
@@ -318,6 +322,9 @@ function mergeData(rows, driveMap) {
     const imdbRating  = row.imdb_rating || row.imdbrating || row.imdb || '';
 
     const match = findDriveMatch(title, driveMap);
+    const posterKey = normalize(title);
+    const poster = posterMap[posterKey] || null;
+
     return {
       title,
       resolution,
@@ -329,6 +336,7 @@ function mergeData(rows, driveMap) {
       available: !!match,
       driveLink: match ? match.link : null,
       driveResolution: match ? (match.name || '') : '',
+      poster,
     };
   }).filter(m => m.title);
 
@@ -492,6 +500,7 @@ function renderGrid() {
     card.className = 'movie-card';
     card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
     card.innerHTML = `
+      ${m.poster ? `<div class="card-poster"><img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" /></div>` : ''}
       <div class="card-title">${escHtml(m.title)}</div>
       <div class="card-meta">
         <span class="card-year">${escHtml(m.year)}</span>
