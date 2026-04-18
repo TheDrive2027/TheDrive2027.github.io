@@ -61,6 +61,7 @@ const movieGrid   = $('movie-grid');
 const searchInput = $('search-input');
 const clearSearch = $('clear-search');
 const filterRes   = $('filter-resolution');
+const filterMat   = $('filter-maturity');
 const filterStat  = $('filter-status');
 const sortBy      = $('sort-by');
 const movieCount  = $('movie-count');
@@ -357,6 +358,14 @@ function populateResFilter() {
     opt.value = r; opt.textContent = r;
     filterRes.appendChild(opt);
   });
+
+  const ratings = [...new Set(allMovies.map(m => m.maturityRating).filter(Boolean))].sort();
+  filterMat.innerHTML = '<option value="">All</option>';
+  ratings.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    filterMat.appendChild(opt);
+  });
 }
 
 function updateCounts() {
@@ -369,11 +378,13 @@ function updateCounts() {
 function applyFilters() {
   const q   = normalize(searchInput.value);
   const res = filterRes.value;
+  const mat = filterMat.value;
   const st  = filterStat.value;
 
   filtered = allMovies.filter(m => {
     if (q && !normalize(m.title).includes(q)) return false;
     if (res && m.resolution !== res) return false;
+    if (mat && m.maturityRating !== mat) return false;
     if (st === 'Available' && !m.available) return false;
     if (st === 'Not Uploaded' && m.available) return false;
     return true;
@@ -523,6 +534,7 @@ clearSearch.addEventListener('click', () => {
 
 // Filters / sort
 filterRes.addEventListener('change', render);
+filterMat.addEventListener('change', render);
 filterStat.addEventListener('change', render);
 sortBy.addEventListener('change', () => {
   currentSort = sortBy.value;
