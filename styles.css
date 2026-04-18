@@ -541,6 +541,21 @@ tbody tr:hover td { background: var(--surface2); }
   overflow: hidden;
   aspect-ratio: 2/3;
   background: var(--surface2);
+  position: relative;
+}
+
+.card-poster::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .card-poster img {
@@ -548,7 +563,14 @@ tbody tr:hover td { background: var(--surface2); }
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform .4s ease;
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity .3s ease, transform .4s ease;
+}
+
+.card-poster img.loaded {
+  opacity: 1;
 }
 
 .movie-card:hover .card-poster img {
