@@ -103,12 +103,16 @@ function levenshtein(a, b) {
 /** Find best Drive match for a movie title */
 function findDriveMatch(title, driveMap) {
   const key = normalize(title);
-  // Exact match
+  // 1. Exact match
   if (driveMap[key]) return driveMap[key];
-  // Fuzzy: allow up to 2 edits, prefer shortest distance
+  // 2. Prefix match — sheet title is a prefix of the drive key (e.g. "f1" vs "f1themovie")
+  //    or drive key is a prefix of the sheet title
+  for (const [driveKey, val] of Object.entries(driveMap)) {
+    if (driveKey.startsWith(key) || key.startsWith(driveKey)) return val;
+  }
+  // 3. Fuzzy: allow up to 2 edits for close typos
   let best = null, bestDist = Infinity;
   for (const [driveKey, val] of Object.entries(driveMap)) {
-    // Only compare keys of similar length (within 50%)
     if (Math.abs(driveKey.length - key.length) > key.length * 0.5) continue;
     const dist = levenshtein(key, driveKey);
     if (dist <= 2 && dist < bestDist) {
