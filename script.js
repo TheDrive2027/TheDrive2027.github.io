@@ -163,6 +163,8 @@ const movieCount  = $('movie-count');
 const availCount  = $('available-count');
 const resultsSummary = $('results-summary');
 const scanBar     = $('scan-bar');
+const lastUpdatedEl = $('last-updated');
+const refreshBtn  = $('refresh-btn');
 const scanFill    = $('scan-fill');
 const configModal = $('config-modal');
 const tableView   = $('table-view');
@@ -305,6 +307,16 @@ function showToast(msg, duration = 3000) {
   toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
 }
 
+/** Format and display the last-updated timestamp */
+function updateLastUpdated() {
+  const now = new Date();
+  let h = now.getHours(), m = now.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const mm = String(m).padStart(2, '0');
+  if (lastUpdatedEl) lastUpdatedEl.textContent = h + ':' + mm + ' ' + ampm;
+}
+
 /** Set progress bar */
 function setProgress(pct) {
   scanFill.style.width = pct + '%';
@@ -401,6 +413,7 @@ function applyDriveData(rawData, csvRows) {
   render();
   populateResFilter();
   updateCounts();
+  updateLastUpdated();
 }
 
 /** Update only the availability, link, and poster on already-rendered grid cards */
@@ -790,6 +803,28 @@ function setRequestedState(title, count) {
     const countHtml = count ? ' <span class="request-count">' + count + '</span>' : '';
     b.innerHTML = '<span class="request-icon">✓</span> REQUESTED' + countHtml;
     b.dataset.title = title;
+  });
+}
+
+// ─── REFRESH BUTTON ───────────────────────────────────────────
+if (refreshBtn) {
+  refreshBtn.addEventListener('click', async () => {
+    if (refreshBtn.classList.contains('spinning')) return;
+
+    // Spin the icon
+    refreshBtn.classList.add('spinning');
+    scanBar.classList.remove('hidden');
+    setProgress(0);
+
+    // Clear the drive cache and server counts — but KEEP userRequested
+    try { localStorage.removeItem(CACHE_KEY); } catch(e) {}
+    try { localStorage.removeItem(LOCAL_REQUEST_KEY); } catch(e) {}
+    requestCounts = {};
+
+    // Re-fetch everything fresh
+    await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL);
+
+    refreshBtn.classList.remove('spinning');
   });
 }
 
