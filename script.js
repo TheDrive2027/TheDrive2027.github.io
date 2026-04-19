@@ -221,6 +221,17 @@ function showGate() {
 async function initWithGate() {
   const overlay = document.getElementById('gate-overlay');
 
+  // ── Pre-populate UI immediately if a key is already saved ──
+  // This runs before any network calls so the user sees their cached key
+  // and a "Checking permissions…" loading state instead of a blank gate.
+  const earlySavedKey = getSavedKey();
+  if (earlySavedKey && overlay) {
+    const earlyInput = document.getElementById('gate-key-input');
+    const earlyBtn   = document.getElementById('gate-submit');
+    if (earlyInput) { earlyInput.value = earlySavedKey; earlyInput.disabled = true; }
+    if (earlyBtn)   { earlyBtn.textContent = 'CHECKING PERMISSIONS…'; earlyBtn.classList.add('loading'); }
+  }
+
   // ── Step 1: silently check if this device is blocked ──
   // Do this before showing anything — blocked devices skip the gate entirely
   // and go straight to the denied screen.
