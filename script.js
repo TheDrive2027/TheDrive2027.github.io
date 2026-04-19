@@ -1053,7 +1053,10 @@ function renderGrid() {
     const cardReqCount = getRequestCount(m.title);
     const cardIRequested = hasUserRequested(m.title);
     card.innerHTML = `
-      ${m.poster ? `<div class="card-poster"><img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" /></div>` : ''}
+      <div class="card-poster${m.driveLink ? ' card-poster--playable' : ''}">
+        ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
+        ${m.driveLink ? `<a class="card-play-overlay drive-link" href="${m.driveLink}" target="_blank" rel="noopener" data-title="${escHtml(m.title)}" aria-label="Watch ${escHtml(m.title)}"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></a>` : ''}
+      </div>
       <div class="card-title">${escHtml(m.title)}</div>
       <div class="card-meta">
         <span class="card-year">${escHtml(m.year)}</span>
@@ -1069,11 +1072,11 @@ function renderGrid() {
         <span class="status-pill ${m.available ? 'status-available' : 'status-missing'}">
           ${m.available ? 'AVAILABLE' : 'NOT UPLOADED'}
         </span>
-        ${m.driveLink
-          ? `<a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener" data-title="${escHtml(m.title)}">▶ WATCH</a>`
-          : cardIRequested
-            ? `<button class="request-btn request-btn--done" data-title="${escHtml(m.title)}"><span class="request-icon">✓</span> REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</button>`
-            : `<button class="request-btn" data-title="${escHtml(m.title)}"><span class="request-icon">＋</span> REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</button>`}
+        ${!m.driveLink
+          ? cardIRequested
+            ? `<button class="request-btn request-btn--done" data-title="${escHtml(m.title)}"><span class="request-icon">&#10003;</span> REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</button>`
+            : `<button class="request-btn" data-title="${escHtml(m.title)}"><span class="request-icon">&#65291;</span> REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</button>`
+          : ''}
       </div>
       ${m.driveLink ? `<div class="card-rating-row">${ratingHTML(m.title)}</div>` : ''}
     `;
