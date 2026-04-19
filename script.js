@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwL7z3o6TAUd6D8WXWqdr4nLY5yxQslmV6WFx6PQBY8KJrXztv05wyEeS2_Io3-L0EKxQ/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyq965ygRyHrO1BWbFOB08NofBbXTej3pCpn9jlnroTXT6fD4oMZRQ6HEJ6CVZriYu4Xw/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
@@ -397,23 +397,33 @@ async function loadData(sheetURL, scriptURL) {
     updateCounts();
   }
 
-  // ── 3. Fetch Drive JSON in background ──
+  // ── 3. Fetch Drive JSON in background (with one silent retry) ──
   const driveURL = scriptURL && scriptURL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE' ? scriptURL : null;
   if (driveURL) {
-    try {
-      const driveData = await fetchScriptJSON(driveURL);
-      if (driveData && driveData.error) throw new Error(driveData.error);
+    let driveData = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
+        driveData = await fetchScriptJSON(driveURL);
+        if (driveData && driveData.error) throw new Error(driveData.error);
+        break; // success
+      } catch (e) {
+        lastError = e;
+        console.warn('Drive fetch attempt ' + (attempt + 1) + ' failed:', e);
+      }
+    }
+    if (driveData) {
       saveCache(driveData);
       applyDriveData(driveData, csvRows);
       setProgress(100);
       setTimeout(() => scanBar.classList.add('hidden'), 300);
-    } catch (e) {
-      showToast('⚠ Could not load Drive data. Check the Script URL & deployment.');
-      console.error('Drive JSON error:', e);
-      if (!cached) {
-        setProgress(100);
-        setTimeout(() => scanBar.classList.add('hidden'), 300);
-      }
+    } else {
+      // Only show the toast if both attempts failed
+      if (!cached) showToast('⚠ Could not load Drive data. Check the Script URL & deployment.');
+      console.error('Drive JSON error after retry:', lastError);
+      setProgress(100);
+      setTimeout(() => scanBar.classList.add('hidden'), 300);
     }
   } else {
     setProgress(100);
