@@ -914,10 +914,10 @@ function ratingHTML(title) {
   const downs = getRatingCount(title, 'down');
   return `<div class="rating-wrap">
     <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it">
-      ▲<span class="rating-count">${ups || ''}</span>
+      ▲<span class="rating-count">${ups || 0}</span>
     </button>
     <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="down" title="Didn't like it">
-      ▼<span class="rating-count">${downs || ''}</span>
+      ▼<span class="rating-count">${downs || 0}</span>
     </button>
   </div>`;
 }
@@ -1097,7 +1097,7 @@ $('main-content').addEventListener('click', async e => {
     const isUp = b.dataset.ratingType === 'up';
     b.classList.toggle('active', userVote === b.dataset.ratingType);
     const countEl = b.querySelector('.rating-count');
-    if (countEl) countEl.textContent = getRatingCount(title, b.dataset.ratingType) || '';
+    if (countEl) countEl.textContent = getRatingCount(title, b.dataset.ratingType) || 0;
   });
 
   const userVote = getUserRating(title);
