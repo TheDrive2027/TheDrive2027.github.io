@@ -84,7 +84,14 @@ function showGate() {
       input.style.borderColor = '';
     }
 
-    input.addEventListener('input', clearError);
+    input.addEventListener('input', () => {
+      // Force uppercase as the user types, preserving cursor position
+      const start = input.selectionStart;
+      const end   = input.selectionEnd;
+      input.value = input.value.toUpperCase();
+      input.setSelectionRange(start, end);
+      clearError();
+    });
 
     async function attempt() {
       const keyStr = input.value.trim().toUpperCase();
@@ -1140,10 +1147,11 @@ if (refreshBtn) {
     scanBar.classList.remove('hidden');
     setProgress(0);
 
-    // Clear the drive cache and server counts — but KEEP userRequested
+    // Clear the drive cache and server counts — but KEEP userRequested and userRatings
     try { localStorage.removeItem(CACHE_KEY); } catch(e) {}
     try { localStorage.removeItem(LOCAL_REQUEST_KEY); } catch(e) {}
     requestCounts = {};
+    ratingCounts = {};
 
     // Re-fetch everything fresh — bypass cache and bust browser/CDN caches
     await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL, true);
