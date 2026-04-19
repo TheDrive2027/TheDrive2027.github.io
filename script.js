@@ -1968,6 +1968,8 @@ function presenceChartOptions() {
 
 // ── Push presence ping (called every 10s) ──
 function pushPresencePing() {
+  const onlineEl = document.getElementById('online-count');
+  const count    = onlineEl ? (parseInt(onlineEl.textContent, 10) || 0) : 0;
   const cbName   = '__presencePingCallback_' + Date.now();
   const script   = document.createElement('script');
   const timer    = setTimeout(() => {
@@ -2005,6 +2007,7 @@ function pushPresencePing() {
   };
   script.src = DRIVE_SCRIPT_URL
     + '?action=recordPresence'
+    + '&count='    + encodeURIComponent(count)
     + '&callback=' + cbName
     + '&_cb='      + Date.now();
   script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
