@@ -280,7 +280,7 @@ async function initWithGate() {
       overlay.classList.remove('gate-overlay-hidden');
       const submitBtn = document.getElementById('gate-submit');
       const input     = document.getElementById('gate-key-input');
-      if (submitBtn) { submitBtn.textContent = 'CHECKING…'; submitBtn.classList.add('loading'); }
+      if (submitBtn) { submitBtn.textContent = 'CHECKING KEY…'; submitBtn.classList.add('loading'); }
       if (input)     { input.value = savedKey; input.disabled = true; }
     }
 
