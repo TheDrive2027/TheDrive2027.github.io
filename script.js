@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-bTZng9kL7wEZsv45GIE9D2_bOcllKdjm712iBnONyHI6rh03d4062guoEjg7YlrpGg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyO-oWl9Q0gryiQpR961lg-m9HtEU5bdJsel9FKjt9nX7i7F0zXNcSj0FOKtaNjLlcfJQ/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
@@ -84,23 +84,43 @@ async function postRequest(title) {
   if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
     return localCount;
   }
-  try {
-    const res = await fetch(DRIVE_SCRIPT_URL, {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    });
-    const data = await res.json();
-    if (data.count !== undefined) {
-      requestCounts[key] = data.count;
-      saveLocalCounts();
-      return data.count;
+
+  // Use JSONP-style GET instead of POST to avoid Apps Script CORS issues.
+  // The callback param triggers the JSONP path in doGet which reads ?action=request&title=...
+  return new Promise(resolve => {
+    const cbName = '__requestCallback_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup();
+      console.warn('Request timed out, using local count');
+      resolve(localCount);
+    }, 10000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
-  } catch(e) {
-    console.warn('Request POST failed, using local count', e);
-  }
-  return localCount;
+
+    window[cbName] = function(data) {
+      cleanup();
+      if (data && data.count !== undefined) {
+        requestCounts[key] = data.count;
+        saveLocalCounts();
+        resolve(data.count);
+      } else {
+        resolve(localCount);
+      }
+    };
+
+    const url = DRIVE_SCRIPT_URL
+      + '?action=request'
+      + '&title=' + encodeURIComponent(title)
+      + '&callback=' + cbName;
+    script.src = url;
+    script.onerror = () => { cleanup(); resolve(localCount); };
+    document.head.appendChild(script);
+  });
 }
 
 // Seed from localStorage immediately so counts show on first render
