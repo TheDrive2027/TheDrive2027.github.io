@@ -697,7 +697,15 @@ function parseRuntimeMinutes(str) {
 
 /** Maturity rating sort order */
 const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'PG13': 3, 'R': 4, 'NC-17': 5, 'NR': 6 };
-const RES_ORDER = { '4K': 4, '2160P': 4, '1080P': 3, '1080': 3, '720P': 2, '720': 2, 'SD': 1 };
+function parseResolutionScore(res) {
+  if (!res) return 0;
+  const s = String(res).toUpperCase().trim();
+  // 4K / UHD / 2160 → 2160
+  if (s === '4K' || s === 'UHD' || s.includes('2160')) return 2160;
+  // Extract raw number like "1080p", "720P", "576p", etc.
+  const m = s.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
 
 /** IMDb rating CSS class */
 function imdbClass(rating) {
@@ -1117,16 +1125,24 @@ function applySort() {
     else if (key === 'maturity') { va = MATURITY_ORDER[a.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; vb = MATURITY_ORDER[b.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; }
     else if (key === 'status') { va = a.available ? 0 : 1; vb = b.available ? 0 : 1; }
     else if (key === 'res') {
-      va = RES_ORDER[(a.resolution || '').toUpperCase().replace(/[^A-Z0-9]/g,'')] || 0;
-      vb = RES_ORDER[(b.resolution || '').toUpperCase().replace(/[^A-Z0-9]/g,'')] || 0;
+      va = parseResolutionScore(a.resolution);
+      vb = parseResolutionScore(b.resolution);
     }
     else if (key === 'link') {
-      // Primary: rating score (upvotes - downvotes), Secondary: request count, Tertiary: unrequested last
-      const raA = getRatingScore(a.title),  raB = getRatingScore(b.title);
+      // Tier 1: available (has link) sorted by upvotes desc
+      // Tier 2: requested (no link) sorted by request count desc
+      // Tier 3: unrequested (no link, no requests)
+      const availA = a.available ? 1 : 0, availB = b.available ? 1 : 0;
+      if (availA !== availB) return availB - availA; // available first
+      if (availA === 1) {
+        // Both available: sort by rating score desc
+        return getRatingScore(b.title) - getRatingScore(a.title);
+      }
+      // Both unavailable: requested before unrequested, then by request count desc
       const rqA = getRequestCount(a.title), rqB = getRequestCount(b.title);
-      if (raA !== raB) return raB - raA;
-      if (rqA !== rqB) return rqB - rqA;
-      return 0;
+      const hasReqA = rqA > 0 ? 1 : 0, hasReqB = rqB > 0 ? 1 : 0;
+      if (hasReqA !== hasReqB) return hasReqB - hasReqA; // requested first
+      return rqB - rqA; // more requests first
     }
 
     if (va < vb) return dir === 'asc' ? -1 : 1;
