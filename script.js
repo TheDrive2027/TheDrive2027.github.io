@@ -632,6 +632,7 @@ function applySort() {
     else if (key === 'imdb') { va = parseFloat(a.imdbRating) || 0; vb = parseFloat(b.imdbRating) || 0; }
     else if (key === 'year') { va = parseInt(a.year) || 0; vb = parseInt(b.year) || 0; }
     else if (key === 'size') { va = parseSizeGB(a.fileSize); vb = parseSizeGB(b.fileSize); }
+    else if (key === 'requests') { va = getRequestCount(a.title); vb = getRequestCount(b.title); }
 
     if (va < vb) return dir === 'asc' ? -1 : 1;
     if (va > vb) return dir === 'asc' ? 1 : -1;
