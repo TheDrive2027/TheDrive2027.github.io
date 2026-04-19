@@ -1070,12 +1070,12 @@ function renderGrid() {
         <span class="card-year">${escHtml(m.year)}</span>
         <span class="card-sep">·</span>
         <span class="card-rating ${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span>
+        ${m.fileSize ? `<span class="card-sep">·</span><span class="card-size">${escHtml(m.fileSize)}</span>` : ''}
       </div>
       <div class="card-row">
         <span class="card-imdb ${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span>
         <span class="card-res ${resClass(m.resolution)}">${escHtml(m.resolution) || '—'}</span>
       </div>
-      <div class="card-size">${escHtml(m.fileSize) || '—'}</div>
       <div class="card-footer">
         <span class="status-pill ${m.available ? 'status-available' : 'status-missing'}">
           ${m.available ? 'AVAILABLE' : 'NOT UPLOADED'}
