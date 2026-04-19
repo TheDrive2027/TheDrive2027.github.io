@@ -929,14 +929,19 @@ tbody tr:hover td { background: var(--surface2); }
   content: '';
   position: absolute;
   right: 16px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
+  margin: auto;
   width: 14px;
   height: 14px;
   border: 2px solid rgba(0,0,0,0.3);
   border-top-color: var(--bg);
   border-radius: 50%;
-  animation: spin-refresh .7s linear infinite;
+  animation: spin-only .7s linear infinite;
+}
+
+@keyframes spin-only {
+  to { transform: rotate(360deg); }
 }
 
 /* ── TOAST ── */
