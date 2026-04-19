@@ -88,6 +88,31 @@ function callKeyAction(action, keyStr, existing) {
 
 let gateResolveFn = null; // resolved when the gate is passed
 
+/**
+ * Switches the gate modal into "Access Denied" mode:
+ *  - Title changes to ACCESS DENIED
+ *  - Input field group is hidden
+ *  - Button becomes a non-interactive lock icon
+ */
+function showDenied() {
+  const overlay   = document.getElementById('gate-overlay');
+  const titleEl   = overlay && overlay.querySelector('.gate-title');
+  const fieldEl   = overlay && overlay.querySelector('.modal-field');
+  const submitBtn = document.getElementById('gate-submit');
+
+  if (overlay)   overlay.classList.remove('gate-overlay-hidden');
+  if (titleEl)   titleEl.textContent = 'ACCESS DENIED';
+  if (fieldEl)   fieldEl.style.display = 'none';
+  if (submitBtn) {
+    submitBtn.classList.remove('loading');
+    submitBtn.textContent = '🔒';
+    submitBtn.style.fontSize = '1.4rem';
+    submitBtn.style.cursor   = 'default';
+    submitBtn.style.opacity  = '0.6';
+    submitBtn.disabled = true;
+  }
+}
+
 function showGate() {
   return new Promise(resolve => {
     gateResolveFn = resolve;
@@ -140,7 +165,7 @@ function showGate() {
 
       if (!validation.valid) {
         if (validation.reason === 'device_blocked') {
-          showError('This device has been blocked. Please contact Austin for access.');
+          showDenied();
         } else if (validation.reason === 'expired') {
           showError('This key has reached its device limit. Please request a new key.');
         } else {
@@ -152,7 +177,7 @@ function showGate() {
       // Key is valid — consume it (counts this as one new device)
       const consume = await callKeyAction('useKey', keyStr);
       if (!consume.success && consume.reason === 'device_blocked') {
-        showError('This device has been blocked. Please contact Austin for access.');
+        showDenied();
         return;
       }
       if (!consume.success && consume.reason === 'expired') {
@@ -194,8 +219,12 @@ async function initWithGate() {
 
     const validation = await callKeyAction('validateKey', savedKey, true);
 
-    if (validation.valid || validation.error) {
+    if (validation.reason === 'device_blocked') {
+      // Device has been banned — show denied state and stop
+      showDenied();
+    } else if (validation.valid || validation.error) {
       // Valid (or server unreachable — give benefit of the doubt) — proceed silently
+      const overlay = document.getElementById('gate-overlay');
       if (overlay) {
         overlay.classList.add('gate-overlay-hidden');
         overlay.style.display = 'none';
@@ -216,6 +245,7 @@ async function initWithGate() {
     await showGate();
   }
 }
+
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
