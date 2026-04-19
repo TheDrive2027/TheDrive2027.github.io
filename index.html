@@ -8,11 +8,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-
-  <!-- ░░ ACCESS GATE MODAL ░░ -->
+  <!-- ACCESS GATE MODAL -->
   <div class="modal-overlay" id="gate-overlay">
     <div class="modal-box gate-box">
       <div class="gate-logo">
@@ -23,24 +23,18 @@
       <h2 class="modal-title gate-title">ACCESS REQUIRED</h2>
       <div class="modal-field">
         <label for="gate-key-input">ACCESS KEY</label>
-        <input
-          type="text"
-          id="gate-key-input"
-          placeholder="XXXX-XXXX-XXXX"
-          autocomplete="off"
-          spellcheck="false"
-          autocapitalize="characters"
-        />
+        <input type="text" id="gate-key-input" placeholder="XXXX-XXXX-XXXX"
+          autocomplete="off" spellcheck="false" autocapitalize="characters" />
         <small id="gate-error" class="gate-error" hidden></small>
       </div>
       <button class="modal-btn gate-submit-btn" id="gate-submit">ENTER THE DRIVE</button>
     </div>
   </div>
 
-  <!-- ░░ NOISE OVERLAY ░░ -->
+  <!-- NOISE OVERLAY -->
   <div class="noise"></div>
 
-  <!-- ░░ HEADER ░░ -->
+  <!-- HEADER -->
   <header class="site-header">
     <div class="header-inner">
       <div class="logo-wrap">
@@ -56,9 +50,18 @@
         <span id="movie-count">— films</span>
         <span class="dot">·</span>
         <span id="available-count">— available</span>
+        <span class="dot">·</span>
+        <span class="online-wrap"><span class="online-dot"></span><span id="online-count">—</span> online</span>
         <button class="refresh-btn" id="refresh-btn" title="Force refresh">↻</button>
       </div>
     </div>
+
+    <!-- TAB NAV -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="movies">MOVIES</button>
+      <button class="tab-btn" data-tab="stats">STATS</button>
+    </nav>
+
     <div class="scan-bar" id="scan-bar">
       <span class="scan-label">SCANNING DRIVE</span>
       <span class="scan-patience">This may take a while, please be patient</span>
@@ -66,130 +69,161 @@
     </div>
   </header>
 
-  <!-- ░░ CONTROLS ░░ -->
-  <section class="controls-section">
-    <div class="controls-inner">
+  <!-- MOVIES TAB -->
+  <div id="tab-movies" class="tab-panel active">
 
-      <div class="filter-group search-group">
-        <label class="filter-label">SEARCH</label>
-        <div class="search-wrap">
-          <span class="search-icon">⌕</span>
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Search titles…"
-            autocomplete="off"
-            spellcheck="false"
-          />
-          <button class="clear-search" id="clear-search" title="Clear">✕</button>
+    <section class="controls-section">
+      <div class="controls-inner">
+        <div class="filter-group search-group">
+          <label class="filter-label">SEARCH</label>
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input type="text" id="search-input" placeholder="Search titles…" autocomplete="off" spellcheck="false" />
+            <button class="clear-search" id="clear-search" title="Clear">✕</button>
+          </div>
         </div>
-      </div>
-
-      <div class="filter-group">
-        <label class="filter-label">RESOLUTION</label>
-        <select id="filter-resolution">
-          <option value="">All</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label class="filter-label">MATURITY</label>
-        <select id="filter-maturity">
-          <option value="">All</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label class="filter-label">STATUS</label>
-        <select id="filter-status">
-          <option value="">All</option>
-          <option value="Available">Available</option>
-          <option value="Not Uploaded">Not Uploaded</option>
-        </select>
-      </div>
-
-      <div class="filter-group sort-group">
-        <label class="filter-label">SORT BY</label>
-        <div class="sort-row">
-          <select id="sort-by">
-            <option value="title">Title</option>
-            <option value="imdb">IMDb Rating</option>
-            <option value="year">Year</option>
-            <option value="rating">Top Rated</option>
-            <option value="requests">Most Requested</option>
-            <option value="size">File Size</option>
-            <option value="runtime">Runtime</option>
-            <option value="maturity">Maturity</option>
-            <option value="status">Status</option>
+        <div class="filter-group">
+          <label class="filter-label">RESOLUTION</label>
+          <select id="filter-resolution"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">MATURITY</label>
+          <select id="filter-maturity"><option value="">All</option></select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">STATUS</label>
+          <select id="filter-status">
+            <option value="">All</option>
+            <option value="Available">Available</option>
+            <option value="Not Uploaded">Not Uploaded</option>
           </select>
-          <button class="sort-dir-btn" id="sort-dir-btn" title="Toggle sort direction" aria-label="Sort direction">↓</button>
+        </div>
+        <div class="filter-group sort-group">
+          <label class="filter-label">SORT BY</label>
+          <div class="sort-row">
+            <select id="sort-by">
+              <option value="title">Title</option>
+              <option value="imdb">IMDb Rating</option>
+              <option value="year">Year</option>
+              <option value="rating">Top Rated</option>
+              <option value="requests">Most Requested</option>
+              <option value="size">File Size</option>
+              <option value="runtime">Runtime</option>
+              <option value="maturity">Maturity</option>
+              <option value="status">Status</option>
+            </select>
+            <button class="sort-dir-btn" id="sort-dir-btn" title="Toggle sort direction" aria-label="Sort direction">↓</button>
+          </div>
+        </div>
+        <div class="filter-group view-group">
+          <label class="filter-label">VIEW</label>
+          <div class="view-toggle" role="group" aria-label="View mode">
+            <button class="toggle-btn active" id="btn-table" title="Table view" data-view="table">☰</button>
+            <button class="toggle-btn" id="btn-grid" title="Grid view" data-view="grid">⊞</button>
+          </div>
         </div>
       </div>
+    </section>
 
-      <!-- View toggle -->
-      <div class="filter-group view-group">
-        <label class="filter-label">VIEW</label>
-        <div class="view-toggle" role="group" aria-label="View mode">
-          <button class="toggle-btn active" id="btn-table" title="Table view" data-view="table">
-            ☰
-          </button>
-          <button class="toggle-btn" id="btn-grid" title="Grid view" data-view="grid">
-            ⊞
-          </button>
+    <div class="results-summary" id="results-summary"></div>
+
+    <main class="main-content" id="main-content">
+      <div id="table-view" class="view-panel active">
+        <div class="table-scroll">
+          <table id="movie-table">
+            <thead>
+              <tr>
+                <th class="th-num">#</th>
+                <th class="th-title sortable" data-sort="title-asc">TITLE</th>
+                <th class="th-res">RES</th>
+                <th class="th-rating">MATURITY</th>
+                <th class="th-year sortable" data-sort="year-desc">YEAR</th>
+                <th class="th-runtime">RUNTIME</th>
+                <th class="th-size sortable" data-sort="size-desc">SIZE</th>
+                <th class="th-imdb sortable" data-sort="imdb-desc">IMDb</th>
+                <th class="th-status">STATUS</th>
+                <th class="th-link">LINK</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="table-empty" hidden>
+          <span class="empty-icon">◻</span><p>No films match your search.</p>
         </div>
       </div>
+      <div id="grid-view" class="view-panel">
+        <div class="movie-grid" id="movie-grid"></div>
+        <div class="empty-state" id="grid-empty" hidden>
+          <span class="empty-icon">◻</span><p>No films match your search.</p>
+        </div>
+      </div>
+    </main>
+
+  </div><!-- /tab-movies -->
+
+  <!-- STATS TAB -->
+  <div id="tab-stats" class="tab-panel">
+    <div class="stats-page">
+
+      <!-- Upload Progress -->
+      <section class="stats-section">
+        <h2 class="stats-heading">UPLOAD PROGRESS</h2>
+        <div class="upload-progress-wrap">
+          <div class="upload-progress-labels">
+            <span class="upload-fraction" id="upload-fraction">— / — films uploaded</span>
+            <span class="upload-pct" id="upload-pct">—%</span>
+          </div>
+          <div class="upload-track">
+            <div class="upload-fill" id="upload-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Library Growth Chart -->
+      <section class="stats-section">
+        <h2 class="stats-heading">LIBRARY GROWTH</h2>
+        <p class="stats-subheading">Daily snapshot — total vs. available films</p>
+        <div class="chart-wrap">
+          <canvas id="chart-library"></canvas>
+        </div>
+      </section>
+
+      <!-- Online History Chart -->
+      <section class="stats-section">
+        <h2 class="stats-heading">ONLINE HISTORY</h2>
+        <p class="stats-subheading">Concurrent users online, sampled every 10 seconds</p>
+        <div class="chart-wrap">
+          <canvas id="chart-presence"></canvas>
+        </div>
+      </section>
+
+      <!-- Stats Cards -->
+      <section class="stats-section">
+        <h2 class="stats-heading">LIBRARY STATS</h2>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-label">TOTAL FILMS</div><div class="stat-value" id="stat-total-films">—</div></div>
+          <div class="stat-card"><div class="stat-label">AVAILABLE</div><div class="stat-value" id="stat-available">—</div></div>
+          <div class="stat-card"><div class="stat-label">TOTAL USERS</div><div class="stat-value" id="stat-total-users">—</div></div>
+          <div class="stat-card"><div class="stat-label">TOTAL SIZE</div><div class="stat-value" id="stat-total-size">—</div></div>
+          <div class="stat-card"><div class="stat-label">TOTAL RUNTIME</div><div class="stat-value" id="stat-total-runtime">—</div></div>
+          <div class="stat-card"><div class="stat-label">AVG IMDb</div><div class="stat-value" id="stat-avg-imdb">—</div></div>
+          <div class="stat-card"><div class="stat-label">RATED G</div><div class="stat-value" id="stat-g">—</div></div>
+          <div class="stat-card"><div class="stat-label">RATED PG</div><div class="stat-value" id="stat-pg">—</div></div>
+          <div class="stat-card"><div class="stat-label">RATED PG-13</div><div class="stat-value" id="stat-pg13">—</div></div>
+          <div class="stat-card"><div class="stat-label">RATED R</div><div class="stat-value" id="stat-r">—</div></div>
+          <div class="stat-card"><div class="stat-label">4K FILMS</div><div class="stat-value" id="stat-4k">—</div></div>
+          <div class="stat-card"><div class="stat-label">1080p FILMS</div><div class="stat-value" id="stat-1080">—</div></div>
+        </div>
+      </section>
 
     </div>
-  </section>
+  </div><!-- /tab-stats -->
 
-  <!-- ░░ RESULTS SUMMARY ░░ -->
-  <div class="results-summary" id="results-summary"></div>
-
-  <!-- ░░ MAIN CONTENT ░░ -->
-  <main class="main-content" id="main-content">
-
-    <!-- TABLE VIEW -->
-    <div id="table-view" class="view-panel active">
-      <div class="table-scroll">
-        <table id="movie-table">
-          <thead>
-            <tr>
-              <th class="th-num">#</th>
-              <th class="th-title sortable" data-sort="title-asc">TITLE</th>
-              <th class="th-res">RES</th>
-              <th class="th-rating">MATURITY</th>
-              <th class="th-year sortable" data-sort="year-desc">YEAR</th>
-              <th class="th-runtime">RUNTIME</th>
-              <th class="th-size sortable" data-sort="size-desc">SIZE</th>
-              <th class="th-imdb sortable" data-sort="imdb-desc">IMDb</th>
-              <th class="th-status">STATUS</th>
-              <th class="th-link">LINK</th>
-            </tr>
-          </thead>
-          <tbody id="table-body"></tbody>
-        </table>
-      </div>
-      <div class="empty-state" id="table-empty" hidden>
-        <span class="empty-icon">◻</span>
-        <p>No films match your search.</p>
-      </div>
-    </div>
-
-    <!-- GRID VIEW -->
-    <div id="grid-view" class="view-panel">
-      <div class="movie-grid" id="movie-grid"></div>
-      <div class="empty-state" id="grid-empty" hidden>
-        <span class="empty-icon">◻</span>
-        <p>No films match your search.</p>
-      </div>
-    </div>
-
-  </main>
-
-  <!-- ░░ TOAST ░░ -->
+  <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
-  <!-- ░░ SITE FOOTER ░░ -->
+  <!-- FOOTER -->
   <footer class="site-footer-bar">
     <div class="site-footer-inner">
       <div class="footer-brand">
@@ -200,21 +234,8 @@
       <div class="footer-form-wrap">
         <p class="footer-form-label">LEAVE A COMMENT OR QUESTION</p>
         <div class="footer-form">
-          <input
-            type="text"
-            id="footer-name"
-            placeholder="Your name (optional)"
-            autocomplete="off"
-            spellcheck="false"
-            maxlength="80"
-          />
-          <textarea
-            id="footer-message"
-            placeholder="Message, question, request anything…"
-            rows="3"
-            maxlength="1000"
-            spellcheck="false"
-          ></textarea>
+          <input type="text" id="footer-name" placeholder="Your name (optional)" autocomplete="off" spellcheck="false" maxlength="80" />
+          <textarea id="footer-message" placeholder="Message, question, request anything…" rows="3" maxlength="1000" spellcheck="false"></textarea>
           <button class="footer-submit-btn" id="footer-submit">SEND</button>
           <small class="footer-form-status" id="footer-form-status" hidden></small>
         </div>
