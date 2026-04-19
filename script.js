@@ -329,18 +329,21 @@ function setProgress(pct) {
  * Apps Script redirects to a Google-CDN URL that has proper CORS headers,
  * so we must follow redirects without locking the mode to 'cors'.
  */
-async function fetchURL(url) {
-  return fetch(url, { redirect: 'follow' });
+async function fetchURL(url, bustCache = false) {
+  if (bustCache) {
+    url += (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+  }
+  return fetch(url, { redirect: 'follow', cache: bustCache ? 'no-store' : 'default' });
 }
 
 /**
  * Fetch the Apps Script JSON via a JSONP-style callback to sidestep
  * any remaining CORS preflight issues. Falls back to direct fetch.
  */
-function fetchScriptJSON(url) {
+function fetchScriptJSON(url, bustCache = false) {
   return new Promise((resolve, reject) => {
     // Primary: plain fetch with redirect following (works in most cases)
-    fetchURL(url)
+    fetchURL(url, bustCache)
       .then(r => {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -367,7 +370,8 @@ function fetchScriptJSON(url) {
         };
 
         // Apps Script supports ?callback= for JSONP
-        script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+        const jsonpUrl = bustCache ? url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now() : url;
+        script.src = jsonpUrl + (jsonpUrl.includes('?') ? '&' : '?') + 'callback=' + cbName;
         script.onerror = () => { cleanup(); reject(new Error('JSONP script error')); };
         document.head.appendChild(script);
       });
@@ -421,13 +425,13 @@ function patchGridCards() {
   applyFilters();
 }
 
-async function loadData(sheetURL, scriptURL) {
+async function loadData(sheetURL, scriptURL, forceRefresh = false) {
   setProgress(10);
   let csvRows = [];
 
   // ── 1. Fetch CSV ──
   try {
-    const r = await fetchURL(sheetURL);
+    const r = await fetchURL(sheetURL, forceRefresh);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const text = await r.text();
     csvRows = parseCSV(text);
@@ -437,8 +441,8 @@ async function loadData(sheetURL, scriptURL) {
     console.error('CSV fetch error:', e);
   }
 
-  // ── 2. Render immediately from cache if available ──
-  const cached = loadCache();
+  // ── 2. Render immediately from cache if available (skipped on force refresh) ──
+  const cached = forceRefresh ? null : loadCache();
   if (cached) {
     applyDriveData(cached, csvRows);
     setProgress(100);
@@ -459,7 +463,7 @@ async function loadData(sheetURL, scriptURL) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         if (attempt > 0) await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
-        driveData = await fetchScriptJSON(driveURL);
+        driveData = await fetchScriptJSON(driveURL, forceRefresh);
         if (driveData && driveData.error) throw new Error(driveData.error);
         break; // success
       } catch (e) {
@@ -821,8 +825,8 @@ if (refreshBtn) {
     try { localStorage.removeItem(LOCAL_REQUEST_KEY); } catch(e) {}
     requestCounts = {};
 
-    // Re-fetch everything fresh
-    await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL);
+    // Re-fetch everything fresh — bypass cache and bust browser/CDN caches
+    await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL, true);
 
     refreshBtn.classList.remove('spinning');
   });
