@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0HtsaUNDtdZe9nAG2XZ50dHCGqX94il98ljF6h4Txn1yX1WLoQ5DO7tsb3lPzQGsEWg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJ_r2mWynf0YqcPz2Gmo4MOhl4ElrowNc1eQUSbGKx6xi4hcTX2Ni01YMzeDTrtpvM/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -572,6 +572,23 @@ function ratingClass(rating) {
 
 /** Show toast notification */
 let toastTimer;
+
+/** Fire-and-forget log of a client-side event to the server */
+function logClientEvent(event, detail) {
+  if (!DRIVE_SCRIPT_URL) return;
+  const cbName = '__logCallback_' + Date.now();
+  const script = document.createElement('script');
+  window[cbName] = function() { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); };
+  script.src = DRIVE_SCRIPT_URL
+    + '?action=logEvent'
+    + '&event='  + encodeURIComponent(event)
+    + '&detail=' + encodeURIComponent(detail || '')
+    + '&key='    + encodeURIComponent(getSavedKey() || '')
+    + '&callback=' + cbName;
+  script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
+
 function showToast(msg, duration = 3000) {
   toast.textContent = msg;
   toast.classList.add('show');
@@ -1092,13 +1109,14 @@ clearSearch.addEventListener('click', () => {
 });
 
 // Filters / sort
-filterRes.addEventListener('change',  () => { render(); saveSettings(); });
-filterMat.addEventListener('change',  () => { render(); saveSettings(); });
-filterStat.addEventListener('change', () => { render(); saveSettings(); });
+filterRes.addEventListener('change',  () => { render(); saveSettings(); logClientEvent('Filter Resolution', filterRes.value || 'All'); });
+filterMat.addEventListener('change',  () => { render(); saveSettings(); logClientEvent('Filter Maturity', filterMat.value || 'All'); });
+filterStat.addEventListener('change', () => { render(); saveSettings(); logClientEvent('Filter Status', filterStat.value || 'All'); });
 sortBy.addEventListener('change', () => {
   currentSort = sortBy.value;
   applySort();
   saveSettings();
+  logClientEvent('Sort', sortBy.value);
 });
 
 // Column header sort
@@ -1118,6 +1136,7 @@ document.querySelectorAll('th.sortable').forEach(th => {
     th.classList.add('sort-active');
     applySort();
     saveSettings();
+    logClientEvent('Sort', currentSort);
   });
 });
 
@@ -1133,6 +1152,7 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
     gridView.classList.toggle('active', v === 'grid');
     renderCurrentView();
     saveSettings();
+    logClientEvent('Switch View', v);
   });
 });
 
