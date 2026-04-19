@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxL942_SfPWPGZv5wvyiM2gIqpGrd2OCTorTcSpOutWGWTjgXpCvLTJyF9npD_FkCuCsw/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxK2M-Wzb2KUb7Fioq6AQNHFUE3OLrnoBatQxIKnDcox5AIHkEXIMiVzXIzhRoYSPNs/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -314,6 +314,70 @@ async function postRequest(title) {
 // requestCounts starts empty — server data fills it in applyDriveData()
 requestCounts = {};
 
+// ─── RATINGS (thumbs up / down for available movies) ─────────────
+// userRatings — persisted locally: { normalizedTitle: 'up' | 'down' }
+// ratingCounts — from server: { normalizedTitle: { up: N, down: N } }
+
+const LOCAL_RATINGS_KEY = 'thedrive_ratings_v1';
+let ratingCounts = {}; // filled by applyDriveData
+
+function loadUserRatings() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_RATINGS_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveUserRatings() {
+  try { localStorage.setItem(LOCAL_RATINGS_KEY, JSON.stringify(userRatings)); } catch(e) {}
+}
+let userRatings = loadUserRatings();
+
+function getUserRating(title) {
+  return userRatings[normalize(title)] || null;
+}
+function getRatingCount(title, type) {
+  return (ratingCounts[normalize(title)] || {})[type] || 0;
+}
+
+async function postRating(title, type) {
+  const key = normalize(title);
+  const prev = userRatings[key];
+
+  // Toggle off if clicking the same type again
+  if (prev === type) {
+    delete userRatings[key];
+  } else {
+    userRatings[key] = type;
+  }
+  saveUserRatings();
+
+  // Optimistically update local counts
+  if (!ratingCounts[key]) ratingCounts[key] = { up: 0, down: 0 };
+  if (prev) ratingCounts[key][prev] = Math.max(0, (ratingCounts[key][prev] || 0) - 1);
+  if (userRatings[key]) ratingCounts[key][type] = (ratingCounts[key][type] || 0) + 1;
+
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
+
+  // Fire and forget — JSONP to Apps Script
+  const cbName = '__ratingCallback_' + Date.now();
+  const script = document.createElement('script');
+  const timer = setTimeout(() => {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }, 10000);
+  window[cbName] = function() {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  };
+  script.src = DRIVE_SCRIPT_URL
+    + '?action=rateMovie'
+    + '&title=' + encodeURIComponent(title)
+    + '&type='  + encodeURIComponent(type)
+    + '&prev='  + encodeURIComponent(prev || '')
+    + '&callback=' + cbName;
+  script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
+
 // ─── SETTINGS PERSISTENCE ────────────────────────────────────
 const LOCAL_SETTINGS_KEY = 'thedrive_settings_v1';
 
@@ -608,6 +672,12 @@ function applyDriveData(rawData, csvRows) {
       requestCounts[normalize(k)] = v;
     }
   }
+  if (rawData.ratings) {
+    ratingCounts = {};
+    for (const [k, v] of Object.entries(rawData.ratings)) {
+      ratingCounts[normalize(k)] = v; // v = { up: N, down: N }
+    }
+  }
   const videoMimeTypes = ['video/', 'application/octet-stream'];
   const driveMap = Object.fromEntries(
     Object.entries(rawMovies).filter(([, val]) =>
@@ -829,6 +899,22 @@ function renderCurrentView() {
   }
 }
 
+
+/** Build the rating widget HTML for a movie */
+function ratingHTML(title) {
+  const userVote = getUserRating(title);
+  const ups   = getRatingCount(title, 'up');
+  const downs = getRatingCount(title, 'down');
+  return `<div class="rating-wrap">
+    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it">
+      ▲<span class="rating-count">${ups || ''}</span>
+    </button>
+    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="down" title="Didn't like it">
+      ▼<span class="rating-count">${downs || ''}</span>
+    </button>
+  </div>`;
+}
+
 function renderTable() {
   tableBody.innerHTML = '';
 
@@ -859,7 +945,7 @@ function renderTable() {
       </td>
       <td class="td-link">
         ${m.driveLink
-          ? `<a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener">▶ WATCH</a>`
+          ? `<div class="td-link-inner"><a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener">▶ WATCH</a>${ratingHTML(m.title)}</div>`
           : iRequested
             ? `<button class="request-btn request-btn--done" data-title="${escHtml(m.title)}"><span class="request-icon">✓</span> REQUESTED${reqCount ? ' <span class="request-count">' + reqCount + '</span>' : ''}</button>`
             : `<button class="request-btn" data-title="${escHtml(m.title)}"><span class="request-icon">＋</span> REQUEST${reqCount ? ' <span class="request-count">' + reqCount + '</span>' : ''}</button>`}
@@ -909,6 +995,7 @@ function renderGrid() {
             ? `<button class="request-btn request-btn--done" data-title="${escHtml(m.title)}"><span class="request-icon">✓</span> REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</button>`
             : `<button class="request-btn" data-title="${escHtml(m.title)}"><span class="request-icon">＋</span> REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</button>`}
       </div>
+      ${m.driveLink ? `<div class="card-rating-row">${ratingHTML(m.title)}</div>` : ''}
     `;
     frag.appendChild(card);
   });
@@ -984,6 +1071,32 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
     renderCurrentView();
     saveSettings();
   });
+});
+
+// Rating buttons (event delegation on main content)
+$('main-content').addEventListener('click', async e => {
+  const btn = e.target.closest('.rating-btn');
+  if (!btn) return;
+
+  const title = btn.dataset.ratingTitle;
+  const type  = btn.dataset.ratingType;
+  if (!title || !type) return;
+
+  await postRating(title, type);
+
+  // Re-render all matching rating widgets in the DOM
+  document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
+    const userVote = getUserRating(title);
+    const isUp = b.dataset.ratingType === 'up';
+    b.classList.toggle('active', userVote === b.dataset.ratingType);
+    const countEl = b.querySelector('.rating-count');
+    if (countEl) countEl.textContent = getRatingCount(title, b.dataset.ratingType) || '';
+  });
+
+  const userVote = getUserRating(title);
+  if (userVote === 'up')   showToast('▲ You liked ' + title);
+  else if (userVote === 'down') showToast('▼ You disliked ' + title);
+  else showToast('Rating removed for ' + title);
 });
 
 // Request button (event delegation on main content)
