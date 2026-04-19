@@ -258,7 +258,7 @@ function hasUserRequested(title) {
 
 // ── Server counts ──
 function getRatingScore(title) {
-  const r = allRatings[normalize(title)];
+  const r = ratingCounts[normalize(title)];
   if (!r) return 0;
   return (r.up || 0) - (r.down || 0);
 }
@@ -1161,21 +1161,20 @@ sortDirBtn.addEventListener('click', () => {
 // Column header sort
 document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
-    const s = th.dataset.sort;
-    // Toggle direction if same key
-    const [key] = s.split('-');
-    const [curKey, curDir] = currentSort.split('-');
-    if (curKey === key) {
-      currentSort = key + '-' + (curDir === 'asc' ? 'desc' : 'asc');
+    const [key, defaultDir] = th.dataset.sort.split('-');
+    if (currentSort === key) {
+      currentDir = currentDir === 'asc' ? 'desc' : 'asc';
     } else {
-      currentSort = s;
+      currentSort = key;
+      currentDir = defaultDir || 'desc';
     }
-    sortBy.value = currentSort;
+    sortDirBtn.textContent = currentDir === 'desc' ? '↓' : '↑';
+    if (sortBy.querySelector(`option[value="${key}"]`)) sortBy.value = key;
     document.querySelectorAll('th.sortable').forEach(t => t.classList.remove('sort-active'));
     th.classList.add('sort-active');
     applySort();
     saveSettings();
-    logClientEvent('Sort', currentSort);
+    logClientEvent('Sort', currentSort + '-' + currentDir);
   });
 });
 
