@@ -1395,33 +1395,29 @@ tbody tr:hover td { background: var(--surface2); }
 /* ── SORT ROW + DIRECTION BUTTON ── */
 .sort-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
 }
 
 .sort-row select {
   flex: 1;
+  min-width: 0;
 }
 
 .sort-dir-btn {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 14px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
   cursor: pointer;
-  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  padding: 6px 9px;
+  border-radius: 4px;
+  font-size: 14px;
   line-height: 1;
+  transition: background var(--transition), color var(--transition);
 }
 
 .sort-dir-btn:hover {
-  background: var(--surface3, var(--surface2));
-  border-color: var(--accent);
-  color: var(--accent);
+  color: var(--text);
+  background: var(--border);
 }
