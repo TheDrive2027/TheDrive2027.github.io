@@ -837,6 +837,108 @@ tbody tr:hover td { background: var(--surface2); }
   color: var(--text);
 }
 
+
+/* ── ACCESS GATE MODAL ── */
+.gate-overlay-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gate-box {
+  text-align: center;
+  padding: 48px 40px 40px;
+  animation: modal-in .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+.gate-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.gate-logo-text {
+  font-family: var(--font-head);
+  font-size: 28px;
+  letter-spacing: 5px;
+  color: var(--text);
+}
+
+.gate-logo .logo-mark {
+  font-size: 20px;
+  color: var(--accent);
+  animation: pulse-mark 3s ease-in-out infinite;
+}
+
+.gate-byline {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  opacity: 0.55;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+
+.gate-title {
+  font-size: 26px;
+  margin-bottom: 10px;
+}
+
+.gate-desc {
+  font-size: 13px;
+  margin-bottom: 28px;
+  line-height: 1.65;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.modal-field { text-align: left; }
+
+#gate-key-input {
+  font-size: 14px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 14px;
+}
+
+.gate-error {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--red);
+  font-family: var(--font-mono);
+  letter-spacing: .5px;
+  text-align: center;
+}
+
+.gate-submit-btn {
+  margin-top: 16px;
+  position: relative;
+}
+
+.gate-submit-btn.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.gate-submit-btn.loading::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: var(--bg);
+  border-radius: 50%;
+  animation: spin-refresh .7s linear infinite;
+}
+
 /* ── TOAST ── */
 .toast {
   position: fixed;
