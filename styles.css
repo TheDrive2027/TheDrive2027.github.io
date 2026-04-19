@@ -135,6 +135,15 @@ body {
   border-top-color: transparent;
 }
 
+.scan-patience {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 .scan-label {
   font-family: var(--font-mono);
   font-size: 9px;
