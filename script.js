@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytc-0nc-3uuCh9RrRtU_yrTLxDCGb_cNZl_dJYyCaNuiwYl7DPt13fI1TKzIa9DJXL/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwL7z3o6TAUd6D8WXWqdr4nLY5yxQslmV6WFx6PQBY8KJrXztv05wyEeS2_Io3-L0EKxQ/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
@@ -588,10 +588,9 @@ function renderTable() {
       <td class="td-link">
         ${m.driveLink
           ? `<a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener">▶ WATCH</a>`
-          : `<button class="request-btn" data-title="${escHtml(m.title)}">
-               <span class="request-icon">＋</span> REQUEST
-               ${reqCount ? `<span class="request-count">${reqCount}</span>` : ''}
-             </button>`}
+          : reqCount
+            ? `<button class="request-btn request-btn--done" data-title="${escHtml(m.title)}"><span class="request-icon">✓</span> REQUESTED <span class="request-count">${reqCount}</span></button>`
+            : `<button class="request-btn" data-title="${escHtml(m.title)}"><span class="request-icon">＋</span> REQUEST</button>`}
       </td>
     `;
     frag.appendChild(tr);
@@ -633,10 +632,9 @@ function renderGrid() {
         </span>
         ${m.driveLink
           ? `<a class="drive-link" href="${m.driveLink}" target="_blank" rel="noopener">▶</a>`
-          : `<button class="request-btn" data-title="${escHtml(m.title)}">
-               <span class="request-icon">＋</span> REQUEST
-               ${cardReqCount ? `<span class="request-count">${cardReqCount}</span>` : ''}
-             </button>`}
+          : cardReqCount
+            ? `<button class="request-btn request-btn--done" data-title="${escHtml(m.title)}"><span class="request-icon">✓</span> REQUESTED <span class="request-count">${cardReqCount}</span></button>`
+            : `<button class="request-btn" data-title="${escHtml(m.title)}"><span class="request-icon">＋</span> REQUEST</button>`}
       </div>
     `;
     frag.appendChild(card);
@@ -714,35 +712,35 @@ document.querySelectorAll('.toggle-btn').forEach(btn => {
 // Request button (event delegation on main content)
 $('main-content').addEventListener('click', async e => {
   const btn = e.target.closest('.request-btn');
-  if (!btn) return;
+  if (!btn || btn.classList.contains('request-btn--done')) return;
 
-  // Disable immediately to prevent double-clicks
   btn.disabled = true;
   const title = btn.dataset.title;
 
-  // Update all matching buttons immediately (optimistic UI)
-  function updateButtons(count) {
-    document.querySelectorAll(`.request-btn[data-title="${CSS.escape(title)}"]`).forEach(b => {
-      b.disabled = false;
-      const countEl = b.querySelector('.request-count');
-      countEl.textContent = count;
-      b.classList.add('request-btn--fired');
-      setTimeout(() => b.classList.remove('request-btn--fired'), 600);
-    });
-  }
-
-  // Increment locally and show immediately — no view switch needed
+  // Optimistically update all matching buttons right away
   const optimisticCount = (requestCounts[normalize(title)] || 0) + 1;
-  updateButtons(optimisticCount);
+  setRequestedState(title, optimisticCount);
 
-  // Then fire the real POST and correct the count if the server differs
+  // Fire POST and correct count if server differs
   const serverCount = await postRequest(title);
   if (serverCount !== optimisticCount) {
-    updateButtons(serverCount);
+    setRequestedState(title, serverCount);
   }
 
-  showToast(`📌 Requested: ${title}`);
+  showToast('✓ Requested: ' + title);
 });
+
+function setRequestedState(title, count) {
+  document.querySelectorAll('.request-btn[data-title="' + CSS.escape(title) + '"]').forEach(b => {
+    b.disabled = false;
+    b.classList.add('request-btn--done');
+    // Replace inner content with checkmark + count
+    const countHtml = count ? '<span class="request-count">' + count + '</span>' : '';
+    b.innerHTML = '<span class="request-icon">✓</span> REQUESTED ' + countHtml;
+    // Re-attach data-title since innerHTML wipe keeps the attribute
+    b.dataset.title = title;
+  });
+}
 
 // ─── INIT ─────────────────────────────────────────────────────
 
