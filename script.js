@@ -697,6 +697,7 @@ function parseRuntimeMinutes(str) {
 
 /** Maturity rating sort order */
 const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'PG13': 3, 'R': 4, 'NC-17': 5, 'NR': 6 };
+const RES_ORDER = { '4K': 4, '2160P': 4, '1080P': 3, '1080': 3, '720P': 2, '720': 2, 'SD': 1 };
 
 /** IMDb rating CSS class */
 function imdbClass(rating) {
@@ -1115,6 +1116,18 @@ function applySort() {
     else if (key === 'runtime') { va = parseRuntimeMinutes(a.runtime); vb = parseRuntimeMinutes(b.runtime); }
     else if (key === 'maturity') { va = MATURITY_ORDER[a.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; vb = MATURITY_ORDER[b.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; }
     else if (key === 'status') { va = a.available ? 0 : 1; vb = b.available ? 0 : 1; }
+    else if (key === 'res') {
+      va = RES_ORDER[(a.resolution || '').toUpperCase().replace(/[^A-Z0-9]/g,'')] || 0;
+      vb = RES_ORDER[(b.resolution || '').toUpperCase().replace(/[^A-Z0-9]/g,'')] || 0;
+    }
+    else if (key === 'link') {
+      // Primary: rating score (upvotes - downvotes), Secondary: request count, Tertiary: unrequested last
+      const raA = getRatingScore(a.title),  raB = getRatingScore(b.title);
+      const rqA = getRequestCount(a.title), rqB = getRequestCount(b.title);
+      if (raA !== raB) return raB - raA;
+      if (rqA !== rqB) return rqB - rqA;
+      return 0;
+    }
 
     if (va < vb) return dir === 'asc' ? -1 : 1;
     if (va > vb) return dir === 'asc' ? 1 : -1;
