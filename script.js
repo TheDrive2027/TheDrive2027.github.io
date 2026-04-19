@@ -260,11 +260,6 @@ async function initWithGate() {
     }
   }
 
-      showDenied();
-      return; // stop here — never show the gate or load data
-    }
-  }
-
   // ── Step 2: normal gate / saved-key flow ──
   const savedKey = getSavedKey();
 
