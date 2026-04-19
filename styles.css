@@ -243,16 +243,19 @@ body {
 
 .controls-inner {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
 }
 
 /* Search */
-.search-wrap {
-  position: relative;
+.search-group {
   flex: 1;
   min-width: 220px;
+}
+
+.search-wrap {
+  position: relative;
 }
 
 .search-icon {
@@ -343,6 +346,9 @@ select:focus { border-color: var(--accent); }
   border: 1px solid var(--border2);
   border-radius: var(--radius);
   padding: 3px;
+}
+
+.view-group {
   margin-left: auto;
 }
 
@@ -1406,12 +1412,12 @@ tbody tr:hover td { background: var(--surface2); }
 
 .sort-dir-btn {
   flex-shrink: 0;
-  background: none;
+  background: var(--surface2);
   border: 1px solid var(--border2);
   color: var(--text-dim);
   cursor: pointer;
-  padding: 6px 9px;
-  border-radius: 4px;
+  padding: 8px 11px;
+  border-radius: var(--radius);
   font-size: 14px;
   line-height: 1;
   transition: background var(--transition), color var(--transition), border-color var(--transition);
