@@ -1952,6 +1952,7 @@ function chartOptions(yLabel) {
 function presenceChartOptions() {
   const base = chartOptions('Users');
   // Show time-of-day ticks every hour on the x-axis
+  base.scales.x.type = 'category';
   base.scales.x.ticks = {
     color: '#78788f',
     font: { family: 'DM Mono', size: 10 },
