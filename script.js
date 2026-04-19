@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8zt6JfblBPJJOHP9WJ87M2CL0HPuaGgdbKBf1brmGvcYx2xh9G-8ZK5EGNA0HDtCRxA/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzrnCQ-4-ybEp5_qzQ_4NU34Gm1KEkEnTp6B77ANbCvdDNVVJcz_aaRfsVXVHDgXyfy6g/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -241,6 +241,7 @@ async function initWithGate() {
       script.src = DRIVE_SCRIPT_URL
         + '?action=checkDevice'
         + '&did='      + encodeURIComponent(getDeviceId())
+        + '&key='      + encodeURIComponent(getSavedKey() || '')
         + '&callback=' + cbName
         + '&_cb='      + Date.now();
       script.onerror = () => { cleanup(); resolve({ allowed: true }); };
@@ -248,6 +249,17 @@ async function initWithGate() {
     });
 
     if (deviceCheck.allowed === false) {
+      showDenied();
+      return; // stop here — never show the gate or load data
+    }
+
+    // Key column was cleared in the Devices sheet — wipe locally and
+    // force them to re-enter a key, but don't block them entirely.
+    if (deviceCheck.keyCleared) {
+      try { localStorage.removeItem(LOCAL_KEY_STORE); } catch(e) {}
+    }
+  }
+
       showDenied();
       return; // stop here — never show the gate or load data
     }
