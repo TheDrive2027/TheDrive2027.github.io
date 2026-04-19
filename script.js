@@ -1954,6 +1954,13 @@ function presenceChartOptions(times) {
       return times[val] || '';
     }
   };
+  // Override tooltip so the title shows HH:MM instead of the numeric index
+  base.plugins.tooltip.callbacks = {
+    title: function(tooltipItems) {
+      const idx = tooltipItems[0].dataIndex;
+      return times[idx] || '';
+    }
+  };
   return base;
 }
 
