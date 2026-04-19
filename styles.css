@@ -825,6 +825,19 @@ tbody tr:hover td { background: var(--surface2); }
   transform: scale(1.08);
 }
 
+.request-btn--done {
+  background: rgba(62,207,116,.08);
+  border-color: rgba(62,207,116,.3);
+  color: var(--green);
+  cursor: default;
+}
+
+.request-btn--done:hover {
+  background: rgba(62,207,116,.08);
+  border-color: rgba(62,207,116,.3);
+  color: var(--green);
+}
+
 .request-icon {
   font-size: 12px;
   line-height: 1;
