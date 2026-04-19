@@ -653,7 +653,9 @@ const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
 
 function saveCache(data) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+    // Strip ratings from the cache — they're stored separately and refreshed every load
+    const { ratings, ...rest } = data;
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: rest }));
   } catch(e) {}
 }
 
@@ -684,9 +686,18 @@ function applyDriveData(rawData, csvRows) {
   }
   if (rawData.ratings) {
     ratingCounts = {};
+    try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
     for (const [k, v] of Object.entries(rawData.ratings)) {
       ratingCounts[normalize(k)] = v; // v = { up: N, down: N }
     }
+    // Store separately from the Drive cache so ratings are always fresh on load
+    try { localStorage.setItem('thedrive_rating_counts_v1', JSON.stringify(ratingCounts)); } catch(e) {}
+  } else {
+    // No ratings in this response — load from our separate store as fallback
+    try {
+      const stored = JSON.parse(localStorage.getItem('thedrive_rating_counts_v1') || '{}');
+      ratingCounts = stored;
+    } catch(e) {}
   }
   const videoMimeTypes = ['video/', 'application/octet-stream'];
   const driveMap = Object.fromEntries(
@@ -1155,6 +1166,7 @@ if (refreshBtn) {
     try { localStorage.removeItem(LOCAL_REQUEST_KEY); } catch(e) {}
     requestCounts = {};
     ratingCounts = {};
+    try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
 
     // Re-fetch everything fresh — bypass cache and bust browser/CDN caches
     await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL, true);
