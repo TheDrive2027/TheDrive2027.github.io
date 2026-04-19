@@ -91,8 +91,9 @@ let gateResolveFn = null; // resolved when the gate is passed
 /**
  * Switches the gate modal into "Access Denied" mode:
  *  - Title changes to ACCESS DENIED
+ *  - A subtitle "Your device has been blocked" appears beneath
  *  - Input field group is hidden
- *  - Button becomes a non-interactive lock icon
+ *  - Button becomes a non-interactive SVG lock icon
  */
 function showDenied() {
   const overlay   = document.getElementById('gate-overlay');
@@ -100,18 +101,34 @@ function showDenied() {
   const fieldEl   = overlay && overlay.querySelector('.modal-field');
   const submitBtn = document.getElementById('gate-submit');
 
-  if (overlay)   overlay.classList.remove('gate-overlay-hidden');
-  if (titleEl)   titleEl.textContent = 'ACCESS DENIED';
-  if (fieldEl)   fieldEl.style.display = 'none';
+  if (overlay) overlay.classList.remove('gate-overlay-hidden');
+
+  if (titleEl) {
+    titleEl.textContent = 'ACCESS DENIED';
+
+    // Insert subtitle beneath the title if not already there
+    if (!overlay.querySelector('.gate-denied-msg')) {
+      const msg = document.createElement('p');
+      msg.className = 'gate-denied-msg';
+      msg.textContent = 'Your device has been blocked';
+      titleEl.insertAdjacentElement('afterend', msg);
+    }
+  }
+
+  if (fieldEl) fieldEl.style.display = 'none';
+
   if (submitBtn) {
     submitBtn.classList.remove('loading');
-    submitBtn.textContent = '🔒';
-    submitBtn.style.fontSize = '1.4rem';
-    submitBtn.style.cursor   = 'default';
-    submitBtn.style.opacity  = '0.6';
+    submitBtn.classList.add('denied');
     submitBtn.disabled = true;
+    // SVG lock icon (Lucide-style outline)
+    submitBtn.innerHTML = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>`;
   }
 }
+
 
 function showGate() {
   return new Promise(resolve => {
