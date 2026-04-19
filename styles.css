@@ -77,6 +77,24 @@ body {
   padding: 16px 28px;
 }
 
+
+.logo-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logo-byline {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  opacity: 0.55;
+  text-transform: uppercase;
+  padding-left: 2px;
+  user-select: none;
+}
+
 .logo {
   display: flex;
   align-items: center;
