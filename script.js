@@ -221,17 +221,6 @@ function showGate() {
 async function initWithGate() {
   const overlay = document.getElementById('gate-overlay');
 
-  // ── Pre-populate UI immediately if a key is already saved ──
-  // This runs before any network calls so the user sees their cached key
-  // and a "Checking permissions…" loading state instead of a blank gate.
-  const earlySavedKey = getSavedKey();
-  if (earlySavedKey && overlay) {
-    const earlyInput  = document.getElementById('gate-key-input');
-    const earlyBtn    = document.getElementById('gate-submit');
-    if (earlyInput) { earlyInput.value = earlySavedKey; earlyInput.disabled = true; }
-    if (earlyBtn)   { earlyBtn.textContent = 'CHECKING PERMISSIONS…'; earlyBtn.classList.add('loading'); }
-  }
-
   // ── Step 1: silently check if this device is blocked ──
   // Do this before showing anything — blocked devices skip the gate entirely
   // and go straight to the denied screen.
@@ -991,6 +980,7 @@ function mergeData(rows, driveMap, posterMap = {}) {
   // Normalize column names: handles "Title", "title", "Movie Title", etc.
   const mapped = rows.map(row => {
     const title       = row.title || row.movie_title || row['movie title'] || '';
+    const runtime     = row.runtime || row.run_time || row.duration || '';
     const resolution  = row.resolution || row.res || '';
     const maturityRating = row.maturity_rating || row.rating || row.maturityrating || '';
     const releaseDate = row.release_date || row.releasedate || row.date || '';
@@ -1003,6 +993,7 @@ function mergeData(rows, driveMap, posterMap = {}) {
 
     return {
       title,
+      runtime,
       resolution,
       maturityRating,
       releaseDate,
@@ -1164,6 +1155,7 @@ function renderTable() {
       <td class="td-res"><span class="${resClass(m.resolution)}">${escHtml(m.resolution) || '—'}</span></td>
       <td class="td-rating"><span class="${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span></td>
       <td class="td-year">${escHtml(m.year)}</td>
+      <td class="td-runtime">${escHtml(m.runtime) || '—'}</td>
       <td class="td-size">${escHtml(m.fileSize) || '—'}</td>
       <td class="td-imdb"><span class="${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span></td>
       <td>
@@ -1218,6 +1210,7 @@ function renderGrid() {
         <span class="card-year">${escHtml(m.year)}</span>
         <span class="card-sep">·</span>
         <span class="card-rating ${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span>
+        ${m.runtime ? `<span class="card-sep">·</span><span class="card-runtime">${escHtml(m.runtime)}</span>` : ''}
         ${m.fileSize ? `<span class="card-sep">·</span><span class="card-size">${escHtml(m.fileSize)}</span>` : ''}
       </div>
       <div class="card-row">
