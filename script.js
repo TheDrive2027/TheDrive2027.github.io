@@ -1094,10 +1094,22 @@ function escHtml(str) {
 
 // Search
 let searchTimer;
+let searchLogTimer;
 searchInput.addEventListener('input', () => {
-  clearSearch.classList.toggle('visible', searchInput.value.length > 0);
+  const query = searchInput.value;
+  clearSearch.classList.toggle('visible', query.length > 0);
+
+  // Render immediately (debounced 200ms)
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => { render(); saveSettings(); }, 200);
+
+  // Log the search query after the user pauses for 1.5s (non-empty only)
+  clearTimeout(searchLogTimer);
+  if (query.trim().length > 0) {
+    searchLogTimer = setTimeout(() => {
+      logClientEvent('Search', query.trim());
+    }, 1500);
+  }
 });
 
 clearSearch.addEventListener('click', () => {
