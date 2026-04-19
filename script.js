@@ -361,11 +361,14 @@ function loadCache() {
 function applyDriveData(rawData, csvRows) {
   const rawMovies = rawData.movies || rawData;
   posterMap = rawData.posters || {};
-  // Merge server counts with local — take the higher of the two per title
-  // so locally-clicked counts never get wiped by a stale server response
+  // On page load, always replace local counts with the authoritative server counts.
+  // This ensures a refresh clears any stale local state and reflects the true
+  // total from the Requests sheet. Any optimistic local increments from THIS
+  // session (not yet in requestCounts) are already committed to the server.
   if (rawData.requests) {
+    requestCounts = {};
     for (const [k, v] of Object.entries(rawData.requests)) {
-      requestCounts[k] = Math.max(requestCounts[k] || 0, v);
+      requestCounts[k] = v;
     }
     saveLocalCounts();
   }
