@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxHchSy9iI4ahmyX2N0OyeTFVJvTnm4BQzRZkCRONkYY73AMFqSQ4AuX12LMpOZTtqNg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8QRBHSDR29-80kHdKZYit1nGCCrOkQiEO9takJc-Cmiq1nBXkC-L53rRDZXAbshNS/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -718,6 +718,43 @@ function patchGridCards() {
   applyFilters();
 }
 
+
+/** Fetch fresh ratings from the server and re-render any visible rating widgets */
+function fetchRatings(scriptURL) {
+  return new Promise(resolve => {
+    const cbName = '__ratingsCallback_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      resolve();
+    }, 10000);
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      if (data && data.ratings) {
+        ratingCounts = {};
+        for (const [k, v] of Object.entries(data.ratings)) {
+          ratingCounts[normalize(k)] = v;
+        }
+        // Patch all visible rating count elements without a full re-render
+        document.querySelectorAll('.rating-btn').forEach(b => {
+          const title = b.dataset.ratingTitle;
+          const type  = b.dataset.ratingType;
+          if (!title || !type) return;
+          const countEl = b.querySelector('.rating-count');
+          if (countEl) countEl.textContent = getRatingCount(title, type) || 0;
+        });
+      }
+      resolve();
+    };
+    script.src = scriptURL + '?action=getRatings&callback=' + cbName + '&_cb=' + Date.now();
+    script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); resolve(); };
+    document.head.appendChild(script);
+  });
+}
+
 async function loadData(sheetURL, scriptURL, forceRefresh = false) {
   setProgress(10);
   let csvRows = [];
@@ -780,6 +817,9 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
     setProgress(100);
     setTimeout(() => scanBar.classList.add('hidden'), 300);
   }
+
+  // Always fetch fresh ratings independently — they're not cached with Drive data
+  if (driveURL) fetchRatings(driveURL);
 }
 
 function mergeData(rows, driveMap, posterMap = {}) {
