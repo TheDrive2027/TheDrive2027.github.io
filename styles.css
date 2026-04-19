@@ -244,6 +244,7 @@ body {
 .controls-inner {
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -1416,10 +1417,10 @@ tbody tr:hover td { background: var(--surface2); }
   border: 1px solid var(--border2);
   color: var(--text-dim);
   cursor: pointer;
-  padding: 8px 11px;
+  padding: 8px 12px;
   border-radius: var(--radius);
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
+  line-height: 1.4;
   transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
 
