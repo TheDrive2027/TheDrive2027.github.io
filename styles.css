@@ -766,15 +766,15 @@ tbody tr:hover td { background: var(--surface2); }
   color: var(--green);
 }
 
-/* Counter: green when requested, gold when hovering the done pill */
+/* Counter: gold on hover when unrequested, green always when requested */
+.card-poster--requestable:hover .card-request-btn:not(.card-request-btn--done) .request-count {
+  background: rgba(232, 197, 71, 0.15);
+  color: var(--accent);
+}
+
 .card-request-btn--done .request-count {
   background: rgba(62, 207, 116, 0.15);
   color: var(--green);
-}
-
-.card-request-overlay--done:hover .card-request-btn--done .request-count {
-  background: rgba(232, 197, 71, 0.15);
-  color: var(--accent);
 }
 
 /* Always show the done pill even without hover */
