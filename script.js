@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyq965ygRyHrO1BWbFOB08NofBbXTej3pCpn9jlnroTXT6fD4oMZRQ6HEJ6CVZriYu4Xw/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz-bTZng9kL7wEZsv45GIE9D2_bOcllKdjm712iBnONyHI6rh03d4062guoEjg7YlrpGg/exec';
 
 // ─── DEMO DATA ────────────────────────────────────────────────
 const DEMO_MOVIES = [
