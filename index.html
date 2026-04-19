@@ -11,6 +11,33 @@
 </head>
 <body>
 
+
+  <!-- ░░ ACCESS GATE MODAL ░░ -->
+  <div class="modal-overlay" id="gate-overlay">
+    <div class="modal-box gate-box">
+      <div class="gate-logo">
+        <span class="logo-mark">▶</span>
+        <span class="gate-logo-text">THE DRIVE</span>
+      </div>
+      <div class="gate-byline">Austin Borchardt</div>
+      <h2 class="modal-title gate-title">ACCESS REQUIRED</h2>
+      <p class="modal-desc gate-desc">Enter your access key to continue. Keys are personal — don't share them.</p>
+      <div class="modal-field">
+        <label for="gate-key-input">ACCESS KEY</label>
+        <input
+          type="text"
+          id="gate-key-input"
+          placeholder="XXXX-XXXX-XXXX"
+          autocomplete="off"
+          spellcheck="false"
+          autocapitalize="characters"
+        />
+        <small id="gate-error" class="gate-error" hidden></small>
+      </div>
+      <button class="modal-btn gate-submit-btn" id="gate-submit">ENTER THE DRIVE</button>
+    </div>
+  </div>
+
   <!-- ░░ NOISE OVERLAY ░░ -->
   <div class="noise"></div>
 
