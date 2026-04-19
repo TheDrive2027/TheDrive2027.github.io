@@ -1407,17 +1407,18 @@ tbody tr:hover td { background: var(--surface2); }
 .sort-dir-btn {
   flex-shrink: 0;
   background: none;
-  border: none;
+  border: 1px solid var(--border2);
   color: var(--text-dim);
   cursor: pointer;
   padding: 6px 9px;
   border-radius: 4px;
   font-size: 14px;
   line-height: 1;
-  transition: background var(--transition), color var(--transition);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
 }
 
 .sort-dir-btn:hover {
   color: var(--text);
   background: var(--border);
+  border-color: var(--accent);
 }
