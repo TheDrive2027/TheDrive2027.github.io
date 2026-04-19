@@ -674,7 +674,7 @@ tbody tr:hover td { background: var(--surface2); }
   height: 56px;
   border-radius: 50%;
   background: rgba(232, 197, 71, 0.15);
-  border: 2px solid var(--accent);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -720,7 +720,7 @@ tbody tr:hover td { background: var(--surface2); }
   padding: 9px 18px;
   border-radius: 99px;
   background: rgba(232, 197, 71, 0.12);
-  border: 1.5px solid var(--accent);
+  border: none;
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 200ms ease, transform 200ms cubic-bezier(.34,1.56,.64,1), background 160ms ease;
@@ -755,7 +755,7 @@ tbody tr:hover td { background: var(--surface2); }
 /* "Done" state — green tint */
 .card-request-btn--done {
   background: rgba(62, 207, 116, 0.12) !important;
-  border-color: var(--green) !important;
+  border-color: transparent !important;
   opacity: 1 !important;
   transform: translateY(0) !important;
   cursor: default;
