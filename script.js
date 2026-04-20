@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxNB8CGn3HA8ZtqXtfZN1PJqeyEq0N3DAnxx2KMoausRtKCAvKqz4HHdFnQigjvg4EH5g/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw_GqZhTfa2Fg5e6UhGTEeVrC6C5via2O_pUEoDtgSvLBsfvurC7JPEpqkjGCof5wqGPg/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -978,19 +978,24 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
     console.error('CSV fetch error:', e);
   }
 
-  // ── 2. Render from cache immediately if available (skipped on force refresh) ──
-  const cached = forceRefresh ? null : loadCache();
-  if (cached) {
+  // ── 2. Render stale cache immediately so the page feels instant, then
+  //       always rescan Drive to pick up any new files.
+  //       If this is an explicit force-refresh (refresh button), skip straight
+  //       to the full scan with the scan bar visible.
+  const cached = loadCache();
+  if (cached && !forceRefresh) {
     applyDriveData(cached, csvRows);
     setProgress(100);
     setTimeout(() => scanBar.classList.add('hidden'), 300);
     if (scriptURL && scriptURL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-      fetchRatings(scriptURL, forceRefresh);
+      fetchRatings(scriptURL, false);
+      // Background rescan — updates the display silently when complete
+      loadDataBulkFallback(scriptURL, csvRows, true, true).catch(() => {});
     }
     return;
   }
 
-  // No cache — show all titles immediately without Drive data while we fetch
+  // No cache, or force-refresh — show titles from CSV immediately while scanning
   allMovies = mergeData(csvRows, {}, {});
   render();
   populateResFilter();
@@ -1013,12 +1018,12 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
     } else if (!indexData || indexData.error === 'cache_miss') {
       // Cache is cold (first load after deploy) — fall back to bulk fetch
       console.log('Apps Script cache cold, falling back to bulk fetch…');
-      await loadDataBulkFallback(driveURL, csvRows, forceRefresh);
+      await loadDataBulkFallback(driveURL, csvRows, forceRefresh, false);
       return;
     }
   } catch (e) {
     console.warn('getMovieIndex failed, falling back to bulk fetch:', e);
-    await loadDataBulkFallback(driveURL, csvRows, forceRefresh);
+    await loadDataBulkFallback(driveURL, csvRows, forceRefresh, false);
     return;
   }
 
@@ -1083,10 +1088,10 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
   fetchRatings(driveURL, forceRefresh);
 }
 
-// Fallback for when the Apps Script cache is cold (Drive scan not yet cached).
-// Scans the Drive file-by-file: first fetches the full flat file list via
-// getFileList, then calls scanFile once per file, re-rendering incrementally.
-async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
+// Scans Drive file-by-file using batched scanFiles calls.
+// background=true means the scan runs silently without touching the scan bar
+// (used when stale cache was already shown and we\'re refreshing in the background).
+async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background = false) {
   // ── Step 1: get the flat list of every file in the Drive tree ──
   let files = [];
   try {
@@ -1097,17 +1102,21 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
       throw new Error(listData && listData.error ? listData.error : 'getFileList failed');
     }
   } catch (e) {
-    showToast('⚠ Could not load Drive file list. Check the Script URL & deployment.');
+    if (!background) {
+      showToast('⚠ Could not load Drive file list. Check the Script URL & deployment.');
+      setProgress(100);
+      setTimeout(() => scanBar.classList.add('hidden'), 300);
+    }
     console.error('getFileList error:', e);
-    setProgress(100);
-    setTimeout(() => scanBar.classList.add('hidden'), 300);
     fetchRatings(driveURL, forceRefresh);
     return;
   }
 
   if (files.length === 0) {
-    setProgress(100);
-    setTimeout(() => scanBar.classList.add('hidden'), 300);
+    if (!background) {
+      setProgress(100);
+      setTimeout(() => scanBar.classList.add('hidden'), 300);
+    }
     fetchRatings(driveURL, forceRefresh);
     return;
   }
@@ -1161,7 +1170,9 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
     }
 
     completedFiles += concurrentBatches.reduce((s, b) => s + b.length, 0);
-    setProgress(progressStart + ((completedFiles / total) * (progressEnd - progressStart)));
+    if (!background) {
+      setProgress(progressStart + ((completedFiles / total) * (progressEnd - progressStart)));
+    }
 
     applyDriveData({
       movies:   accumMovies,
@@ -1180,8 +1191,8 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
   };
   saveCache(finalPayload);
 
-  // ── Step 4: write the assembled payload to the Apps Script cache so the
-  //    next load hits getMovieIndex instantly instead of re-scanning Drive.
+  // ── Step 4: write the assembled payload to the Apps Script cache (5-min TTL)
+  //    so the next person to load the site gets it instantly.
   try {
     fetch(driveURL, {
       method:  'POST',
@@ -1196,9 +1207,12 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
     }).catch(() => {}); // fire-and-forget — failure is non-critical
   } catch(e) {}
 
-  setProgress(100);
-  setTimeout(() => scanBar.classList.add('hidden'), 300);
+  if (!background) {
+    setProgress(100);
+    setTimeout(() => scanBar.classList.add('hidden'), 300);
+  }
   fetchRatings(driveURL, forceRefresh);
+  updateLastUpdated();
 }
 
 function mergeData(rows, driveMap, posterMap = {}) {
@@ -1922,8 +1936,8 @@ if (refreshBtn) {
   if (savedSettings) {
     applySettings(savedSettings);
   } else {
-    sortBy.value = 'rating';
-    currentSort = 'rating';
+    sortBy.value = 'imdb';
+    currentSort = 'imdb';
     currentDir  = 'desc';
     sortDirBtn.textContent = '↓';
   }
