@@ -1415,6 +1415,11 @@ function renderTable() {
 }
 
 function renderGrid() {
+  // Track which cards are already rendered so we only animate new arrivals.
+  const existingKeys = new Set(
+    Array.from(movieGrid.querySelectorAll('.movie-card[data-key]'))
+      .map(el => el.dataset.key)
+  );
   movieGrid.innerHTML = '';
 
   if (filtered.length === 0) {
@@ -1426,8 +1431,15 @@ function renderGrid() {
   const frag = document.createDocumentFragment();
   filtered.forEach((m, i) => {
     const card = document.createElement('div');
+    const key  = normalize(m.title);
+    const isNew = !existingKeys.has(key);
     card.className = 'movie-card';
-    card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
+    card.dataset.key = key;
+    if (isNew) {
+      card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
+    } else {
+      card.style.animation = 'none';
+    }
     const cardReqCount = getRequestCount(m.title);
     const cardIRequested = hasUserRequested(m.title);
     const posterClasses = ['card-poster'];
