@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw_GqZhTfa2Fg5e6UhGTEeVrC6C5via2O_pUEoDtgSvLBsfvurC7JPEpqkjGCof5wqGPg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz_SNckeML0N2__SIGtqzPyTirNsfByPRodmEFD8yu957p-qV8VnVw4tuClyLp3KFAvcw/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -1003,36 +1003,40 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
     return;
   }
 
-  // Normal load — try the server cache first
+  // Normal load — ask the server for its shared scan cache.
+  // The getScanCache action checks both CacheService (L1, fast) and
+  // the ScanCache Google Sheet (L2, durable, cross-device). If the
+  // data is < 5 minutes old it returns it instantly; otherwise {stale:true}.
   setProgress(25);
   let serverPayload = null;
   try {
-    serverPayload = await jsonpAction(driveURL + '?_cb=' + Date.now());
-    // If the server had to do a full folder walk and returned data, great.
-    // If it returned an error (cache cold and walk failed), fall through.
-    if (serverPayload && serverPayload.error) {
-      console.log('Server cache cold or error:', serverPayload.error, '— running batched scan');
-      serverPayload = null;
+    const cacheResult = await jsonpAction(
+      driveURL + '?action=getScanCache&_cb=' + Date.now()
+    );
+    if (cacheResult && cacheResult.ok && cacheResult.payload && cacheResult.payload.movies) {
+      serverPayload = cacheResult.payload;
+      console.log('Scan cache hit (' + (cacheResult.source || '?') + ', ' + Math.round(cacheResult.age_s) + 's old)');
+    } else {
+      console.log('Scan cache stale or missing — running full Drive scan');
     }
   } catch (e) {
-    console.warn('Server cache fetch failed:', e);
-    serverPayload = null;
+    console.warn('getScanCache failed:', e);
   }
 
-  if (serverPayload && serverPayload.movies) {
-    // ── Cache hit — apply data immediately ──
+  if (serverPayload) {
+    // ── Cache hit — apply data immediately, done ──
     applyDriveData(serverPayload, csvRows);
     setProgress(100);
     setTimeout(() => scanBar.classList.add('hidden'), 300);
-    // Fetch ratings separately (not stored in the Drive cache)
     fetchRatings(driveURL, false);
     updateLastUpdated();
     return;
   }
 
   // ── Cache miss — run the full batched Drive scan ──
-  // loadDataBulkFallback scans Drive in parallel batches and writes the result
-  // back to the Apps Script server cache via a writeCache POST when done.
+  // loadDataBulkFallback scans Drive in parallel batches, then POSTs
+  // the result to writeCache which saves it to both CacheService and
+  // the ScanCache sheet so every other device benefits immediately.
   await loadDataBulkFallback(driveURL, csvRows, false, false);
 }
 
@@ -1167,9 +1171,11 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
     }
   } catch(e) {}
 
-  // Also pull request counts from the live sheet via the main payload
+  // Pull request counts from the live sheet via getScanCache
+  // (at this point we just POSTed writeCache so L1/L2 are fresh)
   try {
-    const reqPayload = await jsonpAction(driveURL + '?_cb=' + Date.now());
+    const reqResult = await jsonpAction(driveURL + '?action=getScanCache&_cb=' + Date.now());
+    const reqPayload = (reqResult && reqResult.ok) ? reqResult.payload : null;
     if (reqPayload && reqPayload.requests) {
       for (const [k, v] of Object.entries(reqPayload.requests)) {
         liveRequests[normalize(k)] = v;
