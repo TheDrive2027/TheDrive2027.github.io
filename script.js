@@ -1414,153 +1414,69 @@ function renderTable() {
   tableBody.appendChild(frag);
 }
 
-function buildGridCard(m, isNew, i) {
-  const card = document.createElement('div');
-  const key  = normalize(m.title);
-  card.className   = 'movie-card';
-  card.dataset.key = key;
-  if (isNew) {
-    card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
-  } else {
-    card.style.animation = 'none';
-  }
-
-  const cardReqCount   = getRequestCount(m.title);
-  const cardIRequested = hasUserRequested(m.title);
-  const posterClasses  = ['card-poster'];
-  if (m.driveLink) posterClasses.push('card-poster--playable');
-  else             posterClasses.push('card-poster--requestable');
-
-  card.innerHTML = `
-    <div class="${posterClasses.join(' ')}">
-      ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
-      ${m.driveLink
-        ? `<a class="card-play-overlay drive-link" href="${m.driveLink}" target="_blank" rel="noopener" data-title="${escHtml(m.title)}" aria-label="Watch ${escHtml(m.title)}"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></a>`
-        : cardIRequested
-          ? `<div class="card-play-overlay card-request-overlay card-request-overlay--done"><div class="card-request-btn card-request-btn--done"><span class="card-request-icon">&#10003;</span><span class="card-request-label">REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></div>`
-          : `<button class="card-play-overlay card-request-overlay request-btn" data-title="${escHtml(m.title)}" aria-label="Request ${escHtml(m.title)}"><div class="card-request-btn"><span class="card-request-icon">&#65291;</span><span class="card-request-label">REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></button>`}
-    </div>
-    <div class="card-title">${escHtml(m.title)}</div>
-    <div class="card-meta">
-      <span class="card-year">${escHtml(m.year)}</span>
-      <span class="card-sep">·</span>
-      <span class="card-rating ${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span>
-      ${m.runtime  ? `<span class="card-sep">·</span><span class="card-runtime">${escHtml(m.runtime)}</span>`  : ''}
-      ${m.fileSize ? `<span class="card-sep">·</span><span class="card-size">${escHtml(m.fileSize)}</span>`   : ''}
-    </div>
-    <div class="card-row">
-      <span class="card-imdb ${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span>
-      <span class="card-res ${resClass(m.resolution)}">${escHtml(m.resolution) || '—'}</span>
-    </div>
-    <div class="card-footer">
-      <span class="status-pill ${m.available ? 'status-available' : 'status-missing'}">
-        ${m.available ? 'AVAILABLE' : 'NOT UPLOADED'}
-      </span>
-      ${m.driveLink ? `<div class="card-rating-row">${ratingHTML(m.title)}</div>` : ''}
-    </div>
-  `;
-  return card;
-}
-
-/**
- * Patch a card's mutable UI in-place without touching the <img> element.
- * Called for cards that already exist in the DOM when the movie data changes
- * (e.g. a file becomes available, request count updates, ratings update).
- */
-function patchGridCard(card, m) {
-  const cardReqCount   = getRequestCount(m.title);
-  const cardIRequested = hasUserRequested(m.title);
-
-  // ── Poster wrapper classes (playable / requestable) ──
-  const poster = card.querySelector('.card-poster');
-  if (poster) {
-    poster.classList.toggle('card-poster--playable',    !!m.driveLink);
-    poster.classList.toggle('card-poster--requestable', !m.driveLink);
-  }
-
-  // ── Overlay (play link / request button) ──
-  // Only rebuild the overlay HTML — the <img> above it is untouched.
-  const existingOverlay = card.querySelector(
-    '.card-play-overlay, .card-request-overlay'
-  );
-  const overlayHTML = m.driveLink
-    ? `<a class="card-play-overlay drive-link" href="${m.driveLink}" target="_blank" rel="noopener" data-title="${escHtml(m.title)}" aria-label="Watch ${escHtml(m.title)}"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></a>`
-    : cardIRequested
-      ? `<div class="card-play-overlay card-request-overlay card-request-overlay--done"><div class="card-request-btn card-request-btn--done"><span class="card-request-icon">&#10003;</span><span class="card-request-label">REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></div>`
-      : `<button class="card-play-overlay card-request-overlay request-btn" data-title="${escHtml(m.title)}" aria-label="Request ${escHtml(m.title)}"><div class="card-request-btn"><span class="card-request-icon">&#65291;</span><span class="card-request-label">REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></button>`;
-
-  if (existingOverlay) {
-    existingOverlay.outerHTML = overlayHTML;
-  } else if (poster) {
-    poster.insertAdjacentHTML('beforeend', overlayHTML);
-  }
-
-  // ── Status pill ──
-  const pill = card.querySelector('.status-pill');
-  if (pill) {
-    pill.className   = 'status-pill ' + (m.available ? 'status-available' : 'status-missing');
-    pill.textContent = m.available ? 'AVAILABLE' : 'NOT UPLOADED';
-  }
-
-  // ── Rating widget (only present when available) ──
-  const footer = card.querySelector('.card-footer');
-  if (footer) {
-    const existingRatingRow = footer.querySelector('.card-rating-row');
-    if (m.driveLink && !existingRatingRow) {
-      footer.insertAdjacentHTML('beforeend', `<div class="card-rating-row">${ratingHTML(m.title)}</div>`);
-    } else if (!m.driveLink && existingRatingRow) {
-      existingRatingRow.remove();
-    } else if (m.driveLink && existingRatingRow) {
-      // Patch just the counts without rebuilding
-      existingRatingRow.querySelectorAll('.rating-btn').forEach(b => {
-        const countEl = b.querySelector('.rating-count');
-        if (countEl) countEl.textContent = getRatingCount(m.title, b.dataset.ratingType) || 0;
-        b.classList.toggle('active', getUserRating(m.title) === b.dataset.ratingType);
-      });
-    }
-  }
-}
-
 function renderGrid() {
+  // Track which cards are already rendered so we only animate new arrivals.
+  const existingKeys = new Set(
+    Array.from(movieGrid.querySelectorAll('.movie-card[data-key]'))
+      .map(el => el.dataset.key)
+  );
+  movieGrid.innerHTML = '';
+
   if (filtered.length === 0) {
-    movieGrid.innerHTML = '';
     gridEmpty.hidden = false;
     return;
   }
   gridEmpty.hidden = true;
 
-  // Build a map of currently rendered cards keyed by normalized title.
-  const existingCards = new Map(
-    Array.from(movieGrid.querySelectorAll('.movie-card[data-key]'))
-      .map(el => [el.dataset.key, el])
-  );
-
-  // Build the new ordered list of cards, reusing existing DOM nodes where possible.
   const frag = document.createDocumentFragment();
   filtered.forEach((m, i) => {
-    const key      = normalize(m.title);
-    const existing = existingCards.get(key);
-
-    if (existing) {
-      // Reuse the existing card (image stays loaded), just patch mutable parts.
-      patchGridCard(existing, m);
-      frag.appendChild(existing); // moves it into the fragment in the new order
+    const card = document.createElement('div');
+    const key  = normalize(m.title);
+    const isNew = !existingKeys.has(key);
+    card.className = 'movie-card';
+    card.dataset.key = key;
+    if (isNew) {
+      card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
     } else {
-      // Brand-new card — build from scratch and animate it in.
-      frag.appendChild(buildGridCard(m, true, i));
+      card.style.animation = 'none';
     }
-  });
+    const cardReqCount = getRequestCount(m.title);
+    const cardIRequested = hasUserRequested(m.title);
+    const posterClasses = ['card-poster'];
+    if (m.driveLink) posterClasses.push('card-poster--playable');
+    else posterClasses.push('card-poster--requestable');
 
-  // Swap the grid contents in one operation — no innerHTML wipe, no image reload.
+    card.innerHTML = `
+      <div class="${posterClasses.join(' ')}">
+        ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
+        ${m.driveLink
+          ? `<a class="card-play-overlay drive-link" href="${m.driveLink}" target="_blank" rel="noopener" data-title="${escHtml(m.title)}" aria-label="Watch ${escHtml(m.title)}"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></a>`
+          : cardIRequested
+            ? `<div class="card-play-overlay card-request-overlay card-request-overlay--done"><div class="card-request-btn card-request-btn--done"><span class="card-request-icon">&#10003;</span><span class="card-request-label">REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></div>`
+            : `<button class="card-play-overlay card-request-overlay request-btn" data-title="${escHtml(m.title)}" aria-label="Request ${escHtml(m.title)}"><div class="card-request-btn"><span class="card-request-icon">&#65291;</span><span class="card-request-label">REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></button>`}
+      </div>
+      <div class="card-title">${escHtml(m.title)}</div>
+      <div class="card-meta">
+        <span class="card-year">${escHtml(m.year)}</span>
+        <span class="card-sep">·</span>
+        <span class="card-rating ${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span>
+        ${m.runtime ? `<span class="card-sep">·</span><span class="card-runtime">${escHtml(m.runtime)}</span>` : ''}
+        ${m.fileSize ? `<span class="card-sep">·</span><span class="card-size">${escHtml(m.fileSize)}</span>` : ''}
+      </div>
+      <div class="card-row">
+        <span class="card-imdb ${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span>
+        <span class="card-res ${resClass(m.resolution)}">${escHtml(m.resolution) || '—'}</span>
+      </div>
+      <div class="card-footer">
+        <span class="status-pill ${m.available ? 'status-available' : 'status-missing'}">
+          ${m.available ? 'AVAILABLE' : 'NOT UPLOADED'}
+        </span>
+        ${m.driveLink ? `<div class="card-rating-row">${ratingHTML(m.title)}</div>` : ''}
+      </div>
+    `;
+    frag.appendChild(card);
+  });
   movieGrid.appendChild(frag);
-
-  // Remove any cards that are no longer in the filtered set.
-  const newKeys = new Set(filtered.map(m => normalize(m.title)));
-  existingCards.forEach((card, key) => {
-    if (!newKeys.has(key) && card.parentNode === movieGrid) {
-      movieGrid.removeChild(card);
-    }
-  });
 }
 
 function escHtml(str) {
