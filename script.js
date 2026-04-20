@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVnR785olEllVx7TFLITrNZKqeBAdr21gxDf5CD2GWT8Ct1MqLcnKwgvJlNuMEFbDLMA/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4Li6FHuqHx1FFm-g9A8SIsGgvQTqnNKmYHIiOCbdVpfTZfEyyov2v9Q48mMg4q3Wf0Q/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -1162,12 +1162,29 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
   }
 
   // ── Step 3: save assembled payload to local cache ──
-  saveCache({
+  const finalPayload = {
     movies:   accumMovies,
     posters:  accumPosters,
     requests: accumRequests,
     ratings:  accumRatings,
-  });
+  };
+  saveCache(finalPayload);
+
+  // ── Step 4: write the assembled payload to the Apps Script cache so the
+  //    next load hits getMovieIndex instantly instead of re-scanning Drive.
+  try {
+    fetch(driveURL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        action:  'writeCache',
+        payload: finalPayload,
+        key:     getSavedKey() || '',
+        did:     getDeviceId(),
+      }),
+      redirect: 'follow',
+    }).catch(() => {}); // fire-and-forget — failure is non-critical
+  } catch(e) {}
 
   setProgress(100);
   setTimeout(() => scanBar.classList.add('hidden'), 300);
