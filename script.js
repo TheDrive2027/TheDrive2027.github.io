@@ -1761,17 +1761,32 @@ if (refreshBtn) {
       updateCounts();
       setProgress(10);
 
-      // Step 1: get the folder list (also clears server cache)
-      let folders = [];
+      // Step 1: bust the server-side cache so the scan starts fresh
       try {
-        const listData = await jsonpAction(
-          DRIVE_SCRIPT_URL + '?action=getFolderList'
+        await jsonpAction(
+          DRIVE_SCRIPT_URL + '?action=bustCache'
           + '&key=' + encodeURIComponent(getSavedKey() || '')
           + '&did=' + encodeURIComponent(getDeviceId())
         );
-        if (listData && listData.folders) folders = listData.folders;
       } catch(e) {
-        console.warn('getFolderList failed:', e);
+        console.warn('bustCache failed (non-critical):', e);
+      }
+
+      // Step 2: get the flat file list from Drive
+      let files = [];
+      try {
+        const listData = await jsonpAction(
+          DRIVE_SCRIPT_URL + '?action=getFileList'
+          + '&key=' + encodeURIComponent(getSavedKey() || '')
+          + '&did=' + encodeURIComponent(getDeviceId())
+        );
+        if (listData && listData.ok && Array.isArray(listData.files)) {
+          files = listData.files;
+        } else {
+          throw new Error(listData && listData.error ? listData.error : 'getFileList failed');
+        }
+      } catch(e) {
+        console.warn('getFileList failed:', e);
         showToast('⚠ Could not reach Drive. Try again.');
         refreshBtn.classList.remove('spinning');
         setProgress(100);
@@ -1779,61 +1794,81 @@ if (refreshBtn) {
         return;
       }
 
-      if (folders.length === 0) {
+      if (files.length === 0) {
         setProgress(100);
         setTimeout(() => scanBar.classList.add('hidden'), 300);
         refreshBtn.classList.remove('spinning');
         return;
       }
 
-      // Step 2: scan each folder sequentially, rendering movies as they arrive
+      // Step 3: scan each file one at a time, re-rendering as we go
       const accumMovies   = {};
       const accumPosters  = {};
+      const accumRequests = {};
+      const accumRatings  = {};
+      const total         = files.length;
       const progressStart = 10;
       const progressEnd   = 95;
 
-      for (let i = 0; i < folders.length; i++) {
-        const folder  = folders[i];
-        const isFinal = i === folders.length - 1;
+      for (let i = 0; i < total; i++) {
+        const file    = files[i];
+        const isFinal = i === total - 1;
 
         try {
-          const scanData = await jsonpAction(
-            DRIVE_SCRIPT_URL + '?action=scanFolder'
-            + '&folderId='  + encodeURIComponent(folder.id)
-            + '&isPosters=' + (folder.isPosters ? '1' : '0')
-            + '&rootOnly='  + (folder.rootOnly  ? '1' : '0')
-            + '&isFinal='   + (isFinal           ? '1' : '0')
+          const result = await jsonpAction(
+            DRIVE_SCRIPT_URL + '?action=scanFile'
+            + '&fileId='    + encodeURIComponent(file.id)
+            + '&isPosters=' + (file.isPosters ? '1' : '0')
+            + '&isFinal='   + (isFinal ? '1' : '0')
             + '&key='       + encodeURIComponent(getSavedKey() || '')
             + '&did='       + encodeURIComponent(getDeviceId())
           );
 
-          if (scanData && scanData.movies)  Object.assign(accumMovies,  scanData.movies);
-          if (scanData && scanData.posters) Object.assign(accumPosters, scanData.posters);
-
+          if (result && result.ok) {
+            Object.assign(accumMovies,  result.movie  || {});
+            Object.assign(accumPosters, result.poster || {});
+            if (result.requests) Object.assign(accumRequests, result.requests);
+            if (result.ratings)  Object.assign(accumRatings,  result.ratings);
+          }
         } catch(e) {
-          console.warn('scanFolder failed for', folder.name, e);
-          // Continue — don't stop the whole scan for one failed folder
+          console.warn('scanFile failed for', file.id, file.name, e);
+          // Skip this file and keep going
         }
 
-        // Update progress and re-render after every folder
-        setProgress(progressStart + ((i + 1) / folders.length) * (progressEnd - progressStart));
+        setProgress(progressStart + (((i + 1) / total) * (progressEnd - progressStart)));
         applyDriveData({
           movies:   accumMovies,
           posters:  accumPosters,
-          requests: requestCounts,
-          ratings:  ratingCounts,
+          requests: accumRequests,
+          ratings:  accumRatings,
         }, csvRows);
       }
 
-      // Save the fully assembled result to local cache
-      saveCache({
+      // Step 4: save assembled payload to local cache
+      const finalPayload = {
         movies:   accumMovies,
         posters:  accumPosters,
-        requests: requestCounts,
-        ratings:  ratingCounts,
-      });
+        requests: accumRequests,
+        ratings:  accumRatings,
+      };
+      saveCache(finalPayload);
 
-      // Fetch fresh ratings now that scan is complete
+      // Step 5: write to Apps Script cache so next load is instant
+      try {
+        fetch(DRIVE_SCRIPT_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            action:  'writeCache',
+            payload: finalPayload,
+            key:     getSavedKey() || '',
+            did:     getDeviceId(),
+          }),
+          redirect: 'follow',
+        }).catch(() => {});
+      } catch(e) {}
+
+      // Step 6: fetch fresh ratings now that scan is complete
       fetchRatings(DRIVE_SCRIPT_URL, true);
 
     } else {
