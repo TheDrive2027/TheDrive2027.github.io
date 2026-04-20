@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbaWCZJFxJyFD0tEEuOL8cIEnfckY2IYLFBvZepoxx6mdYEubXVybsVDvHU3wQ8Fi7YQ/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzBTYk1ZvPo-7tRundowFSasIBf6x8og8cP3LqjRvUcCNAcDZ7d4aiXBk2duRzjtgSlOg/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -1140,6 +1140,9 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
       if (result && result.ok) {
         Object.assign(accumMovies,  result.movie  || {});
         Object.assign(accumPosters, result.poster || {});
+        // On the final file the backend returns requests + ratings
+        if (result.requests) Object.assign(accumRequests, result.requests);
+        if (result.ratings)  Object.assign(accumRatings,  result.ratings);
       }
     } catch (e) {
       // Skip this file and keep going — partial data is fine
