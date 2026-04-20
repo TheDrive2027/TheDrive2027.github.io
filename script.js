@@ -941,6 +941,56 @@ function fetchRatings(scriptURL, isRefresh = false) {
   });
 }
 
+/**
+ * Fetch fresh request counts from the server and patch all visible
+ * request buttons and tooltips without a full re-render.
+ */
+function fetchRequestCounts(scriptURL) {
+  if (!scriptURL || scriptURL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
+  const cbName = '__requestCountsCallback_' + Date.now();
+  const script = document.createElement('script');
+  const timer  = setTimeout(() => {
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }, 10000);
+  window[cbName] = function(data) {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    // The main doGet returns { movies, posters, requests, ratings }
+    // We only care about requests here.
+    if (data && data.requests) {
+      requestCounts = {};
+      for (const [k, v] of Object.entries(data.requests)) {
+        requestCounts[normalize(k)] = v;
+      }
+      // Patch all visible request buttons with fresh counts
+      document.querySelectorAll('.request-btn, .card-request-overlay').forEach(btn => {
+        const title = btn.dataset.title;
+        if (!title) return;
+        const count = getRequestCount(title);
+        const countHtml = count ? ' <span class="request-count">' + count + '</span>' : '';
+        const isDone = btn.classList.contains('request-btn--done') || btn.classList.contains('card-request-overlay--done');
+        const label  = isDone ? 'REQUESTED' : 'REQUEST';
+        const icon   = isDone ? '&#10003;' : '&#65291;';
+        const inner  = btn.querySelector('.card-request-label');
+        if (inner) {
+          inner.innerHTML = label + countHtml;
+        } else {
+          btn.innerHTML = '<span class="request-icon">' + icon + '</span> ' + label + countHtml;
+          btn.dataset.title = title;
+        }
+      });
+    }
+  };
+  // Fetch the full cached payload — requests are always included
+  script.src = scriptURL
+    + '?callback=' + cbName
+    + '&_cb='      + Date.now();
+  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
+
 // ── JSONP helper for a single Apps Script action call ──
 function jsonpAction(url) {
   return new Promise((resolve, reject) => {
@@ -988,8 +1038,14 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
     setProgress(100);
     setTimeout(() => scanBar.classList.add('hidden'), 300);
     if (scriptURL && scriptURL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-      fetchRatings(scriptURL, false);
-      // Background rescan — updates the display silently when complete
+      // Always fetch fresh ratings AND request counts on every load,
+      // even when cache is warm — counts change every time someone requests.
+      fetchRatings(scriptURL, false).then(() => {
+        // After ratings load, also pull fresh request counts separately
+        fetchRequestCounts(scriptURL);
+      });
+      // Always rescan Drive in the background to pick up newly added files.
+      // background=true keeps the scan bar hidden since stale data is already shown.
       loadDataBulkFallback(scriptURL, csvRows, true, true).catch(() => {});
     }
     return;
@@ -1510,6 +1566,81 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// ─── REQUEST COUNT TOOLTIP ────────────────────────────────────
+// Shows a floating tooltip with the server request count when
+// hovering over any movie title cell (table) or card title (grid).
+
+(function initRequestTooltip() {
+  const tooltip = document.getElementById('req-tooltip');
+  if (!tooltip) return;
+
+  let hideTimer;
+
+  function showTooltipForTitle(title, anchorEl) {
+    clearTimeout(hideTimer);
+    const count = getRequestCount(title);
+    if (count <= 0) {
+      // Still show "No requests yet" so users know the feature exists
+      tooltip.innerHTML = '<span class="tt-count">0</span> requests';
+    } else {
+      tooltip.innerHTML = '<span class="tt-count">' + count + '</span> request' + (count === 1 ? '' : 's');
+    }
+    tooltip.removeAttribute('hidden');
+    // Force reflow before adding visible so the CSS transition fires
+    tooltip.getBoundingClientRect();
+    tooltip.classList.add('visible');
+    positionTooltip(anchorEl);
+  }
+
+  function positionTooltip(el) {
+    const rect = el.getBoundingClientRect();
+    const ttW  = tooltip.offsetWidth;
+    const ttH  = tooltip.offsetHeight;
+    let left   = rect.left + rect.width / 2 - ttW / 2;
+    let top    = rect.top - ttH - 8;
+    // Keep within viewport
+    if (left < 8) left = 8;
+    if (left + ttW > window.innerWidth - 8) left = window.innerWidth - ttW - 8;
+    if (top < 8) top = rect.bottom + 8; // flip below if no room above
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  }
+
+  function hideTooltip() {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      tooltip.classList.remove('visible');
+      tooltip.setAttribute('hidden', '');
+    }, 80);
+  }
+
+  // Delegate from main content — works for both table and grid views
+  document.getElementById('main-content').addEventListener('mouseover', e => {
+    // Table: hovering the title cell td.td-title or its text
+    const tdTitle = e.target.closest('td.td-title');
+    if (tdTitle) {
+      const titleText = tdTitle.textContent.trim();
+      showTooltipForTitle(titleText, tdTitle);
+      return;
+    }
+    // Grid: hovering the .card-title div
+    const cardTitle = e.target.closest('.card-title');
+    if (cardTitle) {
+      const titleText = cardTitle.textContent.trim();
+      showTooltipForTitle(titleText, cardTitle);
+      return;
+    }
+  });
+
+  document.getElementById('main-content').addEventListener('mouseout', e => {
+    const leaving = e.target.closest('td.td-title, .card-title');
+    if (leaving) hideTooltip();
+  });
+
+  // Keep tooltip positioned if the element scrolls
+  document.addEventListener('scroll', () => { tooltip.classList.remove('visible'); }, { passive: true });
+})();
 
 // ─── EVENTS ───────────────────────────────────────────────────
 
