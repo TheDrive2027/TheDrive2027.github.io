@@ -1112,7 +1112,7 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
     return;
   }
 
-  // ── Step 2: scan each file one at a time, re-rendering as we go ──
+  // ── Step 2: scan files in parallel batches, re-rendering after each batch ──
   const accumMovies   = {};
   const accumPosters  = {};
   const accumRequests = {};
@@ -1121,38 +1121,37 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
   const total         = files.length;
   const progressStart = 25;
   const progressEnd   = 95;
+  const CONCURRENCY   = 6; // simultaneous scanFile requests
+  let   completed     = 0;
 
-  for (let i = 0; i < total; i++) {
-    const file    = files[i];
-    const isFinal = i === total - 1;
+  for (let i = 0; i < total; i += CONCURRENCY) {
+    const batch = files.slice(i, i + CONCURRENCY);
 
-    try {
-      const result = await jsonpAction(
+    const results = await Promise.all(batch.map(file =>
+      jsonpAction(
         driveURL
         + '?action=scanFile'
         + '&fileId='    + encodeURIComponent(file.id)
         + '&isPosters=' + (file.isPosters ? '1' : '0')
-        + '&isFinal='   + (isFinal ? '1' : '0')
+        + '&isFinal=0'  // requests+ratings fetched separately below
         + '&key='       + encodeURIComponent(getSavedKey() || '')
         + '&did='       + encodeURIComponent(getDeviceId())
-      );
+      ).catch(e => {
+        console.warn('scanFile failed for', file.id, file.name, e);
+        return null; // skip failed files, keep going
+      })
+    ));
 
+    for (const result of results) {
       if (result && result.ok) {
         Object.assign(accumMovies,  result.movie  || {});
         Object.assign(accumPosters, result.poster || {});
-        // On the final file the backend returns requests + ratings
-        if (result.requests) Object.assign(accumRequests, result.requests);
-        if (result.ratings)  Object.assign(accumRatings,  result.ratings);
       }
-    } catch (e) {
-      // Skip this file and keep going — partial data is fine
-      console.warn('scanFile failed for', file.id, file.name, e);
     }
 
-    // Advance progress bar proportionally
-    setProgress(progressStart + (((i + 1) / total) * (progressEnd - progressStart)));
+    completed += batch.length;
+    setProgress(progressStart + ((completed / total) * (progressEnd - progressStart)));
 
-    // Re-render with all data accumulated so far
     applyDriveData({
       movies:   accumMovies,
       posters:  accumPosters,
@@ -1801,7 +1800,7 @@ if (refreshBtn) {
         return;
       }
 
-      // Step 3: scan each file one at a time, re-rendering as we go
+      // Step 3: scan files in parallel batches, re-rendering after each batch
       const accumMovies   = {};
       const accumPosters  = {};
       const accumRequests = {};
@@ -1809,33 +1808,35 @@ if (refreshBtn) {
       const total         = files.length;
       const progressStart = 10;
       const progressEnd   = 95;
+      const CONCURRENCY   = 6;
+      let   completed     = 0;
 
-      for (let i = 0; i < total; i++) {
-        const file    = files[i];
-        const isFinal = i === total - 1;
+      for (let i = 0; i < total; i += CONCURRENCY) {
+        const batch = files.slice(i, i + CONCURRENCY);
 
-        try {
-          const result = await jsonpAction(
+        const results = await Promise.all(batch.map(file =>
+          jsonpAction(
             DRIVE_SCRIPT_URL + '?action=scanFile'
             + '&fileId='    + encodeURIComponent(file.id)
             + '&isPosters=' + (file.isPosters ? '1' : '0')
-            + '&isFinal='   + (isFinal ? '1' : '0')
+            + '&isFinal=0'  // requests+ratings fetched separately below
             + '&key='       + encodeURIComponent(getSavedKey() || '')
             + '&did='       + encodeURIComponent(getDeviceId())
-          );
+          ).catch(e => {
+            console.warn('scanFile failed for', file.id, file.name, e);
+            return null;
+          })
+        ));
 
+        for (const result of results) {
           if (result && result.ok) {
             Object.assign(accumMovies,  result.movie  || {});
             Object.assign(accumPosters, result.poster || {});
-            if (result.requests) Object.assign(accumRequests, result.requests);
-            if (result.ratings)  Object.assign(accumRatings,  result.ratings);
           }
-        } catch(e) {
-          console.warn('scanFile failed for', file.id, file.name, e);
-          // Skip this file and keep going
         }
 
-        setProgress(progressStart + (((i + 1) / total) * (progressEnd - progressStart)));
+        completed += batch.length;
+        setProgress(progressStart + ((completed / total) * (progressEnd - progressStart)));
         applyDriveData({
           movies:   accumMovies,
           posters:  accumPosters,
