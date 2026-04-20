@@ -8,7 +8,7 @@
 // Sheet published as CSV
 const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
 // ↓↓ PASTE YOUR APPS SCRIPT /exec URL HERE ↓↓
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxvwtc3S1kqZcCeWj7mBOxwATz0NmKdsHR9gy81xpnBCNTbli1ZOCRqJmDyh0PeFq2U/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx4v4_kG-dXKpSu3fZIbqKBNw1-ck5br5VI-cnZdQx9iVwLgMdLIPU0xq-_WJPtHNUIdA/exec';
 
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
@@ -1659,6 +1659,7 @@ if (refreshBtn) {
 
     // Bust the Apps Script server-side cache so the next fetch rescans Drive
     if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+      showToast('↻ Rescanning Drive… this may take a moment', 30000);
       await new Promise(resolve => {
         const cbName = '__bustCallback_' + Date.now();
         const script = document.createElement('script');
@@ -1666,7 +1667,7 @@ if (refreshBtn) {
           delete window[cbName];
           if (script.parentNode) script.parentNode.removeChild(script);
           resolve();
-        }, 8000);
+        }, 60000); // Drive scan can take up to ~60s
         window[cbName] = function() {
           clearTimeout(timer);
           delete window[cbName];
@@ -1686,6 +1687,8 @@ if (refreshBtn) {
         };
         document.head.appendChild(script);
       });
+      // Dismiss the scanning toast before data loads
+      toast.classList.remove('show');
     }
 
     // Re-fetch everything fresh — bypass cache and bust browser/CDN caches
