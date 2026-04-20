@@ -1121,7 +1121,7 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh) {
   const total         = files.length;
   const progressStart = 25;
   const progressEnd   = 95;
-  const CONCURRENCY   = 12; // simultaneous scanFile requests
+  const CONCURRENCY   = 30; // simultaneous scanFile requests
   let   completed     = 0;
 
   for (let i = 0; i < total; i += CONCURRENCY) {
