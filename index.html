@@ -44,6 +44,13 @@
         </div>
         <span class="logo-byline">Austin Borchardt</span>
       </div>
+      <div class="header-center">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="search-input" placeholder="Search titles…" autocomplete="off" spellcheck="false" />
+          <button class="clear-search" id="clear-search" title="Clear">✕</button>
+        </div>
+      </div>
       <div class="header-meta">
         <span class="meta-updated">UPDATED <span id="last-updated">—</span></span>
         <span class="dot">·</span>
@@ -71,104 +78,120 @@
 
   <!-- MOVIES TAB -->
   <div id="tab-movies" class="tab-panel active">
+    <div class="movies-layout">
 
-    <section class="controls-section">
-      <div class="controls-inner">
-        <div class="filter-group search-group">
-          <label class="filter-label">SEARCH</label>
-          <div class="search-wrap">
-            <span class="search-icon">⌕</span>
-            <input type="text" id="search-input" placeholder="Search titles…" autocomplete="off" spellcheck="false" />
-            <button class="clear-search" id="clear-search" title="Clear">✕</button>
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-inner">
+
+          <!-- SORT -->
+          <div class="sidebar-section">
+            <div class="sidebar-heading">SORT BY</div>
+            <div class="sidebar-sort-wrap">
+              <select id="sort-by" class="sidebar-select">
+                <option value="title">Title</option>
+                <option value="year">Release Year</option>
+                <option value="runtime">Runtime</option>
+                <option value="rating">Top Rated</option>
+                <option value="requests">Top Requested</option>
+                <option value="imdb">IMDb Rating</option>
+              </select>
+              <button class="sort-dir-btn" id="sort-dir-btn" title="Toggle sort direction" aria-label="Sort direction">↓</button>
+            </div>
+          </div>
+
+          <!-- MATURITY -->
+          <div class="sidebar-section">
+            <div class="sidebar-heading">MATURITY</div>
+            <div class="sidebar-checks" id="filter-maturity-checks">
+              <!-- populated by JS -->
+            </div>
+          </div>
+
+          <!-- STATUS -->
+          <div class="sidebar-section">
+            <div class="sidebar-heading">STATUS</div>
+            <div class="sidebar-checks">
+              <label class="check-row">
+                <input type="checkbox" value="Available" data-filter="status" />
+                <span class="check-label">Available</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" value="Not Uploaded" data-filter="status" />
+                <span class="check-label">Not Uploaded</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- RESOLUTION -->
+          <div class="sidebar-section">
+            <div class="sidebar-heading">RESOLUTION</div>
+            <div class="sidebar-checks" id="filter-resolution-checks">
+              <!-- populated by JS -->
+            </div>
+          </div>
+
+          <!-- CLEAR FILTERS -->
+          <button class="sidebar-clear-btn" id="sidebar-clear-btn" hidden>CLEAR FILTERS</button>
+
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT AREA -->
+      <main class="main-content" id="main-content">
+        <div class="results-summary" id="results-summary"></div>
+
+        <!-- ROW VIEW (default, no filters active) -->
+        <div id="row-view" class="view-panel active">
+
+          <section class="movie-row-section" id="row-available">
+            <div class="row-header">
+              <h2 class="row-title">AVAILABLE</h2>
+              <span class="row-subtitle">Sorted by top rated</span>
+            </div>
+            <div class="movie-row-scroll">
+              <div class="movie-row" id="row-available-cards"></div>
+            </div>
+          </section>
+
+          <section class="movie-row-section" id="row-requested">
+            <div class="row-header">
+              <h2 class="row-title">MOST REQUESTED</h2>
+              <span class="row-subtitle">Highest request count</span>
+            </div>
+            <div class="movie-row-scroll">
+              <div class="movie-row" id="row-requested-cards"></div>
+            </div>
+          </section>
+
+          <section class="movie-row-section" id="row-imdb">
+            <div class="row-header">
+              <h2 class="row-title">TOP IMDb</h2>
+              <span class="row-subtitle">Highest rated on IMDb</span>
+            </div>
+            <div class="movie-row-scroll">
+              <div class="movie-row" id="row-imdb-cards"></div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- GRID VIEW (shown when filters/search are active) -->
+        <div id="grid-view" class="view-panel">
+          <div class="movie-grid" id="movie-grid"></div>
+          <div class="empty-state" id="grid-empty" hidden>
+            <span class="empty-icon">◻</span><p>No films match your filters.</p>
           </div>
         </div>
-        <div class="filter-group">
-          <label class="filter-label">RESOLUTION</label>
-          <select id="filter-resolution"><option value="">All</option></select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">MATURITY</label>
-          <select id="filter-maturity"><option value="">All</option></select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">STATUS</label>
-          <select id="filter-status">
-            <option value="">All</option>
-            <option value="Available">Available</option>
-            <option value="Not Uploaded">Not Uploaded</option>
-          </select>
-        </div>
-        <div class="filter-group sort-group">
-          <label class="filter-label">SORT BY</label>
-          <div class="sort-row">
-            <select id="sort-by">
-              <option value="title">Title</option>
-              <option value="imdb">IMDb Rating</option>
-              <option value="year">Year</option>
-              <option value="rating">Top Rated</option>
-              <option value="requests">Most Requested</option>
-              <option value="size">File Size</option>
-              <option value="runtime">Runtime</option>
-              <option value="maturity">Maturity</option>
-              <option value="status">Status</option>
-              <option value="res">Resolution</option>
-              <option value="link">Link (Available → Requested → Unrequested)</option>
-            </select>
-            <button class="sort-dir-btn" id="sort-dir-btn" title="Toggle sort direction" aria-label="Sort direction">↓</button>
-          </div>
-        </div>
-        <div class="filter-group view-group">
-          <label class="filter-label">VIEW</label>
-          <div class="view-toggle" role="group" aria-label="View mode">
-            <button class="toggle-btn active" id="btn-table" title="Table view" data-view="table">☰</button>
-            <button class="toggle-btn" id="btn-grid" title="Grid view" data-view="grid">⊞</button>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <div class="results-summary" id="results-summary"></div>
-
-    <main class="main-content" id="main-content">
-      <div id="table-view" class="view-panel active">
-        <div class="table-scroll">
-          <table id="movie-table">
-            <thead>
-              <tr>
-                <th class="th-num">#</th>
-                <th class="th-title sortable" data-sort="title-asc">TITLE</th>
-                <th class="th-res sortable" data-sort="res-desc">RES</th>
-                <th class="th-rating sortable" data-sort="maturity-asc">MATURITY</th>
-                <th class="th-year sortable" data-sort="year-desc">YEAR</th>
-                <th class="th-runtime sortable" data-sort="runtime-desc">RUNTIME</th>
-                <th class="th-size sortable" data-sort="size-desc">SIZE</th>
-                <th class="th-imdb sortable" data-sort="imdb-desc">IMDb</th>
-                <th class="th-status sortable" data-sort="status-asc">STATUS</th>
-                <th class="th-link sortable" data-sort="link-desc">LINK</th>
-              </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-          </table>
-        </div>
-        <div class="empty-state" id="table-empty" hidden>
-          <span class="empty-icon">◻</span><p>No films match your search.</p>
-        </div>
-      </div>
-      <div id="grid-view" class="view-panel">
-        <div class="movie-grid" id="movie-grid"></div>
-        <div class="empty-state" id="grid-empty" hidden>
-          <span class="empty-icon">◻</span><p>No films match your search.</p>
-        </div>
-      </div>
-    </main>
-
+      </main>
+    </div>
   </div><!-- /tab-movies -->
 
   <!-- STATS TAB -->
   <div id="tab-stats" class="tab-panel">
     <div class="stats-page">
 
-      <!-- Upload Progress -->
       <section class="stats-section">
         <h2 class="stats-heading">UPLOAD PROGRESS</h2>
         <div class="upload-progress-wrap">
@@ -182,34 +205,24 @@
         </div>
       </section>
 
-      <!-- Online History Chart -->
       <section class="stats-section">
         <h2 class="stats-heading">ONLINE HISTORY</h2>
         <p class="stats-subheading">Concurrent users online, sampled every 10 seconds</p>
-        <div class="chart-wrap">
-          <canvas id="chart-presence"></canvas>
-        </div>
+        <div class="chart-wrap"><canvas id="chart-presence"></canvas></div>
       </section>
 
-      <!-- User Growth Chart -->
       <section class="stats-section">
         <h2 class="stats-heading">USER GROWTH</h2>
         <p class="stats-subheading">Total unique users, recorded daily</p>
-        <div class="chart-wrap">
-          <canvas id="chart-users"></canvas>
-        </div>
+        <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
       </section>
 
-      <!-- Library Growth Chart -->
       <section class="stats-section">
         <h2 class="stats-heading">LIBRARY GROWTH</h2>
         <p class="stats-subheading">Daily snapshot — total vs. available films</p>
-        <div class="chart-wrap">
-          <canvas id="chart-library"></canvas>
-        </div>
+        <div class="chart-wrap"><canvas id="chart-library"></canvas></div>
       </section>
 
-      <!-- Stats Cards -->
       <section class="stats-section">
         <h2 class="stats-heading">LIBRARY STATS</h2>
         <div class="stats-grid">
@@ -254,7 +267,6 @@
     </div>
   </footer>
 
-  <!-- REQUEST COUNT TOOLTIP -->
   <div class="req-tooltip" id="req-tooltip" hidden></div>
 
   <script src="script.js"></script>
