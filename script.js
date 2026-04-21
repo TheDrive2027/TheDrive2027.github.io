@@ -757,10 +757,12 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
   } catch(e) {}
 
   try {
-    const reqResult = await jsonpAction(driveURL + '?action=getScanCache&_cb=' + Date.now());
-    const reqPayload = (reqResult && reqResult.ok) ? reqResult.payload : null;
-    if (reqPayload && reqPayload.requests) {
-      for (const [k, v] of Object.entries(reqPayload.requests)) liveRequests[normalize(k)] = v;
+    // Fetch request counts live from the sheet so the full-scan payload
+    // always contains up-to-date data (getScanCache would be stale here
+    // since the new cache hasn't been written yet).
+    const reqResult = await jsonpAction(driveURL + '?action=getRequests&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&_cb=' + Date.now());
+    if (reqResult && reqResult.requests) {
+      for (const [k, v] of Object.entries(reqResult.requests)) liveRequests[normalize(k)] = v;
       requestCounts = { ...liveRequests };
     }
   } catch(e) {}
