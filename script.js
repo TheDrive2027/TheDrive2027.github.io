@@ -2,7 +2,7 @@
    THE DRIVE — script.js
    Fetches Sheet CSV + Drive JSON, merges them, renders the UI.
    No external dependencies except Google Fonts (CSS only).
-   4/20/2026 6:01 PM
+   4/20/2026 6:08 PM
    ============================================================= */
 
 // ─── CONFIG ───────────────────────────────────────────────────
@@ -754,10 +754,11 @@ function showToast(msg, duration = 3000) {
   toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
 }
 
-/** Format and display the last-updated timestamp */
-function updateLastUpdated() {
-  const now = new Date();
-  let h = now.getHours(), m = now.getMinutes();
+/** Format and display the last-updated timestamp.
+ *  @param {Date} [date] — when the cache was written; defaults to now (fresh scan). */
+function updateLastUpdated(date) {
+  const d = (date instanceof Date && !isNaN(date)) ? date : new Date();
+  let h = d.getHours(), m = d.getMinutes();
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
   const mm = String(m).padStart(2, '0');
@@ -1030,7 +1031,11 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
     setProgress(100);
     setTimeout(() => scanBar.classList.add('hidden'), 300);
     fetchRatings(driveURL, false);
-    updateLastUpdated();
+    // Show when the cache was written, not the current time
+    const cacheDate = (typeof cacheResult.age_s === 'number')
+      ? new Date(Date.now() - cacheResult.age_s * 1000)
+      : new Date();
+    updateLastUpdated(cacheDate);
     return;
   }
 
