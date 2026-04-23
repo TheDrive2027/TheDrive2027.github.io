@@ -1542,14 +1542,26 @@ function renderPresenceChart(presence) {
   const INTERVAL_MS = 10 * 1000, GAP_THRESH = INTERVAL_MS * 2;
   function tsToMs(ts) { return new Date(ts.replace(' ', 'T')).getTime(); }
   const filled = [];
+  const pad = n => String(n).padStart(2, '0');
+  function fmtTs(dateObj) {
+    // Rebuild a timestamp string in the same "YYYY-MM-DD HH:MM:SS" format
+    return dateObj.getFullYear() + '-' +
+      pad(dateObj.getMonth() + 1) + '-' +
+      pad(dateObj.getDate()) + ' ' +
+      pad(dateObj.getHours()) + ':' +
+      pad(dateObj.getMinutes()) + ':' +
+      pad(dateObj.getSeconds());
+  }
   for (let i = 0; i < presence.length; i++) {
     filled.push(presence[i]);
     if (i < presence.length - 1) {
       const gap = tsToMs(presence[i + 1].ts) - tsToMs(presence[i].ts);
       if (gap > GAP_THRESH) {
-        const afterTs = new Date(tsToMs(presence[i].ts) + INTERVAL_MS);
-        const pad = n => String(n).padStart(2, '0');
-        filled.push({ ts: presence[i].ts.slice(0, 11) + pad(afterTs.getHours()) + ':' + pad(afterTs.getMinutes()) + ':' + pad(afterTs.getSeconds()), online: 0 });
+        // Insert a zero just after the last real point …
+        filled.push({ ts: fmtTs(new Date(tsToMs(presence[i].ts) + INTERVAL_MS)), online: 0 });
+        // … and another zero just before the next real point so the line
+        // stays flat at 0 for the entire gap instead of interpolating back up.
+        filled.push({ ts: fmtTs(new Date(tsToMs(presence[i + 1].ts) - INTERVAL_MS)), online: 0 });
       }
     }
   }
@@ -1614,8 +1626,13 @@ function pushPresencePing() {
       const hhmm = pad(now.getHours()) + ':' + pad(now.getMinutes());
       const labels = chartPresence.data.labels, vals = chartPresence.data.datasets[0].data, times = chartPresence._times || [];
       if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 20000) {
-        const zeroTime = new Date(lastPresenceAppendAt + 10000);
-        times.push(pad(zeroTime.getHours()) + ':' + pad(zeroTime.getMinutes())); labels.push(labels.length); vals.push(0);
+        // Zero just after the last recorded point …
+        const zeroAfter = new Date(lastPresenceAppendAt + 10000);
+        times.push(pad(zeroAfter.getHours()) + ':' + pad(zeroAfter.getMinutes())); labels.push(labels.length); vals.push(0);
+        // … and a second zero just before the current point so the line stays
+        // flat at 0 for the full gap instead of sloping back up immediately.
+        const zeroBefore = new Date(now.getTime() - 10000);
+        times.push(pad(zeroBefore.getHours()) + ':' + pad(zeroBefore.getMinutes())); labels.push(labels.length); vals.push(0);
       }
       times.push(hhmm); labels.push(labels.length); vals.push(serverCount);
       lastPresenceAppendAt = now.getTime();
