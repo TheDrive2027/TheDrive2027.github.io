@@ -1539,46 +1539,30 @@ function showPresenceCanvas() {
 function renderPresenceChart(presence) {
   showPresenceCanvas();
   const canvas = $('chart-presence'); if (!canvas) return;
-  const GAP_THRESH = 10 * 1000;
+  const INTERVAL_MS = 10 * 1000, GAP_THRESH = INTERVAL_MS * 2;
   function tsToMs(ts) { return new Date(ts.replace(' ', 'T')).getTime(); }
-  const pad = n => String(n).padStart(2, '0');
-  function fmtHHMM(ms) { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
-
-  // Figure out the average time between real data points so we know
-  // how many zero slots to insert to represent a gap accurately.
-  const totalSpan = presence.length > 1
-    ? tsToMs(presence[presence.length - 1].ts) - tsToMs(presence[0].ts)
-    : 1;
-  const avgInterval = totalSpan / Math.max(presence.length - 1, 1);
-
-  // Sample the raw presence array, then build chart arrays inserting
-  // proportional zero points for any gap > 10s.
-  const step = Math.max(1, Math.floor(presence.length / 500));
-  const sampled = presence.filter((_, i) => i % step === 0);
-
-  const times = [], values = [];
-  for (let i = 0; i < sampled.length; i++) {
-    const cur = sampled[i];
-    if (i > 0) {
-      const prevMs = tsToMs(sampled[i - 1].ts);
-      const curMs  = tsToMs(cur.ts);
-      const gap    = curMs - prevMs;
+  const filled = [];
+  for (let i = 0; i < presence.length; i++) {
+    filled.push(presence[i]);
+    if (i < presence.length - 1) {
+      const gap = tsToMs(presence[i + 1].ts) - tsToMs(presence[i].ts);
       if (gap > GAP_THRESH) {
-        // How many zero points should fill this gap proportionally?
-        // Use the same density as the real data, capped so we don't
-        // blow out the 500-point budget.
-        const zeroCount = Math.max(2, Math.min(50, Math.round(gap / avgInterval)));
-        for (let z = 0; z < zeroCount; z++) {
-          const t = prevMs + (gap * (z + 1)) / (zeroCount + 1);
-          times.push(fmtHHMM(t));
-          values.push(0);
-        }
+        const afterTs = new Date(tsToMs(presence[i].ts) + INTERVAL_MS);
+        const pad = n => String(n).padStart(2, '0');
+        filled.push({ ts: presence[i].ts.slice(0, 11) + pad(afterTs.getHours()) + ':' + pad(afterTs.getMinutes()) + ':' + pad(afterTs.getSeconds()), online: 0 });
       }
     }
-    times.push(fmtHHMM(tsToMs(cur.ts)));
-    values.push(cur.online);
   }
-  const cfg = { type: 'line', data: { labels: values.map((_, i) => i), datasets: [{ label: 'Online', data: values, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: presenceChartOptions(times) };
+  const step = Math.max(1, Math.floor(filled.length / 500));
+  const sampled = filled.filter((_, i) => i % step === 0);
+  const times = sampled.map(p => { const m = String(p.ts).match(/(\d{1,2}:\d{2})(?::\d{2})?/); return m ? m[1] : ''; });
+  const rawValues = sampled.map(p => p.online);
+  const values = rawValues.map((v, i, arr) => {
+    const p2 = arr[i-2] !== undefined ? arr[i-2] : v, p1 = arr[i-1] !== undefined ? arr[i-1] : v;
+    const n1 = arr[i+1] !== undefined ? arr[i+1] : v, n2 = arr[i+2] !== undefined ? arr[i+2] : v;
+    return Math.round((p2 + p1 + v + n1 + n2) / 5 * 100) / 100;
+  });
+  const cfg = { type: 'line', data: { labels: sampled.map((_, i) => i), datasets: [{ label: 'Online', data: values, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: presenceChartOptions(times) };
   if (chartPresence) chartPresence.destroy();
   chartPresence = new Chart(canvas, cfg);
   chartPresence._times = times;
@@ -1629,14 +1613,9 @@ function pushPresencePing() {
       const now = new Date(), pad = n => String(n).padStart(2, '0');
       const hhmm = pad(now.getHours()) + ':' + pad(now.getMinutes());
       const labels = chartPresence.data.labels, vals = chartPresence.data.datasets[0].data, times = chartPresence._times || [];
-      if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 10000) {
-        // Zero just after the last recorded point …
-        const zeroAfter = new Date(lastPresenceAppendAt + 10000);
-        times.push(pad(zeroAfter.getHours()) + ':' + pad(zeroAfter.getMinutes())); labels.push(labels.length); vals.push(0);
-        // … and a second zero just before the current point so the line stays
-        // flat at 0 for the full gap instead of sloping back up immediately.
-        const zeroBefore = new Date(now.getTime() - 10000);
-        times.push(pad(zeroBefore.getHours()) + ':' + pad(zeroBefore.getMinutes())); labels.push(labels.length); vals.push(0);
+      if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 20000) {
+        const zeroTime = new Date(lastPresenceAppendAt + 10000);
+        times.push(pad(zeroTime.getHours()) + ':' + pad(zeroTime.getMinutes())); labels.push(labels.length); vals.push(0);
       }
       times.push(hhmm); labels.push(labels.length); vals.push(serverCount);
       lastPresenceAppendAt = now.getTime();
