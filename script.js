@@ -1539,7 +1539,7 @@ function showPresenceCanvas() {
 function renderPresenceChart(presence) {
   showPresenceCanvas();
   const canvas = $('chart-presence'); if (!canvas) return;
-  const INTERVAL_MS = 10 * 1000, GAP_THRESH = INTERVAL_MS * 2;
+  const INTERVAL_MS = 10 * 1000, GAP_THRESH = INTERVAL_MS;
   function tsToMs(ts) { return new Date(ts.replace(' ', 'T')).getTime(); }
   const filled = [];
   const pad = n => String(n).padStart(2, '0');
@@ -1558,15 +1558,15 @@ function renderPresenceChart(presence) {
       const gap = tsToMs(presence[i + 1].ts) - tsToMs(presence[i].ts);
       if (gap > GAP_THRESH) {
         // Insert a zero just after the last real point …
-        filled.push({ ts: fmtTs(new Date(tsToMs(presence[i].ts) + INTERVAL_MS)), online: 0 });
+        filled.push({ ts: fmtTs(new Date(tsToMs(presence[i].ts) + INTERVAL_MS)), online: 0, _gap: true });
         // … and another zero just before the next real point so the line
         // stays flat at 0 for the entire gap instead of interpolating back up.
-        filled.push({ ts: fmtTs(new Date(tsToMs(presence[i + 1].ts) - INTERVAL_MS)), online: 0 });
+        filled.push({ ts: fmtTs(new Date(tsToMs(presence[i + 1].ts) - INTERVAL_MS)), online: 0, _gap: true });
       }
     }
   }
   const step = Math.max(1, Math.floor(filled.length / 500));
-  const sampled = filled.filter((_, i) => i % step === 0);
+  const sampled = filled.filter((p, i) => i % step === 0 || p._gap);
   const times = sampled.map(p => { const m = String(p.ts).match(/(\d{1,2}:\d{2})(?::\d{2})?/); return m ? m[1] : ''; });
   const rawValues = sampled.map(p => p.online);
   const values = rawValues.map((v, i, arr) => {
@@ -1625,7 +1625,7 @@ function pushPresencePing() {
       const now = new Date(), pad = n => String(n).padStart(2, '0');
       const hhmm = pad(now.getHours()) + ':' + pad(now.getMinutes());
       const labels = chartPresence.data.labels, vals = chartPresence.data.datasets[0].data, times = chartPresence._times || [];
-      if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 20000) {
+      if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 10000) {
         // Zero just after the last recorded point …
         const zeroAfter = new Date(lastPresenceAppendAt + 10000);
         times.push(pad(zeroAfter.getHours()) + ':' + pad(zeroAfter.getMinutes())); labels.push(labels.length); vals.push(0);
