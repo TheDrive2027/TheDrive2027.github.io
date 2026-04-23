@@ -1570,6 +1570,8 @@ function renderPresenceChart(presence) {
   const times = sampled.map(p => { const m = String(p.ts).match(/(\d{1,2}:\d{2})(?::\d{2})?/); return m ? m[1] : ''; });
   const rawValues = sampled.map(p => p.online);
   const values = rawValues.map((v, i, arr) => {
+    // Don't smooth gap points — keep them hard at 0
+    if (sampled[i]._gap) return 0;
     const p2 = arr[i-2] !== undefined ? arr[i-2] : v, p1 = arr[i-1] !== undefined ? arr[i-1] : v;
     const n1 = arr[i+1] !== undefined ? arr[i+1] : v, n2 = arr[i+2] !== undefined ? arr[i+2] : v;
     return Math.round((p2 + p1 + v + n1 + n2) / 5 * 100) / 100;
