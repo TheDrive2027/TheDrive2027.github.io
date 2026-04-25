@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=121928462';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=1799938400';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOrUlOJ2ahLzoPJcmuQpYK8caFC_nhaDJ9SkOpt4ohRUw-ii8hv0nNbUwke-_jbP3bBw/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx3TXPzwikXbiBfIoVw3C-hwcLC6_9juak00k8LN_Qnbq5r310wl4mRzPt28H95_1MuYg/exec';
 
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
@@ -581,7 +581,43 @@ async function loadShowsData(forceRefresh = false) {
     console.warn('Shows CSV fetch error:', e);
     allShows = [];
   }
+
+  // Fetch the Drive file map and merge links onto episodes
+  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    try {
+      const data = await jsonpAction(
+        DRIVE_SCRIPT_URL + '?action=getShowFiles&key=' +
+        encodeURIComponent(getSavedKey() || '') +
+        '&did=' + encodeURIComponent(getDeviceId())
+      );
+      if (data && data.ok && data.shows) mergeShowDriveFiles(data.shows);
+    } catch(e) {
+      console.warn('getShowFiles error:', e);
+    }
+  }
+
   renderShows();
+}
+
+function mergeShowDriveFiles(showFileMap) {
+  allShows.forEach(show => {
+    const showNorm = normalize(show.title);
+    show.seasons.forEach(season => {
+      const padS = String(season.num).padStart(2, '0');
+      season.episodes.forEach(ep => {
+        if (ep.link) return; // already has a link from the sheet
+        const padE = String(ep.num).padStart(2, '0');
+        const epCode = normalize('s' + padS + 'e' + padE);
+        for (const [key, val] of Object.entries(showFileMap)) {
+          if (key.startsWith(showNorm) && key.includes(epCode)) {
+            ep.link      = val.link;
+            ep.available = true;
+            break;
+          }
+        }
+      });
+    });
+  });
 }
 
 // ─── SHOWS: render the shows tab ─────────────────────────────
