@@ -1154,7 +1154,7 @@ function clearAllFilters() {
 }
 
 function updateCounts() {
-  if (movieCount) movieCount.textContent = allMovies.length + ' films';
+  if (movieCount) movieCount.textContent = allMovies.length + ' movies';
   if (availCount) availCount.textContent = allMovies.filter(m => m.available).length + ' available';
 }
 
@@ -1210,12 +1210,12 @@ function renderCurrentView() {
     gridView.classList.add('active');
     renderGrid();
     const total = allMovies.length, shown = filtered.length;
-    if (resultsSummary) resultsSummary.textContent = shown === total ? `Showing all ${total} films` : `Showing ${shown} of ${total} films`;
+    if (resultsSummary) resultsSummary.textContent = shown === total ? `Showing all ${total} movies` : `Showing ${shown} of ${total} movies`;
   } else {
     gridView.classList.remove('active');
     rowView.classList.add('active');
     renderRows();
-    if (resultsSummary) resultsSummary.textContent = `${allMovies.length} films in the library`;
+    if (resultsSummary) resultsSummary.textContent = `${allMovies.length} movies in the library`;
   }
 }
 
@@ -1725,15 +1725,23 @@ function initStatsTab() {
 }
 
 function renderLocalStats() {
-  if (!allMovies.length) return;
+  if (!allMovies.length && !allShows.length) return;
   const total = allMovies.length, available = allMovies.filter(m => m.available).length;
-  const pct = total > 0 ? ((available / total) * 100).toFixed(2) : '0.00';
+
+  // Count episodes across all shows
+  const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0);
+  const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
+
+  const totalAll = total + totalEps;
+  const availAll = available + availEps;
+
+  const pct = totalAll > 0 ? ((availAll / totalAll) * 100).toFixed(2) : '0.00';
   const fracEl = $('upload-fraction'), pctEl = $('upload-pct'), fillEl = $('upload-fill');
-  if (fracEl)  fracEl.textContent  = available + ' / ' + total + ' films uploaded';
+  if (fracEl)  fracEl.textContent  = availAll + ' / ' + totalAll + ' movies & episodes uploaded';
   if (pctEl)   pctEl.textContent   = pct + '%';
   if (fillEl)  fillEl.style.width  = parseFloat(pct) + '%';
-  setText('stat-total-films', total);
-  setText('stat-available', available);
+  setText('stat-total-films', totalAll);
+  setText('stat-available', availAll);
   let totalGB = 0; allMovies.forEach(m => { totalGB += parseSizeGB(m.fileSize); });
   setText('stat-total-size', totalGB > 0 ? totalGB.toFixed(1) + ' GB' : '—');
   let totalMins = 0; allMovies.forEach(m => { totalMins += parseRuntimeMinutes(m.runtime); });
@@ -1771,7 +1779,7 @@ function fetchStatsData() {
 
 function renderLibraryChart(snapshots) {
   const canvas = $('chart-library'); if (!canvas) return;
-  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Films', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Films') };
+  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Movies', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Movies') };
   if (chartLibrary) chartLibrary.destroy();
   chartLibrary = new Chart(canvas, cfg);
 }
