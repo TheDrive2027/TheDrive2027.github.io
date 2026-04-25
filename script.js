@@ -694,14 +694,19 @@ function renderOverlayEpisodes() {
 
   episodesEl.innerHTML = season.episodes.map(ep => {
     const padE = String(ep.num).padStart(2, '0');
-    // We normalize a search string to find the matching thumbnail in thumbMap
-    // E.g. "breakingbads01e01"
-    const prefix = normalize(`${overlayCurrentShow.title} s${padS}e${padE}`);
-    
+    // Build two match tokens:
+    //   showNorm — the normalized show title (must appear at the start of the Drive key)
+    //   epCode   — the normalized episode code, e.g. "s01e02"
+    // Using startsWith(showNorm) + includes(epCode) instead of startsWith(full prefix)
+    // correctly handles multi-episode files like "Show - S01E01 S01E02 - Titles.mkv",
+    // where S01E02 sits in the middle of the key and would never match a startsWith check.
+    const showNorm = normalize(overlayCurrentShow.title);
+    const epCode   = normalize(`s${padS}e${padE}`);
+
     let thumbUrl = '';
     // Check thumbMap first (image files stored outside the Posters folder — have .id)
     for (const key of Object.keys(thumbMap)) {
-      if (key.startsWith(prefix) && key.includes('thumb')) {
+      if (key.startsWith(showNorm) && key.includes(epCode) && key.includes('thumb')) {
         if (thumbMap[key].id) {
           thumbUrl = `https://drive.google.com/thumbnail?id=${thumbMap[key].id}&sz=w400`;
         }
@@ -711,7 +716,7 @@ function renderOverlayEpisodes() {
     // Fall back to posterMap (image files stored inside the Posters folder — are plain URL strings)
     if (!thumbUrl) {
       for (const key of Object.keys(posterMap)) {
-        if (key.startsWith(prefix) && key.includes('thumb')) {
+        if (key.startsWith(showNorm) && key.includes(epCode) && key.includes('thumb')) {
           // posterMap values are already thumbnail URLs (sz=w200); bump to w400 for episode display
           thumbUrl = String(posterMap[key]).replace(/sz=w\d+/, 'sz=w400');
           break;
