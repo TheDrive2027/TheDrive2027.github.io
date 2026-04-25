@@ -754,10 +754,11 @@ function renderOverlayEpisodes() {
     }
     // Fall back to posterMap (image files stored inside the Posters folder — are plain URL strings)
     if (!thumbUrl) {
-      for (const key of Object.keys(posterMap)) {
+      for (const [rawKey, val] of Object.entries(posterMap)) {
+        const key = normalize(rawKey.replace(/\.[a-z0-9]{2,5}$/i, ''));
         if (key.startsWith(showNorm) && key.includes(epCode) && key.includes('thumb')) {
           // posterMap values are already thumbnail URLs (sz=w200); bump to w400 for episode display
-          thumbUrl = String(posterMap[key]).replace(/sz=w\d+/, 'sz=w400');
+          thumbUrl = String(val).replace(/sz=w\d+/, 'sz=w400');
           break;
         }
       }
@@ -847,14 +848,7 @@ function fetchScriptJSON(url, bustCache = false) {
 
 function applyDriveData(rawData, csvRows) {
   const rawMovies = rawData.movies || rawData;
-  // Normalize poster keys: strip file extensions so "Breaking Bad.jpg" → "breakingbad"
-  // and matches the normalize(title) lookup used in mergeData and applyDriveData.
-  const rawPosters = rawData.posters || {};
-  posterMap = {};
-  for (const [k, v] of Object.entries(rawPosters)) {
-    const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
-    posterMap[cleanKey] = v;
-  }
+  posterMap = rawData.posters || {};
   if (rawData.requests) {
     requestCounts = {};
     for (const [k, v] of Object.entries(rawData.requests)) requestCounts[normalize(k)] = v;
@@ -893,7 +887,7 @@ function applyDriveData(rawData, csvRows) {
   // Auto-match show posters from the Drive folder
   if (allShows.length > 0) {
     allShows.forEach(show => {
-      const autoPoster = posterMap[normalize(show.title)];
+      const autoPoster = findPosterMatch(show.title, posterMap);
       if (!show.poster && autoPoster) {
         show.poster = autoPoster;
       }
@@ -993,6 +987,10 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
 
     if (cacheAgeS !== null && cacheAgeS > BACKGROUND_REFRESH_THRESHOLD_S) {
       setTimeout(() => loadDataBulkFallback(driveURL, csvRows, false, true), 2000);
+    } else {
+      // Always refresh posters/thumbnails from Drive on every page load,
+      // even when the main file cache is fresh.
+      setTimeout(() => refreshPostersInBackground(driveURL, csvRows), 1500);
     }
     return;
   }
@@ -1108,6 +1106,95 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
   updateLastUpdated();
 }
 
+// ─── BACKGROUND POSTER REFRESH ────────────────────────────────
+// Runs on every page load after serving main data from cache.
+// Fetches only the poster/thumbnail files from Drive and patches
+// posterMap + thumbMap without touching the progress bar or movie data.
+async function refreshPostersInBackground(driveURL, csvRows) {
+  let files = [];
+  try {
+    const listData = await jsonpAction(driveURL + '?action=getFileList');
+    if (listData && listData.ok && Array.isArray(listData.files)) files = listData.files;
+    else return;
+  } catch(e) { return; }
+
+  // Only process files that are in the Posters folder or are images
+  const posterFiles = files.filter(f => f.isPosters);
+  if (!posterFiles.length) return;
+
+  const BATCH_SIZE = 10;
+  const freshPosters = {};
+  const freshThumbs  = {};
+
+  for (let i = 0; i < posterFiles.length; i += BATCH_SIZE) {
+    const batch    = posterFiles.slice(i, i + BATCH_SIZE);
+    const fileIds  = batch.map(f => f.id).join(',');
+    const isPosters = batch.map(() => '1').join(',');
+    try {
+      const result = await jsonpAction(
+        driveURL + '?action=scanFiles'
+        + '&fileIds='   + encodeURIComponent(fileIds)
+        + '&isPosters=' + encodeURIComponent(isPosters)
+        + '&key='       + encodeURIComponent(getSavedKey() || '')
+        + '&did='       + encodeURIComponent(getDeviceId())
+      );
+      if (result && result.ok) {
+        Object.assign(freshPosters, result.posters || {});
+        // Collect any image entries that landed in result.movies (thumbs stored outside Posters folder)
+        for (const [k, v] of Object.entries(result.movies || {})) {
+          if (typeof v === 'object' && v !== null && v.mimeType && v.mimeType.startsWith('image/')) {
+            freshThumbs[k] = v;
+          }
+        }
+      }
+    } catch(e) { /* skip failed batch */ }
+    if (i + BATCH_SIZE < posterFiles.length) await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Patch the global maps and re-render anything that uses them
+  if (Object.keys(freshPosters).length || Object.keys(freshThumbs).length) {
+    // Merge into existing maps (fresh data wins)
+    for (const [k, v] of Object.entries(freshPosters)) {
+      const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
+      posterMap[cleanKey] = v;
+    }
+    Object.assign(thumbMap, freshThumbs);
+
+    // Patch poster onto each movie card that currently has none
+    allMovies.forEach(m => {
+      if (!m.poster) m.poster = findPosterMatch(m.title, posterMap) || null;
+    });
+
+    // Patch show posters and re-render the shows grid
+    let showsNeedRender = false;
+    allShows.forEach(show => {
+      const fresh = posterMap[normalize(show.title)];
+      if (fresh && show.poster !== fresh) { show.poster = fresh; showsNeedRender = true; }
+      else if (!show.poster && fresh)     { show.poster = fresh; showsNeedRender = true; }
+    });
+    if (showsNeedRender && showDriveMerged) renderShows();
+
+    // If the episode overlay is open, refresh its thumbnails too
+    if (overlayCurrentShow) renderOverlayEpisodes();
+
+    // Re-render movie cards to pick up any newly matched posters
+    renderCurrentView();
+  }
+}
+
+function findPosterMatch(title, posterMap) {
+  const key = normalize(title);
+  // 1. Direct normalized key lookup (fast path — works when keys are already normalized)
+  if (posterMap[key] !== undefined) return posterMap[key];
+  // 2. Iterate and normalize both sides, stripping file extensions from poster keys
+  //    so "Breaking Bad.jpg", "INVINCIBLE.jpg", "Phineas and Ferb.jpg" all match correctly.
+  for (const [rawKey, val] of Object.entries(posterMap)) {
+    const normalizedPosterKey = normalize(rawKey.replace(/\.[a-z0-9]{2,5}$/i, ''));
+    if (normalizedPosterKey === key) return val;
+  }
+  return null;
+}
+
 function mergeData(rows, driveMap, posterMap = {}) {
   const mapped = rows.map(row => {
     const title          = row.title || row.movie_title || row['movie title'] || '';
@@ -1118,8 +1205,7 @@ function mergeData(rows, driveMap, posterMap = {}) {
     const fileSize       = row.file_size || row.filesize || row.size || '';
     const imdbRating     = row.imdb_rating || row.imdbrating || row.imdb || '';
     const match          = findDriveMatch(title, driveMap);
-    const posterKey      = normalize(title);
-    const poster         = posterMap[posterKey] || null;
+    const poster         = findPosterMatch(title, posterMap);
     return { title, runtime, resolution, maturityRating, releaseDate, year: extractYear(releaseDate), fileSize, imdbRating, available: !!match, driveLink: match ? match.link : null, driveResolution: match ? (match.name || '') : '', poster };
   }).filter(m => m.title);
 
