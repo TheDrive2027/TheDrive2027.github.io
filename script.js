@@ -847,7 +847,14 @@ function fetchScriptJSON(url, bustCache = false) {
 
 function applyDriveData(rawData, csvRows) {
   const rawMovies = rawData.movies || rawData;
-  posterMap = rawData.posters || {};
+  // Normalize poster keys: strip file extensions so "Breaking Bad.jpg" → "breakingbad"
+  // and matches the normalize(title) lookup used in mergeData and applyDriveData.
+  const rawPosters = rawData.posters || {};
+  posterMap = {};
+  for (const [k, v] of Object.entries(rawPosters)) {
+    const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
+    posterMap[cleanKey] = v;
+  }
   if (rawData.requests) {
     requestCounts = {};
     for (const [k, v] of Object.entries(rawData.requests)) requestCounts[normalize(k)] = v;
