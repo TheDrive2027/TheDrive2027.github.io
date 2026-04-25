@@ -699,16 +699,24 @@ function renderOverlayEpisodes() {
     const prefix = normalize(`${overlayCurrentShow.title} s${padS}e${padE}`);
     
     let thumbUrl = '';
-     console.log('thumbMap keys:', Object.keys(thumbMap).slice(0, 10));
-     console.log('looking for prefix:', prefix);
-     console.log('posterMap keys:', Object.keys(posterMap).slice(0, 20));
+    // Check thumbMap first (image files stored outside the Posters folder — have .id)
     for (const key of Object.keys(thumbMap)) {
-       if (key.startsWith(prefix) && key.includes('thumb')) {
-           if (thumbMap[key].id) {
-               thumbUrl = `https://drive.google.com/thumbnail?id=${thumbMap[key].id}&sz=w400`;
-           }
-           break;
-       }
+      if (key.startsWith(prefix) && key.includes('thumb')) {
+        if (thumbMap[key].id) {
+          thumbUrl = `https://drive.google.com/thumbnail?id=${thumbMap[key].id}&sz=w400`;
+        }
+        break;
+      }
+    }
+    // Fall back to posterMap (image files stored inside the Posters folder — are plain URL strings)
+    if (!thumbUrl) {
+      for (const key of Object.keys(posterMap)) {
+        if (key.startsWith(prefix) && key.includes('thumb')) {
+          // posterMap values are already thumbnail URLs (sz=w200); bump to w400 for episode display
+          thumbUrl = String(posterMap[key]).replace(/sz=w\d+/, 'sz=w400');
+          break;
+        }
+      }
     }
 
     const epTitleStr = ep.title ? escHtml(ep.title) : 'Episode ' + ep.num;
