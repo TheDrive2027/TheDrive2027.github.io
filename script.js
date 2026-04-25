@@ -4,8 +4,15 @@
    ============================================================= */
 
 // ─── CONFIG ───────────────────────────────────────────────────
-const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?output=csv';
+// Movies sheet (gid=121928462)
+const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=121928462';
+// Shows sheet (gid=1799938400)
+const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=1799938400';
 const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwBWxYO905TW4Np1JAxFKgbGApQXtO-HDmifw2mz_6ZIVn9Px5sK-YBCPB7ldzwBIlr9Q/exec';
+
+// Auto-reload the full tab every 30 minutes
+const AUTO_RELOAD_MS = 30 * 60 * 1000;
+setTimeout(() => location.reload(), AUTO_RELOAD_MS);
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
 const LOCAL_KEY_STORE = 'thedrive_access_key_v1';
@@ -234,10 +241,12 @@ const DEMO_DRIVE = {
 
 // ─── STATE ────────────────────────────────────────────────────
 let allMovies  = [];
+let allShows   = [];   // parsed show entries from the Shows sheet
 let filtered   = [];
 let currentSort = 'title';
 let currentDir  = 'asc';
 let isDemoMode  = false;
+let activeTab  = 'movies'; // 'movies' | 'shows' | 'stats'
 let posterMap   = {};
 
 // Active sidebar filters
@@ -550,6 +559,183 @@ function updateLastUpdated(date) {
 }
 
 function setProgress(pct) { scanFill.style.width = pct + '%'; }
+
+// ─── SHOWS SHEET PARSER ───────────────────────────────────────
+// Expected sheet columns (row 1 = headers):
+//   show_title | season | episode | episode_title | drive_link | poster_url | imdb_rating | status
+//   status: "uploaded" = available; anything else or blank with no link = not uploaded
+//
+// Groups into: allShows = [{ title, poster, imdbRating, seasons:[{ num, episodes:[{ num, title, link, available }] }] }]
+function parseShowsCSV(text) {
+  const rows = parseCSV(text);
+  const showMap = new Map();
+
+  for (const row of rows) {
+    const showTitle  = (row.show_title  || row['show title']  || '').trim();
+    const season     = parseInt(row.season     || row.s  || '0', 10);
+    const episode    = parseInt(row.episode    || row.ep || row.e || '0', 10);
+    const epTitle    = (row.episode_title || row['episode title'] || row.ep_title || '').trim();
+    const driveLink  = (row.drive_link  || row['drive link']  || row.link   || '').trim();
+    const posterUrl  = (row.poster_url  || row['poster url']  || row.poster || '').trim();
+    const imdbRating = (row.imdb_rating || row['imdb rating'] || row.imdb   || '').trim();
+    const status     = (row.status      || '').trim().toLowerCase();
+    if (!showTitle || !season || !episode) continue;
+
+    if (!showMap.has(showTitle)) {
+      showMap.set(showTitle, { title: showTitle, poster: posterUrl || null, imdbRating: imdbRating || '', seasons: new Map() });
+    }
+    const show = showMap.get(showTitle);
+    if (!show.poster && posterUrl)       show.poster      = posterUrl;
+    if (!show.imdbRating && imdbRating)  show.imdbRating  = imdbRating;
+
+    if (!show.seasons.has(season)) show.seasons.set(season, []);
+    show.seasons.get(season).push({
+      num:       episode,
+      title:     epTitle,
+      link:      driveLink || null,
+      available: status === 'uploaded' || (status === '' && !!driveLink)
+    });
+  }
+
+  return Array.from(showMap.values()).map(show => ({
+    ...show,
+    seasons: Array.from(show.seasons.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([num, eps]) => ({ num, episodes: eps.sort((a, b) => a.num - b.num) }))
+  }));
+}
+
+function showAvailableCount(show) {
+  return show.seasons.reduce((t, s) => t + s.episodes.filter(e => e.available).length, 0);
+}
+function showTotalCount(show) {
+  return show.seasons.reduce((t, s) => t + s.episodes.length, 0);
+}
+
+// ─── SHOWS: load from sheet ────────────────────────────────────
+async function loadShowsData(forceRefresh = false) {
+  try {
+    const r = await fetchURL(SHOWS_CSV_URL, forceRefresh);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    allShows = parseShowsCSV(text);
+  } catch(e) {
+    console.warn('Shows CSV fetch error:', e);
+    allShows = [];
+  }
+  renderShows();
+}
+
+// ─── SHOWS: render the shows tab ─────────────────────────────
+function renderShows() {
+  const container = document.getElementById('shows-grid');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const countEl = document.getElementById('shows-count-label');
+  if (countEl) countEl.textContent = allShows.length + ' show' + (allShows.length !== 1 ? 's' : '');
+
+  if (!allShows.length) {
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No shows found.</p></div>';
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  allShows.forEach((show, i) => {
+    const availEps = showAvailableCount(show);
+    const totalEps = showTotalCount(show);
+    const card = document.createElement('div');
+    card.className = 'show-card';
+    card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
+    card.dataset.showTitle = show.title;
+
+    card.innerHTML = `
+      <div class="show-poster">
+        ${show.poster ? `<img src="${escHtml(show.poster)}" alt="${escHtml(show.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
+        <div class="show-poster-overlay">
+          <span class="show-ep-badge">${availEps}/${totalEps} eps</span>
+        </div>
+      </div>
+      <div class="show-title">${escHtml(show.title)}</div>
+      <div class="show-meta">
+        <span class="show-seasons-count">${show.seasons.length} season${show.seasons.length !== 1 ? 's' : ''}</span>
+        ${show.imdbRating ? `<span class="card-sep">·</span><span class="show-imdb">★ ${escHtml(show.imdbRating)}</span>` : ''}
+      </div>
+      <div class="show-seasons" id="show-seasons-${i}"></div>
+    `;
+    frag.appendChild(card);
+  });
+  container.appendChild(frag);
+
+  // Render season/episode accordions
+  allShows.forEach((show, i) => {
+    const seasonsEl = document.getElementById('show-seasons-' + i);
+    if (!seasonsEl) return;
+    show.seasons.forEach(season => {
+      const seasonDiv = document.createElement('div');
+      seasonDiv.className = 'show-season';
+
+      const availInSeason = season.episodes.filter(e => e.available).length;
+      seasonDiv.innerHTML = `
+        <button class="show-season-btn" aria-expanded="false">
+          <span class="show-season-label">Season ${season.num}</span>
+          <span class="show-season-count">${availInSeason}/${season.episodes.length}</span>
+          <span class="show-season-chevron">›</span>
+        </button>
+        <div class="show-episode-list" hidden>
+          ${season.episodes.map(ep => `
+            <div class="show-episode ${ep.available ? 'show-episode--available' : 'show-episode--missing'}">
+              <span class="show-ep-num">E${ep.num}</span>
+              <span class="show-ep-title">${ep.title ? escHtml(ep.title) : 'Episode ' + ep.num}</span>
+              ${ep.available && ep.link
+                ? `<a class="show-ep-play" href="${escHtml(ep.link)}" target="_blank" rel="noopener" title="Watch">&#9654;</a>`
+                : ep.available
+                  ? `<span class="show-ep-play show-ep-play--nolink" title="Available (no direct link)">&#9654;</span>`
+                  : `<span class="show-ep-status">NOT UPLOADED</span>`}
+            </div>
+          `).join('')}
+        </div>
+      `;
+      seasonsEl.appendChild(seasonDiv);
+    });
+  });
+
+  // Accordion toggle
+  container.querySelectorAll('.show-season-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const list     = btn.nextElementSibling;
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!expanded));
+      list.hidden = expanded;
+      btn.querySelector('.show-season-chevron').style.transform = expanded ? '' : 'rotate(90deg)';
+    });
+  });
+}
+
+
+
+// ─── SHOWS: filtered render ───────────────────────────────────
+function filterAndRenderShows() {
+  const input = document.getElementById('shows-search-input');
+  const q     = normalize(input ? input.value : '');
+  const countEl = document.getElementById('shows-count-label');
+
+  const visible = q
+    ? allShows.filter(s => normalize(s.title).includes(q))
+    : allShows;
+
+  // Temporarily replace allShows for render, then restore
+  const saved = allShows;
+  allShows = visible;
+  renderShows();
+  allShows = saved;
+
+  if (countEl) {
+    countEl.textContent = visible.length === allShows.length
+      ? allShows.length + ' show' + (allShows.length !== 1 ? 's' : '')
+      : 'Showing ' + visible.length + ' of ' + allShows.length;
+  }
+}
 
 // ─── FETCH & MERGE ────────────────────────────────────────────
 async function fetchURL(url, bustCache = false) {
@@ -1381,6 +1567,7 @@ if (refreshBtn) {
 
   await initWithGate();
   loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL);
+  loadShowsData();
 
   if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
     fetchOnlineCount();
@@ -1392,13 +1579,31 @@ if (refreshBtn) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
+      activeTab = tab;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
-      if (tab === 'stats') initStatsTab();
+      if (tab === 'stats')  initStatsTab();
+      if (tab === 'shows')  renderShows();
     });
   });
+
+  // ── Shows search ──
+  const showsSearchInput = document.getElementById('shows-search-input');
+  const showsClearSearch = document.getElementById('shows-clear-search');
+  if (showsSearchInput) {
+    showsSearchInput.addEventListener('input', () => {
+      if (showsClearSearch) showsClearSearch.classList.toggle('visible', showsSearchInput.value.length > 0);
+      filterAndRenderShows();
+    });
+  }
+  if (showsClearSearch) {
+    showsClearSearch.addEventListener('click', () => {
+      if (showsSearchInput) { showsSearchInput.value = ''; showsClearSearch.classList.remove('visible'); }
+      filterAndRenderShows();
+    });
+  }
 })();
 
 // ─── ONLINE COUNT ─────────────────────────────────────────────
