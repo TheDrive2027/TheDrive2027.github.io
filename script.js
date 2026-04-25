@@ -632,9 +632,6 @@ function renderShows() {
   if (!container) return;
   container.innerHTML = '';
 
-  const countEl = document.getElementById('shows-count-label');
-  if (countEl) countEl.textContent = allShows.length + ' show' + (allShows.length !== 1 ? 's' : '');
-
   if (!allShows.length) {
     container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No shows found.</p></div>';
     return;
@@ -645,80 +642,134 @@ function renderShows() {
     const availEps = showAvailableCount(show);
     const totalEps = showTotalCount(show);
     const card = document.createElement('div');
-    card.className = 'show-card';
+    card.className = 'movie-card show-card-item';
     card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
-    card.dataset.showTitle = show.title;
+    card.dataset.showIndex = i;
+    card.style.cursor = 'pointer';
 
     card.innerHTML = `
-      <div class="show-poster">
+      <div class="card-poster card-poster--playable">
         ${show.poster ? `<img src="${escHtml(show.poster)}" alt="${escHtml(show.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
+        <div class="card-play-overlay show-card-click-overlay">
+          <div class="card-play-btn">
+            <span class="card-play-icon" style="font-size:11px;letter-spacing:.5px;font-family:var(--font-mono)">EPISODES</span>
+          </div>
+        </div>
         <div class="show-poster-overlay">
           <span class="show-ep-badge">${availEps}/${totalEps} eps</span>
         </div>
       </div>
-      <div class="show-title">${escHtml(show.title)}</div>
-      <div class="show-meta">
-        <span class="show-seasons-count">${show.seasons.length} season${show.seasons.length !== 1 ? 's' : ''}</span>
-        ${show.imdbRating ? `<span class="card-sep">·</span><span class="show-imdb">★ ${escHtml(show.imdbRating)}</span>` : ''}
+      <div class="card-title">${escHtml(show.title)}</div>
+      <div class="card-meta">
+        <span class="card-year">${show.seasons.length} Season${show.seasons.length !== 1 ? 's' : ''}</span>
+        ${show.imdbRating ? `<span class="card-sep">·</span><span class="card-imdb imdb-${parseFloat(show.imdbRating) >= 8 ? 'high' : parseFloat(show.imdbRating) >= 6.5 ? 'mid' : 'low'}">★ ${escHtml(show.imdbRating)}</span>` : ''}
       </div>
-      <div class="show-seasons" id="show-seasons-${i}"></div>
+      <div class="card-footer">
+        <span class="status-pill ${availEps > 0 ? 'status-available' : 'status-missing'}">
+          ${availEps > 0 ? 'AVAILABLE' : 'NOT UPLOADED'}
+        </span>
+      </div>
     `;
+
+    card.addEventListener('click', () => openShowOverlay(show));
     frag.appendChild(card);
   });
   container.appendChild(frag);
-
-  // Render season/episode accordions
-  allShows.forEach((show, i) => {
-    const seasonsEl = document.getElementById('show-seasons-' + i);
-    if (!seasonsEl) return;
-    show.seasons.forEach(season => {
-      const seasonDiv = document.createElement('div');
-      seasonDiv.className = 'show-season';
-
-      const availInSeason = season.episodes.filter(e => e.available).length;
-      seasonDiv.innerHTML = `
-        <button class="show-season-btn" aria-expanded="false">
-          <span class="show-season-label">Season ${season.num}</span>
-          <span class="show-season-count">${availInSeason}/${season.episodes.length}</span>
-          <span class="show-season-chevron">›</span>
-        </button>
-        <div class="show-episode-list" hidden>
-          ${season.episodes.map(ep => `
-            <div class="show-episode ${ep.available ? 'show-episode--available' : 'show-episode--missing'}">
-              <span class="show-ep-num">E${ep.num}</span>
-              <span class="show-ep-title">${ep.title ? escHtml(ep.title) : 'Episode ' + ep.num}</span>
-              ${ep.available && ep.link
-                ? `<a class="show-ep-play" href="${escHtml(ep.link)}" target="_blank" rel="noopener" title="Watch">&#9654;</a>`
-                : ep.available
-                  ? `<span class="show-ep-play show-ep-play--nolink" title="Available (no direct link)">&#9654;</span>`
-                  : `<span class="show-ep-status">NOT UPLOADED</span>`}
-            </div>
-          `).join('')}
-        </div>
-      `;
-      seasonsEl.appendChild(seasonDiv);
-    });
-  });
-
-  // Accordion toggle
-  container.querySelectorAll('.show-season-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const list     = btn.nextElementSibling;
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
-      btn.setAttribute('aria-expanded', String(!expanded));
-      list.hidden = expanded;
-      btn.querySelector('.show-season-chevron').style.transform = expanded ? '' : 'rotate(90deg)';
-    });
-  });
 }
+
+// ─── SHOW OVERLAY ─────────────────────────────────────────────
+let overlayCurrentShow = null;
+let overlayCurrentSeason = 0;
+
+function openShowOverlay(show) {
+  overlayCurrentShow = show;
+  overlayCurrentSeason = show.seasons[0] ? show.seasons[0].num : 1;
+
+  const overlay = document.getElementById('show-overlay');
+  const posterEl = document.getElementById('show-overlay-poster');
+  const titleEl  = document.getElementById('show-overlay-title');
+  const metaEl   = document.getElementById('show-overlay-meta');
+  const seasonsEl = document.getElementById('show-overlay-seasons');
+
+  if (posterEl) { posterEl.src = show.poster || ''; posterEl.alt = show.title; }
+  if (titleEl)  titleEl.textContent = show.title;
+  if (metaEl) {
+    const totalEps = showTotalCount(show), availEps = showAvailableCount(show);
+    metaEl.innerHTML = `
+      <span>${show.seasons.length} Season${show.seasons.length !== 1 ? 's' : ''}</span>
+      <span class="card-sep">·</span>
+      <span>${availEps}/${totalEps} eps available</span>
+      ${show.imdbRating ? `<span class="card-sep">·</span><span style="color:var(--accent)">★ ${escHtml(show.imdbRating)}</span>` : ''}
+    `;
+  }
+
+  // Season tabs
+  if (seasonsEl) {
+    seasonsEl.innerHTML = show.seasons.map(s => `
+      <button class="show-overlay-season-btn ${s.num === overlayCurrentSeason ? 'active' : ''}" data-season="${s.num}">
+        S${s.num}
+      </button>
+    `).join('');
+    seasonsEl.querySelectorAll('.show-overlay-season-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlayCurrentSeason = parseInt(btn.dataset.season, 10);
+        seasonsEl.querySelectorAll('.show-overlay-season-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.season, 10) === overlayCurrentSeason));
+        renderOverlayEpisodes();
+      });
+    });
+  }
+
+  renderOverlayEpisodes();
+
+  if (overlay) {
+    overlay.removeAttribute('hidden');
+    requestAnimationFrame(() => overlay.classList.add('show-overlay--open'));
+  }
+  document.body.style.overflow = 'hidden';
+}
+
+function renderOverlayEpisodes() {
+  const episodesEl = document.getElementById('show-overlay-episodes');
+  if (!episodesEl || !overlayCurrentShow) return;
+  const season = overlayCurrentShow.seasons.find(s => s.num === overlayCurrentSeason);
+  if (!season) { episodesEl.innerHTML = ''; return; }
+
+  episodesEl.innerHTML = season.episodes.map(ep => `
+    <div class="show-overlay-ep ${ep.available ? 'show-overlay-ep--available' : 'show-overlay-ep--missing'}">
+      <span class="show-overlay-ep-num">E${ep.num}</span>
+      <span class="show-overlay-ep-title">${ep.title ? escHtml(ep.title) : 'Episode ' + ep.num}</span>
+      ${ep.available && ep.link
+        ? `<a class="show-overlay-ep-play drive-link" href="${escHtml(ep.link)}" target="_blank" rel="noopener" data-title="${escHtml(overlayCurrentShow.title)}" title="Watch">&#9654;</a>`
+        : ep.available
+          ? `<span class="show-overlay-ep-play show-overlay-ep-play--nolink" title="Available (no direct link)">&#9654;</span>`
+          : `<span class="show-overlay-ep-status">NOT UPLOADED</span>`}
+    </div>
+  `).join('');
+}
+
+function closeShowOverlay() {
+  const overlay = document.getElementById('show-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('show-overlay--open');
+  setTimeout(() => { overlay.setAttribute('hidden', ''); }, 280);
+  document.body.style.overflow = '';
+  overlayCurrentShow = null;
+}
+
+// Wire up overlay close
+document.addEventListener('DOMContentLoaded', () => {
+  const closeBtn = document.getElementById('show-overlay-close');
+  const backdrop = document.getElementById('show-overlay-backdrop');
+  if (closeBtn)  closeBtn.addEventListener('click', closeShowOverlay);
+  if (backdrop)  backdrop.addEventListener('click', closeShowOverlay);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShowOverlay(); });
+});
 
 
 
 // ─── SHOWS: filtered render ───────────────────────────────────
 function filterAndRenderShows() {
-  const input = document.getElementById('shows-search-input');
-  const q     = normalize(input ? input.value : '');
-  const countEl = document.getElementById('shows-count-label');
+  const q = normalize(searchInput ? searchInput.value : '');
 
   const visible = q
     ? allShows.filter(s => normalize(s.title).includes(q))
@@ -729,12 +780,6 @@ function filterAndRenderShows() {
   allShows = visible;
   renderShows();
   allShows = saved;
-
-  if (countEl) {
-    countEl.textContent = visible.length === allShows.length
-      ? allShows.length + ' show' + (allShows.length !== 1 ? 's' : '')
-      : 'Showing ' + visible.length + ' of ' + allShows.length;
-  }
 }
 
 // ─── FETCH & MERGE ────────────────────────────────────────────
@@ -1393,7 +1438,14 @@ if (searchInput) {
     const query = searchInput.value;
     if (clearSearch) clearSearch.classList.toggle('visible', query.length > 0);
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { render(); saveSettings(); }, 200);
+    searchTimer = setTimeout(() => {
+      if (activeTab === 'shows') {
+        filterAndRenderShows();
+      } else {
+        render();
+        saveSettings();
+      }
+    }, 200);
     clearTimeout(searchLogTimer);
     if (query.trim().length > 0) searchLogTimer = setTimeout(() => logClientEvent('Search', query.trim()), 1500);
   });
@@ -1403,8 +1455,12 @@ if (clearSearch) {
   clearSearch.addEventListener('click', () => {
     searchInput.value = '';
     clearSearch.classList.remove('visible');
-    render();
-    saveSettings();
+    if (activeTab === 'shows') {
+      filterAndRenderShows();
+    } else {
+      render();
+      saveSettings();
+    }
     searchInput.focus();
   });
 }
@@ -1585,25 +1641,11 @@ if (refreshBtn) {
       btn.classList.add('active');
       document.getElementById('tab-' + tab).classList.add('active');
       if (tab === 'stats')  initStatsTab();
-      if (tab === 'shows')  renderShows();
+      if (tab === 'shows')  filterAndRenderShows();
     });
   });
 
-  // ── Shows search ──
-  const showsSearchInput = document.getElementById('shows-search-input');
-  const showsClearSearch = document.getElementById('shows-clear-search');
-  if (showsSearchInput) {
-    showsSearchInput.addEventListener('input', () => {
-      if (showsClearSearch) showsClearSearch.classList.toggle('visible', showsSearchInput.value.length > 0);
-      filterAndRenderShows();
-    });
-  }
-  if (showsClearSearch) {
-    showsClearSearch.addEventListener('click', () => {
-      if (showsSearchInput) { showsSearchInput.value = ''; showsClearSearch.classList.remove('visible'); }
-      filterAndRenderShows();
-    });
-  }
+  // ── Shows search now handled by main search bar ──
 })();
 
 // ─── ONLINE COUNT ─────────────────────────────────────────────
