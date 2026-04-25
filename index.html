@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>THE DRIVE — Movie Library</title>
+  <title>THE DRIVE — Library</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -66,6 +66,7 @@
     <!-- TAB NAV -->
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="movies">MOVIES</button>
+      <button class="tab-btn" data-tab="shows">SHOWS</button>
       <button class="tab-btn" data-tab="stats">STATS</button>
     </nav>
 
@@ -199,6 +200,24 @@
       </main>
     </div>
   </div><!-- /tab-movies -->
+
+
+  <!-- SHOWS TAB -->
+  <div id="tab-shows" class="tab-panel">
+    <div class="shows-page">
+      <div class="shows-toolbar">
+        <div class="search-wrap shows-search-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="shows-search-input" placeholder="Search shows…" autocomplete="off" spellcheck="false" />
+          <button class="clear-search" id="shows-clear-search" title="Clear">✕</button>
+        </div>
+        <span class="shows-count-label" id="shows-count-label"></span>
+      </div>
+      <div class="shows-grid" id="shows-grid">
+        <div class="empty-state"><span class="empty-icon">◻</span><p>Loading shows…</p></div>
+      </div>
+    </div>
+  </div><!-- /tab-shows -->
 
   <!-- STATS TAB -->
   <div id="tab-stats" class="tab-panel">
