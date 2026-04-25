@@ -1050,7 +1050,7 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
   const finalPayload = { movies: accumMovies, posters: accumPosters, requests: liveRequests, ratings: liveRatings };
   applyDriveData(finalPayload, csvRows);
 
-  { const total = allMovies.length, available = allMovies.filter(m => m.available).length; pushSnapshot(total, available); }
+  { const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length; const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0); const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0); pushSnapshot(totalMovies + totalEps, availMovies + availEps); }
 
   try {
     fetch(driveURL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'writeCache', payload: finalPayload, key: getSavedKey() || '', did: getDeviceId() }), mode: 'no-cors' }).catch(() => {});
@@ -1779,7 +1779,7 @@ function fetchStatsData() {
 
 function renderLibraryChart(snapshots) {
   const canvas = $('chart-library'); if (!canvas) return;
-  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Movies', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Movies') };
+  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Files', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available Files', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Files') };
   if (chartLibrary) chartLibrary.destroy();
   chartLibrary = new Chart(canvas, cfg);
 }
