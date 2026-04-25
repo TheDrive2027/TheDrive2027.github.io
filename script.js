@@ -598,6 +598,14 @@ async function loadShowsData(forceRefresh = false) {
     }
   }
 
+  // Apply any posters already in posterMap before rendering
+  if (Object.keys(posterMap).length) {
+    allShows.forEach(show => {
+      const p = findPosterMatch(show.title, posterMap);
+      if (p) show.poster = p;
+    });
+  }
+
   renderShows();
 }
 
@@ -987,10 +995,6 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
 
     if (cacheAgeS !== null && cacheAgeS > BACKGROUND_REFRESH_THRESHOLD_S) {
       setTimeout(() => loadDataBulkFallback(driveURL, csvRows, false, true), 2000);
-    } else {
-      // Always refresh posters/thumbnails from Drive on every page load,
-      // even when the main file cache is fresh.
-      setTimeout(() => refreshPostersInBackground(driveURL, csvRows), 1500);
     }
     return;
   }
@@ -1107,78 +1111,94 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
 }
 
 // ─── BACKGROUND POSTER REFRESH ────────────────────────────────
-// Runs on every page load after serving main data from cache.
-// Fetches only the poster/thumbnail files from Drive and patches
-// posterMap + thumbMap without touching the progress bar or movie data.
+// Runs on every page load after serving from cache. Fetches poster-folder
+// files only, rendering each batch immediately as it arrives.
+// Posters (show cards / movie cards) are fetched first, then episode
+// thumbnails, so the most visible images appear as fast as possible.
 async function refreshPostersInBackground(driveURL, csvRows) {
-  let files = [];
+  let allPosterFiles = [];
   try {
     const listData = await jsonpAction(driveURL + '?action=getFileList');
-    if (listData && listData.ok && Array.isArray(listData.files)) files = listData.files;
-    else return;
+    if (listData && listData.ok && Array.isArray(listData.files)) {
+      allPosterFiles = listData.files.filter(f => f.isPosters);
+    }
   } catch(e) { return; }
 
-  // Only process files that are in the Posters folder or are images
-  const posterFiles = files.filter(f => f.isPosters);
-  if (!posterFiles.length) return;
+  if (!allPosterFiles.length) return;
 
-  const BATCH_SIZE = 10;
-  const freshPosters = {};
-  const freshThumbs  = {};
+  // Split: episode thumbnails (filename contains "thumb") go last
+  const posterFiles = allPosterFiles.filter(f => !normalize(f.name || '').includes('thumb'));
+  const thumbFiles  = allPosterFiles.filter(f =>  normalize(f.name || '').includes('thumb'));
 
-  for (let i = 0; i < posterFiles.length; i += BATCH_SIZE) {
-    const batch    = posterFiles.slice(i, i + BATCH_SIZE);
-    const fileIds  = batch.map(f => f.id).join(',');
+  const BATCH = 10;
+
+  // Helper: scan one batch, merge results into global maps, re-render immediately
+  async function scanAndApplyBatch(batch, isThumbBatch) {
+    const fileIds   = batch.map(f => f.id).join(',');
     const isPosters = batch.map(() => '1').join(',');
+    let result;
     try {
-      const result = await jsonpAction(
+      result = await jsonpAction(
         driveURL + '?action=scanFiles'
         + '&fileIds='   + encodeURIComponent(fileIds)
         + '&isPosters=' + encodeURIComponent(isPosters)
         + '&key='       + encodeURIComponent(getSavedKey() || '')
         + '&did='       + encodeURIComponent(getDeviceId())
       );
-      if (result && result.ok) {
-        Object.assign(freshPosters, result.posters || {});
-        // Collect any image entries that landed in result.movies (thumbs stored outside Posters folder)
-        for (const [k, v] of Object.entries(result.movies || {})) {
-          if (typeof v === 'object' && v !== null && v.mimeType && v.mimeType.startsWith('image/')) {
-            freshThumbs[k] = v;
-          }
-        }
+    } catch(e) { return; }
+    if (!result || !result.ok) return;
+
+    // Merge fresh posters into posterMap
+    let postersChanged = false;
+    for (const [k, v] of Object.entries(result.posters || {})) {
+      const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
+      if (posterMap[cleanKey] !== v) { posterMap[cleanKey] = v; postersChanged = true; }
+    }
+
+    // Merge any image entries that landed in movies (thumbs outside Posters folder)
+    let thumbsChanged = false;
+    for (const [k, v] of Object.entries(result.movies || {})) {
+      if (typeof v === 'object' && v !== null && v.mimeType && v.mimeType.startsWith('image/')) {
+        if (thumbMap[k] !== v) { thumbMap[k] = v; thumbsChanged = true; }
       }
-    } catch(e) { /* skip failed batch */ }
-    if (i + BATCH_SIZE < posterFiles.length) await new Promise(r => setTimeout(r, 300));
+    }
+
+    if (!postersChanged && !thumbsChanged) return;
+
+    if (!isThumbBatch && postersChanged) {
+      // Update show card posters immediately
+      let showsChanged = false;
+      allShows.forEach(show => {
+        const fresh = findPosterMatch(show.title, posterMap);
+        if (fresh && show.poster !== fresh) { show.poster = fresh; showsChanged = true; }
+      });
+      if (showsChanged && showDriveMerged) renderShows();
+
+      // Update movie card posters immediately
+      let moviesChanged = false;
+      allMovies.forEach(m => {
+        const fresh = findPosterMatch(m.title, posterMap);
+        if (fresh && m.poster !== fresh) { m.poster = fresh; moviesChanged = true; }
+      });
+      if (moviesChanged) renderCurrentView();
+    }
+
+    if (isThumbBatch && (thumbsChanged || postersChanged)) {
+      // Refresh the open episode overlay if any
+      if (overlayCurrentShow) renderOverlayEpisodes();
+    }
   }
 
-  // Patch the global maps and re-render anything that uses them
-  if (Object.keys(freshPosters).length || Object.keys(freshThumbs).length) {
-    // Merge into existing maps (fresh data wins)
-    for (const [k, v] of Object.entries(freshPosters)) {
-      const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
-      posterMap[cleanKey] = v;
-    }
-    Object.assign(thumbMap, freshThumbs);
+  // Phase 1: show/movie posters — render each batch as it arrives
+  for (let i = 0; i < posterFiles.length; i += BATCH) {
+    await scanAndApplyBatch(posterFiles.slice(i, i + BATCH), false);
+    if (i + BATCH < posterFiles.length) await new Promise(r => setTimeout(r, 300));
+  }
 
-    // Patch poster onto each movie card that currently has none
-    allMovies.forEach(m => {
-      if (!m.poster) m.poster = findPosterMatch(m.title, posterMap) || null;
-    });
-
-    // Patch show posters and re-render the shows grid
-    let showsNeedRender = false;
-    allShows.forEach(show => {
-      const fresh = posterMap[normalize(show.title)];
-      if (fresh && show.poster !== fresh) { show.poster = fresh; showsNeedRender = true; }
-      else if (!show.poster && fresh)     { show.poster = fresh; showsNeedRender = true; }
-    });
-    if (showsNeedRender && showDriveMerged) renderShows();
-
-    // If the episode overlay is open, refresh its thumbnails too
-    if (overlayCurrentShow) renderOverlayEpisodes();
-
-    // Re-render movie cards to pick up any newly matched posters
-    renderCurrentView();
+  // Phase 2: episode thumbnails — render each batch as it arrives
+  for (let i = 0; i < thumbFiles.length; i += BATCH) {
+    await scanAndApplyBatch(thumbFiles.slice(i, i + BATCH), true);
+    if (i + BATCH < thumbFiles.length) await new Promise(r => setTimeout(r, 300));
   }
 }
 
