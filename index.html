@@ -205,19 +205,30 @@
   <!-- SHOWS TAB -->
   <div id="tab-shows" class="tab-panel">
     <div class="shows-page">
-      <div class="shows-toolbar">
-        <div class="search-wrap shows-search-wrap">
-          <span class="search-icon">⌕</span>
-          <input type="text" id="shows-search-input" placeholder="Search shows…" autocomplete="off" spellcheck="false" />
-          <button class="clear-search" id="shows-clear-search" title="Clear">✕</button>
-        </div>
-        <span class="shows-count-label" id="shows-count-label"></span>
-      </div>
       <div class="shows-grid" id="shows-grid">
         <div class="empty-state"><span class="empty-icon">◻</span><p>Loading shows…</p></div>
       </div>
     </div>
   </div><!-- /tab-shows -->
+
+  <!-- SHOW EPISODE OVERLAY -->
+  <div class="show-overlay" id="show-overlay" hidden>
+    <div class="show-overlay-backdrop" id="show-overlay-backdrop"></div>
+    <div class="show-overlay-panel">
+      <div class="show-overlay-header">
+        <div class="show-overlay-poster-wrap">
+          <img class="show-overlay-poster" id="show-overlay-poster" src="" alt="" />
+        </div>
+        <div class="show-overlay-info">
+          <div class="show-overlay-title" id="show-overlay-title"></div>
+          <div class="show-overlay-meta" id="show-overlay-meta"></div>
+          <div class="show-overlay-seasons" id="show-overlay-seasons"></div>
+        </div>
+        <button class="show-overlay-close" id="show-overlay-close" title="Close">✕</button>
+      </div>
+      <div class="show-overlay-episodes" id="show-overlay-episodes"></div>
+    </div>
+  </div>
 
   <!-- STATS TAB -->
   <div id="tab-stats" class="tab-panel">
