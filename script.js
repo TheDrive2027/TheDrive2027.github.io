@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=121928462';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=1799938400';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyBi7ePRjn5G7Qnl5SfiRRd44a5OBbtwkyDkyOjOyNTH0ph9_W7hdze-KeyU4VbHdC5Q/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOrUlOJ2ahLzoPJcmuQpYK8caFC_nhaDJ9SkOpt4ohRUw-ii8hv0nNbUwke-_jbP3bBw/exec';
 
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
@@ -895,6 +895,8 @@ function jsonpAction(url) {
   });
 }
 
+const SEQUENTIAL_BATCH_SIZE = 10;
+
 async function loadData(sheetURL, scriptURL, forceRefresh = false) {
   setProgress(5);
   let csvRows = [];
@@ -951,46 +953,11 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
 }
 
 async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background = false) {
-  // ── Tuning constants ──────────────────────────────────────────────────────
-  // Each GAS scanFiles call processes files sequentially (~150 ms/file in Apps Script).
-  // 50 files × 150 ms = ~7.5 s, safely under the 30-second JSONP timeout.
-  // Fewer, larger batches means fewer round-trips and less JSONP overhead.
-  const SCAN_BATCH_SIZE = 50;
-
-  // Browsers allow ~6 parallel connections to the same host. Fire all batches at
-  // once (full Promise.all) — GAS queues them server-side and there is no artificial
-  // delay between waves. For very large libraries (>300 files) this saturates the
-  // browser connection pool naturally without needing a manual concurrency cap.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // ── 1. Fetch the file list AND ratings/requests in parallel ───────────────
-  // Ratings and requests were previously fetched *after* the scan completed.
-  // Kicking them off immediately cuts 2-3 s off the total wall-clock time.
-  const ratingsPromise  = jsonpAction(driveURL + '?action=getRatings&key='   + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&_cb=' + Date.now()).catch(() => ({}));
-  const requestsPromise = jsonpAction(driveURL + '?action=getRequests&key='  + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&_cb=' + Date.now()).catch(() => ({}));
-
-  // ── 2. File list — use sessionStorage to skip the round-trip on warm tabs ─
-  // The file list changes only when files are added/removed from Drive, which is
-  // rare relative to how often the page is refreshed. Caching it for the browser
-  // session saves one full Apps Script invocation on every non-first load.
-  const FILE_LIST_CACHE_KEY = 'thedrive_filelist_v1';
   let files = [];
   try {
-    if (!forceRefresh) {
-      try {
-        const cached = sessionStorage.getItem(FILE_LIST_CACHE_KEY);
-        if (cached) files = JSON.parse(cached);
-      } catch(e) {}
-    }
-    if (files.length === 0) {
-      const listData = await jsonpAction(driveURL + '?action=getFileList&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()));
-      if (listData && listData.ok && Array.isArray(listData.files)) {
-        files = listData.files;
-        try { sessionStorage.setItem(FILE_LIST_CACHE_KEY, JSON.stringify(files)); } catch(e) {}
-      } else {
-        throw new Error(listData && listData.error ? listData.error : 'getFileList failed');
-      }
-    }
+    const listData = await jsonpAction(driveURL + '?action=getFileList');
+    if (listData && listData.ok && Array.isArray(listData.files)) files = listData.files;
+    else throw new Error(listData && listData.error ? listData.error : 'getFileList failed');
   } catch (e) {
     if (!background) { showToast('⚠ Could not load Drive file list. Check the Script URL & deployment.'); setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300); }
     console.error('getFileList error:', e);
@@ -1004,89 +971,76 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
     return;
   }
 
-  // ── 3. Build batches then fire ALL of them simultaneously ─────────────────
   const accumMovies = {}, accumPosters = {}, accumRequests = {}, accumRatings = {};
+  const SCAN_BATCH_SIZE = 10, CONCURRENCY = 2; 
+  const INTER_BATCH_DELAY_MS = 350; 
   const total = files.length;
   const progressStart = 25, progressEnd = 95;
   const batches = [];
   for (let i = 0; i < total; i += SCAN_BATCH_SIZE) batches.push(files.slice(i, i + SCAN_BATCH_SIZE));
-
   let completedFiles = 0;
-  const failedFileIds = [];
+  const failedFileIds = []; 
 
-  // Fire every batch concurrently — no artificial delays, no wave-by-wave loops.
-  const batchPromises = batches.map((batch, batchIdx) => {
-    const fileIds   = batch.map(f => f.id).join(',');
-    const isPosters = batch.map(f => f.isPosters ? '1' : '0').join(',');
-    return jsonpAction(
-      driveURL + '?action=scanFiles' +
-      '&fileIds='   + encodeURIComponent(fileIds) +
-      '&isPosters=' + encodeURIComponent(isPosters) +
-      '&key='       + encodeURIComponent(getSavedKey() || '') +
-      '&did='       + encodeURIComponent(getDeviceId())
-    )
-    .then(result => ({ result, batch }))
-    .catch(() => ({ result: null, batch }));
-  });
-
-  // Process each batch as it resolves (Promise.allSettled-style via individual .then)
-  // so the UI updates progressively rather than waiting for the slowest batch.
-  let resolvedCount = 0;
-  const progressPromises = batchPromises.map(p => p.then(({ result, batch }) => {
-    resolvedCount++;
-    if (result && result.ok) {
-      Object.assign(accumMovies,  result.movies  || {});
-      Object.assign(accumPosters, result.posters || {});
-      if (Array.isArray(result.failedIds)) {
-        result.failedIds.forEach(fid => { const orig = batch.find(f => f.id === fid); if (orig) failedFileIds.push(orig); });
-      }
-    } else {
-      batch.forEach(f => failedFileIds.push(f));
-    }
-    completedFiles += batch.length;
-    if (!background) setProgress(progressStart + ((completedFiles / total) * (progressEnd - progressStart)));
-    // Re-render after each batch lands so content appears as fast as possible
-    applyDriveData({ movies: accumMovies, posters: accumPosters, requests: accumRequests, ratings: accumRatings }, csvRows);
-  }));
-
-  await Promise.all(progressPromises);
-
-  // ── 4. Retry failed files (once, no delay) ────────────────────────────────
-  if (failedFileIds.length > 0) {
-    const retryBatches = [];
-    for (let i = 0; i < failedFileIds.length; i += SCAN_BATCH_SIZE) retryBatches.push(failedFileIds.slice(i, i + SCAN_BATCH_SIZE));
-    await Promise.all(retryBatches.map(batch => {
+  for (let i = 0; i < batches.length; i += CONCURRENCY) {
+    const concurrentBatches = batches.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(concurrentBatches.map(batch => {
       const fileIds   = batch.map(f => f.id).join(',');
       const isPosters = batch.map(f => f.isPosters ? '1' : '0').join(',');
-      return jsonpAction(
-        driveURL + '?action=scanFiles' +
-        '&fileIds='   + encodeURIComponent(fileIds) +
-        '&isPosters=' + encodeURIComponent(isPosters) +
-        '&key='       + encodeURIComponent(getSavedKey() || '') +
-        '&did='       + encodeURIComponent(getDeviceId())
-      )
-      .then(result => {
-        if (result && result.ok) {
-          Object.assign(accumMovies,  result.movies  || {});
-          Object.assign(accumPosters, result.posters || {});
-          applyDriveData({ movies: accumMovies, posters: accumPosters, requests: accumRequests, ratings: accumRatings }, csvRows);
-        }
-      })
-      .catch(() => {});
+      return jsonpAction(driveURL + '?action=scanFiles&fileIds=' + encodeURIComponent(fileIds) + '&isPosters=' + encodeURIComponent(isPosters) + '&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId())).catch(err => { console.warn('scanFiles batch failed:', err); return null; });
     }));
+    for (let r = 0; r < results.length; r++) {
+      const result = results[r];
+      if (result && result.ok) {
+        Object.assign(accumMovies, result.movies || {});
+        Object.assign(accumPosters, result.posters || {});
+        if (Array.isArray(result.failedIds)) {
+          const batchFiles = concurrentBatches[r] || [];
+          result.failedIds.forEach(fid => { const orig = batchFiles.find(f => f.id === fid); if (orig) failedFileIds.push(orig); });
+        }
+      } else if (result === null) {
+        (concurrentBatches[r] || []).forEach(f => failedFileIds.push(f));
+      }
+    }
+    completedFiles += concurrentBatches.reduce((s, b) => s + b.length, 0);
+    if (!background) setProgress(progressStart + ((completedFiles / total) * (progressEnd - progressStart)));
+    applyDriveData({ movies: accumMovies, posters: accumPosters, requests: accumRequests, ratings: accumRatings }, csvRows);
+    if (i + CONCURRENCY < batches.length) await new Promise(r => setTimeout(r, INTER_BATCH_DELAY_MS));
   }
 
-  // ── 5. Collect ratings & requests (were pre-fetched in step 1) ────────────
+  if (failedFileIds.length > 0) {
+    await new Promise(r => setTimeout(r, 3000));
+    const retryBatches = [];
+    for (let i = 0; i < failedFileIds.length; i += SCAN_BATCH_SIZE) retryBatches.push(failedFileIds.slice(i, i + SCAN_BATCH_SIZE));
+    for (const batch of retryBatches) {
+      try {
+        const fileIds   = batch.map(f => f.id).join(',');
+        const isPosters = batch.map(f => f.isPosters ? '1' : '0').join(',');
+        const result    = await jsonpAction(driveURL + '?action=scanFiles&fileIds=' + encodeURIComponent(fileIds) + '&isPosters=' + encodeURIComponent(isPosters) + '&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()));
+        if (result && result.ok) { Object.assign(accumMovies, result.movies || {}); Object.assign(accumPosters, result.posters || {}); applyDriveData({ movies: accumMovies, posters: accumPosters, requests: accumRequests, ratings: accumRatings }, csvRows); }
+      } catch(err) {}
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
   let liveRequests = {}, liveRatings = {};
   try {
-    const ratingsData = await ratingsPromise;
+    const ratingsData = await new Promise((resolve) => {
+      const cbName = '__postScanRatings_' + Date.now();
+      const script = document.createElement('script');
+      const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); resolve({}); }, 10000);
+      window[cbName] = function(data) { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); resolve(data || {}); };
+      script.src = driveURL + '?action=getRatings&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&callback=' + cbName + '&_cb=' + Date.now();
+      script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); resolve({}); };
+      document.head.appendChild(script);
+    });
     if (ratingsData.ratings) {
       for (const [k, v] of Object.entries(ratingsData.ratings)) liveRatings[normalize(k)] = v;
       ratingCounts = { ...liveRatings };
     }
   } catch(e) {}
+
   try {
-    const reqResult = await requestsPromise;
+    const reqResult = await jsonpAction(driveURL + '?action=getRequests&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&_cb=' + Date.now());
     if (reqResult && reqResult.requests) {
       for (const [k, v] of Object.entries(reqResult.requests)) liveRequests[normalize(k)] = v;
       requestCounts = { ...liveRequests };
@@ -1633,7 +1587,6 @@ if (refreshBtn) {
     try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
     try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
     try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
-    try { sessionStorage.removeItem('thedrive_filelist_v1'); } catch(e) {}
     if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
       try { await jsonpAction(DRIVE_SCRIPT_URL + '?action=bustCache&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId())); } catch(e) {}
     }
