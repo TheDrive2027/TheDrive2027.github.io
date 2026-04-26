@@ -786,7 +786,7 @@ function renderOverlayEpisodes() {
         <div class="ep-details">
            <span class="ep-num-badge">S${padS} E${padE}</span>
            <span class="ep-title-text">${epTitleStr}</span>
-           ${!ep.available ? `<span class="ep-status-missing">NOT UPLOADED</span>` : ''}
+           <span class="status-pill ${ep.available ? 'status-available' : 'status-missing'}">${ep.available ? 'AVAILABLE' : 'NOT UPLOADED'}</span>
         </div>
       </div>
     `;
