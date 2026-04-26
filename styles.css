@@ -2358,13 +2358,6 @@ tbody tr:hover td { background: var(--surface2); }
   font-weight: 500;
 }
 
-.ep-status-missing {
-  font-size: 10px;
-  color: var(--red);
-  font-family: var(--font-mono);
-  letter-spacing: 0.5px;
-}
-
 /* ── Mobile Responsive ── */
 @media (max-width: 768px) {
   .show-overlay-panel { 
