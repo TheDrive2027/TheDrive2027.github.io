@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=121928462';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=1799938400';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzwR_nj2Jlt2aPmhBbSfqZiV_QLQMzAbs1-QsKWjG4DVfoPt-LvUGXBFP8LCtCfqEtvWg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3Jwr9tj3Vons9F5vWVUbQ5Z6QL3uE5wqKLKPb2tqJPr11_0ueXV9QwR9Pdvi2OuNgRQ/exec';
 
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
@@ -1859,21 +1859,94 @@ function setRequestedState(title, count) {
   });
 })();
 
+// ─── SERVER-SIDE SCAN HELPERS ────────────────────────────────
+// Kicks off a full Drive scan on the server by hitting doGet?bust=1
+// (fire-and-forget via no-cors fetch so it doesn't wait for the response).
+function triggerServerScan() {
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
+  try {
+    fetch(DRIVE_SCRIPT_URL + '?bust=1&_cb=' + Date.now(), { mode: 'no-cors' }).catch(() => {});
+  } catch(e) {}
+}
+
+// Polls getScanCache every `intervalMs` until a fresh payload appears (age < maxAgeS),
+// then resolves with that payload. Gives up after `timeoutMs`.
+function pollForFreshCache(maxAgeS = 90, intervalMs = 2500, timeoutMs = 90000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    function attempt() {
+      if (Date.now() > deadline) { reject(new Error('poll timeout')); return; }
+      jsonpAction(DRIVE_SCRIPT_URL + '?action=getScanCache&_cb=' + Date.now())
+        .then(result => {
+          if (result && result.ok && result.payload && result.payload.movies &&
+              typeof result.age_s === 'number' && result.age_s < maxAgeS) {
+            resolve(result.payload);
+          } else {
+            setTimeout(attempt, intervalMs);
+          }
+        })
+        .catch(() => setTimeout(attempt, intervalMs));
+    }
+    attempt();
+  });
+}
+
 if (refreshBtn) {
   refreshBtn.addEventListener('click', async () => {
     if (refreshBtn.classList.contains('spinning')) return;
     refreshBtn.classList.add('spinning');
     scanBar.classList.remove('hidden');
-    setProgress(0);
+    setProgress(5);
     requestCounts = {}; ratingCounts = {};
     try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
     try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
     try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
-    if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-      try { await jsonpAction(DRIVE_SCRIPT_URL + '?action=bustCache&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId())); } catch(e) {}
+
+    // Fetch CSV fresh
+    let csvRows = [];
+    try {
+      const r = await fetchURL(SHEET_CSV_URL, true);
+      if (r.ok) csvRows = parseCSV(await r.text());
+    } catch(e) {}
+    setProgress(15);
+
+    if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+      allMovies = mergeData(csvRows, {}, {});
+      render(); populateFilterCheckboxes(); updateCounts();
+      setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
+      refreshBtn.classList.remove('spinning');
+      return;
     }
-    await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL, true);
-    updateLastUpdated();
+
+    // Animate progress while server scans (fake-progress: 15→90 over ~45s)
+    const scanStart = Date.now();
+    const FAKE_PROGRESS_DURATION = 45000;
+    const progressInterval = setInterval(() => {
+      const elapsed = Date.now() - scanStart;
+      const pct = 15 + Math.min(75, (elapsed / FAKE_PROGRESS_DURATION) * 75);
+      setProgress(pct);
+    }, 500);
+
+    // Kick the server scan (bust=1 → full Drive walk → writes cache)
+    triggerServerScan();
+
+    // Poll until fresh cache appears (age < 90s = written after we triggered)
+    try {
+      const payload = await pollForFreshCache(90, 2500, 90000);
+      clearInterval(progressInterval);
+      applyDriveData(payload, csvRows);
+      setProgress(100);
+      setTimeout(() => scanBar.classList.add('hidden'), 300);
+      updateLastUpdated();
+      const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
+      const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0);
+      const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
+      pushSnapshot(totalMovies + totalEps, availMovies + availEps);
+    } catch(e) {
+      clearInterval(progressInterval);
+      showToast('⚠ Scan timed out — try again in a moment.');
+      setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
+    }
     refreshBtn.classList.remove('spinning');
   });
 }
