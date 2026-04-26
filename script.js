@@ -1961,8 +1961,60 @@ if (refreshBtn) {
   }
 
   await initWithGate();
-  loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL);
   loadShowsData();
+
+  // ── Initial load: use the same full server-side scan as the manual refresh ──
+  // This replaces the old loadData() cache/batch path which was slow and missed files.
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    // No script URL — just load from CSV
+    try {
+      const r = await fetchURL(SHEET_CSV_URL, false);
+      const text = r.ok ? await r.text() : '';
+      allMovies = mergeData(text ? parseCSV(text) : [], {}, {});
+    } catch(e) { allMovies = mergeData([], {}, {}); }
+    render(); populateFilterCheckboxes(); updateCounts();
+    setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
+  } else {
+    scanBar.classList.remove('hidden');
+    setProgress(5);
+
+    // Fetch fresh CSV in parallel while the server scans Drive (same as refresh button)
+    let csvRows = [];
+    const csvPromise = fetchURL(SHEET_CSV_URL, true)
+      .then(r => r.ok ? r.text() : '')
+      .then(text => { if (text) csvRows = parseCSV(text); })
+      .catch(() => {});
+
+    // Animate fake progress (15 → 90) while waiting
+    const scanStart = Date.now();
+    const FAKE_DURATION_MS = 40000;
+    const progressInterval = setInterval(() => {
+      const pct = 15 + Math.min(75, ((Date.now() - scanStart) / FAKE_DURATION_MS) * 75);
+      setProgress(pct);
+    }, 500);
+
+    try {
+      const [driveData] = await Promise.all([triggerFullScan(), csvPromise]);
+      clearInterval(progressInterval);
+
+      if (driveData && driveData.movies) {
+        applyDriveData(driveData, csvRows);
+        updateLastUpdated();
+        const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
+        const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
+        const availEps    = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
+        pushSnapshot(totalMovies + totalEps, availMovies + availEps);
+      } else {
+        showToast('⚠ Scan returned no data — try refreshing.');
+      }
+    } catch(e) {
+      clearInterval(progressInterval);
+      showToast('⚠ Drive scan timed out on load — try the refresh button.');
+    }
+
+    setProgress(100);
+    setTimeout(() => scanBar.classList.add('hidden'), 300);
+  }
 
   if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
     fetchOnlineCount();
