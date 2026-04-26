@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=121928462';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=1799938400';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx3TXPzwikXbiBfIoVw3C-hwcLC6_9juak00k8LN_Qnbq5r310wl4mRzPt28H95_1MuYg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzwR_nj2Jlt2aPmhBbSfqZiV_QLQMzAbs1-QsKWjG4DVfoPt-LvUGXBFP8LCtCfqEtvWg/exec';
 
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
@@ -961,6 +961,33 @@ function jsonpAction(url) {
 
 const SEQUENTIAL_BATCH_SIZE = 10;
 
+// ─── SCAN STATUS MESSAGES ────────────────────────────────────
+// Shown in the progress bar area during a cold-cache Drive scan.
+// The bar already shows numeric progress; these add a human label.
+const SCAN_STATUS_MSGS = [
+  'Scanning Drive…',
+  'Reading movie files…',
+  'Loading posters…',
+  'Almost there…',
+  'Finishing up…',
+];
+let scanStatusTimer = null;
+
+function startScanStatusCycle(labelEl) {
+  if (!labelEl) return;
+  let idx = 0;
+  labelEl.textContent = SCAN_STATUS_MSGS[0];
+  scanStatusTimer = setInterval(() => {
+    idx = (idx + 1) % SCAN_STATUS_MSGS.length;
+    labelEl.textContent = SCAN_STATUS_MSGS[idx];
+  }, 4000);
+}
+
+function stopScanStatusCycle(labelEl, finalMsg) {
+  if (scanStatusTimer) { clearInterval(scanStatusTimer); scanStatusTimer = null; }
+  if (labelEl) labelEl.textContent = finalMsg || '';
+}
+
 async function loadData(sheetURL, scriptURL, forceRefresh = false) {
   setProgress(5);
   let csvRows = [];
@@ -1036,8 +1063,10 @@ async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background 
   }
 
   const accumMovies = {}, accumPosters = {}, accumRequests = {}, accumRatings = {};
-  const SCAN_BATCH_SIZE = 10, CONCURRENCY = 2; 
-  const INTER_BATCH_DELAY_MS = 350; 
+  // Server now uses Drive.Files.list (fast), so we can push larger batches
+  // with more concurrency without hitting Apps Script quotas.
+  const SCAN_BATCH_SIZE = 50, CONCURRENCY = 3;
+  const INTER_BATCH_DELAY_MS = 200; 
   const total = files.length;
   const progressStart = 25, progressEnd = 95;
   const batches = [];
