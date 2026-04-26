@@ -329,20 +329,12 @@ async function postRating(title, type) {
 const LOCAL_SETTINGS_KEY = 'thedrive_settings_v2';
 
 function saveSettings() {
-  try {
-    localStorage.setItem(LOCAL_SETTINGS_KEY, JSON.stringify({
-      search: searchInput ? searchInput.value : '',
-      sort:   currentSort,
-      dir:    currentDir,
-      maturity:   [...activeFilters.maturity],
-      status:     [...activeFilters.status],
-      resolution: [...activeFilters.resolution],
-    }));
-  } catch(e) {}
+  // Filter persistence disabled — always resets to defaults on load.
 }
 
 function loadSettings() {
-  try { return JSON.parse(localStorage.getItem(LOCAL_SETTINGS_KEY) || 'null'); } catch(e) { return null; }
+  // Always return null so defaults are applied on every page load.
+  return null;
 }
 
 function applySettings(s) {
@@ -1952,13 +1944,12 @@ if (refreshBtn) {
 }
 
 (async function init() {
-  const savedSettings = loadSettings();
-  if (savedSettings) applySettings(savedSettings);
-  else {
-    currentSort = 'title'; currentDir = 'asc';
-    if (sortBy) sortBy.value = 'title';
-    if (sortDirBtn) sortDirBtn.textContent = '↓';
-  }
+  // Always default to movies tab, row view, no filters.
+  // Clear any stale saved state so returning users also get the reset.
+  try { localStorage.removeItem(LOCAL_SETTINGS_KEY); } catch(e) {}
+  currentSort = 'title'; currentDir = 'asc';
+  if (sortBy) sortBy.value = 'title';
+  if (sortDirBtn) sortDirBtn.textContent = '↓';
 
   await initWithGate();
   loadShowsData();
