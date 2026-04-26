@@ -946,11 +946,11 @@ function fetchRatings(scriptURL, isRefresh = false) {
   });
 }
 
-function jsonpAction(url) {
+function jsonpAction(url, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     const cbName = '__cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
-    const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 15000);
+    const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
     function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
     window[cbName] = data => { cleanup(); resolve(data); };
     script.src     = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName + '&_cb=' + Date.now();
@@ -1859,51 +1859,15 @@ function setRequestedState(title, count) {
   });
 })();
 
-// ─── SERVER-SIDE SCAN HELPERS ────────────────────────────────
-// Kicks off a full Drive scan on the server by hitting doGet?bust=1
-// (fire-and-forget via no-cors fetch so it doesn't wait for the response).
-function triggerServerScan() {
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
-  try {
-    fetch(DRIVE_SCRIPT_URL + '?bust=1&_cb=' + Date.now(), { mode: 'no-cors' }).catch(() => {});
-  } catch(e) {}
-}
-
-// Polls getScanCache every `intervalMs` until a payload written AFTER
-// `triggeredAtMs` appears. Gives up after `timeoutMs`.
-function pollForFreshCache(triggeredAtMs, intervalMs = 3000, timeoutMs = 300000) {
-  return new Promise((resolve, reject) => {
-    const deadline = Date.now() + timeoutMs;
-    function attempt() {
-      if (Date.now() > deadline) { reject(new Error('poll timeout')); return; }
-      jsonpAction(DRIVE_SCRIPT_URL + '?action=getScanCache&_cb=' + Date.now())
-        .then(result => {
-          if (result && result.ok && result.payload && result.payload.movies &&
-              typeof result.age_s === 'number' &&
-              (Date.now() - result.age_s * 1000) >= triggeredAtMs) {
-            resolve(result.payload);
-          } else {
-            setTimeout(attempt, intervalMs);
-          }
-        })
-        .catch(() => setTimeout(attempt, intervalMs));
-    }
-    attempt();
-  });
-}
-
 if (refreshBtn) {
   refreshBtn.addEventListener('click', async () => {
     if (refreshBtn.classList.contains('spinning')) return;
     refreshBtn.classList.add('spinning');
     scanBar.classList.remove('hidden');
     setProgress(5);
-    requestCounts = {}; ratingCounts = {};
-    try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
-    try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
-    try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
 
-    // Fetch CSV fresh
+    // Fetch fresh CSV — but don't wipe existing poster/movie state yet so
+    // the UI stays populated while the Drive scan runs on the server.
     let csvRows = [];
     try {
       const r = await fetchURL(SHEET_CSV_URL, true);
@@ -1919,33 +1883,48 @@ if (refreshBtn) {
       return;
     }
 
-    // Record when we triggered the scan, then kick it off
-    const triggeredAtMs = Date.now();
-    triggerServerScan();
-
-    // Animate progress: 15→90 over 3 minutes (generous for a cold scan)
-    const FAKE_PROGRESS_DURATION = 3 * 60 * 1000;
+    // Animate progress: 15 → 89 over 2 minutes while server scans
+    const scanStart = Date.now();
+    const FAKE_PROGRESS_DURATION = 2 * 60 * 1000;
     const progressInterval = setInterval(() => {
-      const elapsed = Date.now() - triggeredAtMs;
-      const pct = 15 + Math.min(75, (elapsed / FAKE_PROGRESS_DURATION) * 75);
+      const elapsed = Date.now() - scanStart;
+      const pct = 15 + Math.min(74, (elapsed / FAKE_PROGRESS_DURATION) * 74);
       setProgress(pct);
     }, 500);
 
-    // Poll until we see a cache entry written after triggeredAtMs (5 min timeout)
+    // Use JSONP to call bust=1 — this triggers the full Drive walk on the
+    // server AND returns the fresh payload directly when done.
+    // (no-cors fetch doesn't work with Apps Script redirects.)
+    // 3-minute timeout to accommodate a full cold scan.
     try {
-      const payload = await pollForFreshCache(triggeredAtMs, 3000, 5 * 60 * 1000);
+      const payload = await jsonpAction(
+        DRIVE_SCRIPT_URL + '?bust=1' +
+        '&key=' + encodeURIComponent(getSavedKey() || '') +
+        '&did=' + encodeURIComponent(getDeviceId()),
+        3 * 60 * 1000
+      );
       clearInterval(progressInterval);
-      applyDriveData(payload, csvRows);
-      setProgress(100);
-      setTimeout(() => scanBar.classList.add('hidden'), 300);
-      updateLastUpdated();
-      const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
-      const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0);
-      const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
-      pushSnapshot(totalMovies + totalEps, availMovies + availEps);
+
+      if (payload && payload.movies) {
+        // Fresh data in hand — now safe to clear stale local state
+        requestCounts = {}; ratingCounts = {};
+        try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
+        try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
+        try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
+        applyDriveData(payload, csvRows);
+        setProgress(100);
+        setTimeout(() => scanBar.classList.add('hidden'), 300);
+        updateLastUpdated();
+        const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
+        const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0);
+        const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
+        pushSnapshot(totalMovies + totalEps, availMovies + availEps);
+      } else {
+        throw new Error('empty response');
+      }
     } catch(e) {
       clearInterval(progressInterval);
-      showToast('⚠ Scan is taking longer than expected — try refreshing again.');
+      showToast('⚠ Scan failed — check your Script URL and try again.');
       setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
     }
     refreshBtn.classList.remove('spinning');
