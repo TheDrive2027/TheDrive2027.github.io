@@ -946,11 +946,11 @@ function fetchRatings(scriptURL, isRefresh = false) {
   });
 }
 
-function jsonpAction(url, timeoutMs = 15000) {
+function jsonpAction(url) {
   return new Promise((resolve, reject) => {
     const cbName = '__cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
-    const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
+    const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 15000);
     function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
     window[cbName] = data => { cleanup(); resolve(data); };
     script.src     = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName + '&_cb=' + Date.now();
@@ -1859,16 +1859,94 @@ function setRequestedState(title, count) {
   });
 })();
 
+// ── Full server-side Drive scan via JSONP ─────────────────────
+// Hits doGet?bust=1, which runs collectFilesViaAPI server-side and
+// returns the complete payload in one response. No polling needed.
+// Uses a long timeout (5 min) since a cold Drive walk can take ~30-45s.
+function triggerFullScan() {
+  return new Promise((resolve, reject) => {
+    const cbName = '__scanCallback_' + Date.now();
+    const script = document.createElement('script');
+    const SCAN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes — Apps Script limit is 6
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('scan timeout'));
+    }, SCAN_TIMEOUT_MS);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(data) { cleanup(); resolve(data); };
+    script.src = DRIVE_SCRIPT_URL
+      + '?bust=1'
+      + '&key='      + encodeURIComponent(getSavedKey() || '')
+      + '&did='      + encodeURIComponent(getDeviceId())
+      + '&callback=' + cbName
+      + '&_cb='      + Date.now();
+    script.onerror = () => { cleanup(); reject(new Error('script error')); };
+    document.head.appendChild(script);
+  });
+}
+
 if (refreshBtn) {
   refreshBtn.addEventListener('click', async () => {
     if (refreshBtn.classList.contains('spinning')) return;
     refreshBtn.classList.add('spinning');
+    scanBar.classList.remove('hidden');
+    setProgress(5);
     requestCounts = {}; ratingCounts = {};
     try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
     try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
     try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
-    await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL, true);
-    updateLastUpdated();
+
+    // Fetch fresh CSV in parallel while server scans Drive
+    let csvRows = [];
+    const csvPromise = fetchURL(SHEET_CSV_URL, true)
+      .then(r => r.ok ? r.text() : '')
+      .then(text => { if (text) csvRows = parseCSV(text); })
+      .catch(() => {});
+
+    if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+      await csvPromise;
+      allMovies = mergeData(csvRows, {}, {});
+      render(); populateFilterCheckboxes(); updateCounts();
+      setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
+      refreshBtn.classList.remove('spinning');
+      return;
+    }
+
+    // Animate fake progress (15 → 90) while waiting for the server scan
+    const scanStart = Date.now();
+    const FAKE_DURATION_MS = 40000; // assume ~40s typical scan
+    const progressInterval = setInterval(() => {
+      const pct = 15 + Math.min(75, ((Date.now() - scanStart) / FAKE_DURATION_MS) * 75);
+      setProgress(pct);
+    }, 500);
+
+    try {
+      // Wait for both CSV and the full server-side Drive scan to finish
+      const [driveData] = await Promise.all([triggerFullScan(), csvPromise]);
+
+      clearInterval(progressInterval);
+
+      if (driveData && driveData.movies) {
+        applyDriveData(driveData, csvRows);
+        updateLastUpdated();
+        const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
+        const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
+        const availEps    = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
+        pushSnapshot(totalMovies + totalEps, availMovies + availEps);
+      } else {
+        showToast('⚠ Scan returned no data — try again.');
+      }
+    } catch(e) {
+      clearInterval(progressInterval);
+      showToast('⚠ Scan timed out. Your library may be very large — try again.');
+    }
+
+    setProgress(100);
+    setTimeout(() => scanBar.classList.add('hidden'), 300);
     refreshBtn.classList.remove('spinning');
   });
 }
