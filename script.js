@@ -1869,9 +1869,9 @@ function triggerServerScan() {
   } catch(e) {}
 }
 
-// Polls getScanCache every `intervalMs` until a fresh payload appears (age < maxAgeS),
-// then resolves with that payload. Gives up after `timeoutMs`.
-function pollForFreshCache(maxAgeS = 90, intervalMs = 2500, timeoutMs = 90000) {
+// Polls getScanCache every `intervalMs` until a payload written AFTER
+// `triggeredAtMs` appears. Gives up after `timeoutMs`.
+function pollForFreshCache(triggeredAtMs, intervalMs = 3000, timeoutMs = 300000) {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     function attempt() {
@@ -1879,7 +1879,8 @@ function pollForFreshCache(maxAgeS = 90, intervalMs = 2500, timeoutMs = 90000) {
       jsonpAction(DRIVE_SCRIPT_URL + '?action=getScanCache&_cb=' + Date.now())
         .then(result => {
           if (result && result.ok && result.payload && result.payload.movies &&
-              typeof result.age_s === 'number' && result.age_s < maxAgeS) {
+              typeof result.age_s === 'number' &&
+              (Date.now() - result.age_s * 1000) >= triggeredAtMs) {
             resolve(result.payload);
           } else {
             setTimeout(attempt, intervalMs);
@@ -1918,21 +1919,21 @@ if (refreshBtn) {
       return;
     }
 
-    // Animate progress while server scans (fake-progress: 15→90 over ~45s)
-    const scanStart = Date.now();
-    const FAKE_PROGRESS_DURATION = 45000;
+    // Record when we triggered the scan, then kick it off
+    const triggeredAtMs = Date.now();
+    triggerServerScan();
+
+    // Animate progress: 15→90 over 3 minutes (generous for a cold scan)
+    const FAKE_PROGRESS_DURATION = 3 * 60 * 1000;
     const progressInterval = setInterval(() => {
-      const elapsed = Date.now() - scanStart;
+      const elapsed = Date.now() - triggeredAtMs;
       const pct = 15 + Math.min(75, (elapsed / FAKE_PROGRESS_DURATION) * 75);
       setProgress(pct);
     }, 500);
 
-    // Kick the server scan (bust=1 → full Drive walk → writes cache)
-    triggerServerScan();
-
-    // Poll until fresh cache appears (age < 90s = written after we triggered)
+    // Poll until we see a cache entry written after triggeredAtMs (5 min timeout)
     try {
-      const payload = await pollForFreshCache(90, 2500, 90000);
+      const payload = await pollForFreshCache(triggeredAtMs, 3000, 5 * 60 * 1000);
       clearInterval(progressInterval);
       applyDriveData(payload, csvRows);
       setProgress(100);
@@ -1944,7 +1945,7 @@ if (refreshBtn) {
       pushSnapshot(totalMovies + totalEps, availMovies + availEps);
     } catch(e) {
       clearInterval(progressInterval);
-      showToast('⚠ Scan timed out — try again in a moment.');
+      showToast('⚠ Scan is taking longer than expected — try refreshing again.');
       setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
     }
     refreshBtn.classList.remove('spinning');
