@@ -538,6 +538,8 @@ function parseShowsCSV(text) {
     const posterUrl  = (row.poster_url  || row['poster url']  || row.poster || '').trim();
     const imdbRating = (row.imdb_rating || row['imdb rating'] || row.imdb   || '').trim();
     const status     = (row.status      || '').trim().toLowerCase();
+    const epRuntime  = (row.runtime     || row.run_time  || row.duration || '').trim();
+    const epFileSize = (row.file_size   || row.filesize  || row.size     || '').trim();
     if (!showTitle || !season || !episode) continue;
 
     if (!showMap.has(showTitle)) {
@@ -552,7 +554,9 @@ function parseShowsCSV(text) {
       num:       episode,
       title:     epTitle,
       link:      driveLink || null,
-      available: status === 'uploaded' || (status === '' && !!driveLink)
+      available: status === 'uploaded' || (status === '' && !!driveLink),
+      runtime:   epRuntime || null,
+      fileSize:  epFileSize || null
     });
   }
 
@@ -1914,9 +1918,13 @@ function renderLocalStats() {
   if (fillEl)  fillEl.style.width  = parseFloat(pct) + '%';
   setText('stat-total-films', totalAll);
   setText('stat-available', availAll);
-  let totalGB = 0; allMovies.forEach(m => { totalGB += parseSizeGB(m.fileSize); });
+  let totalGB = 0;
+  allMovies.forEach(m => { totalGB += parseSizeGB(m.fileSize); });
+  allShows.forEach(s => s.seasons.forEach(season => season.episodes.forEach(ep => { totalGB += parseSizeGB(ep.fileSize); })));
   setText('stat-total-size', totalGB > 0 ? totalGB.toFixed(1) + ' GB' : '—');
-  let totalMins = 0; allMovies.forEach(m => { totalMins += parseRuntimeMinutes(m.runtime); });
+  let totalMins = 0;
+  allMovies.forEach(m => { totalMins += parseRuntimeMinutes(m.runtime); });
+  allShows.forEach(s => s.seasons.forEach(season => season.episodes.forEach(ep => { totalMins += parseRuntimeMinutes(ep.runtime); })));
   if (totalMins > 0) setText('stat-total-runtime', Math.floor(totalMins / 60) + 'h ' + (totalMins % 60) + 'm');
   const rated = allMovies.filter(m => parseFloat(m.imdbRating) > 0);
   if (rated.length) setText('stat-avg-imdb', '★ ' + (rated.reduce((s, m) => s + parseFloat(m.imdbRating), 0) / rated.length).toFixed(1));
