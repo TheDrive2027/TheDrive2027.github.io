@@ -2294,7 +2294,7 @@ tbody tr:hover td { background: var(--surface2); }
   background: rgba(255,255,255,0.06);
 }
 
-.ep-thumb-wrapper {
+-thumb-wrapper {
   position: relative;
   width: 140px;
   height: 78px;
@@ -2341,6 +2341,7 @@ tbody tr:hover td { background: var(--surface2); }
   display: flex;
   flex-direction: column;
   gap: 6px;
+  align-items: flex-start;
 }
 
 .ep-num-badge {
