@@ -1863,101 +1863,13 @@ if (refreshBtn) {
   refreshBtn.addEventListener('click', async () => {
     if (refreshBtn.classList.contains('spinning')) return;
     refreshBtn.classList.add('spinning');
-    scanBar.classList.remove('hidden');
-    setProgress(10);
-
-    // Fetch fresh CSV
-    let csvRows = [];
-    try {
-      const r = await fetchURL(SHEET_CSV_URL, true);
-      if (r.ok) csvRows = parseCSV(await r.text());
-    } catch(e) {}
-    setProgress(20);
-
-    if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-      allMovies = mergeData(csvRows, {}, {});
-      render(); populateFilterCheckboxes(); updateCounts();
-      setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
-      refreshBtn.classList.remove('spinning');
-      return;
-    }
-
-    // Step 1: Tell the server to clear its cache so the next full scan is forced
-    try {
-      await jsonpAction(
-        DRIVE_SCRIPT_URL + '?action=bustCache' +
-        '&key=' + encodeURIComponent(getSavedKey() || '') +
-        '&did=' + encodeURIComponent(getDeviceId())
-      );
-    } catch(e) {}
-    setProgress(25);
-
-    // Step 2: Trigger a fresh Drive scan on the server (fire via a throwaway
-    // script tag — we don't wait for this, we poll for the result instead)
-    const triggerCb = '__trigger_' + Date.now();
-    const triggerScript = document.createElement('script');
-    triggerScript.src = DRIVE_SCRIPT_URL + '?bust=1' +
-      '&key=' + encodeURIComponent(getSavedKey() || '') +
-      '&did=' + encodeURIComponent(getDeviceId()) +
-      '&callback=' + triggerCb + '&_cb=' + Date.now();
-    window[triggerCb] = () => { delete window[triggerCb]; if (triggerScript.parentNode) triggerScript.parentNode.removeChild(triggerScript); };
-    triggerScript.onerror = () => { delete window[triggerCb]; if (triggerScript.parentNode) triggerScript.parentNode.removeChild(triggerScript); };
-    document.head.appendChild(triggerScript);
-
-    // Step 3: Animate progress 25→89 over 90 seconds while server scans
-    const scanStart = Date.now();
-    const FAKE_DURATION = 90 * 1000;
-    const progressInterval = setInterval(() => {
-      const pct = 25 + Math.min(64, ((Date.now() - scanStart) / FAKE_DURATION) * 64);
-      setProgress(pct);
-    }, 500);
-
-    // Step 4: Poll getScanCache until we see a timestamp NEWER than when we
-    // busted the cache (i.e. the scan has finished and written fresh data)
-    const bustTime = Date.now();
-    const POLL_INTERVAL = 3000;
-    const POLL_TIMEOUT  = 3 * 60 * 1000;
-    const deadline = bustTime + POLL_TIMEOUT;
-
-    const poll = async () => {
-      if (Date.now() > deadline) {
-        clearInterval(progressInterval);
-        showToast('⚠ Scan timed out — try again in a moment.');
-        setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 400);
-        refreshBtn.classList.remove('spinning');
-        return;
-      }
-      try {
-        const result = await jsonpAction(
-          DRIVE_SCRIPT_URL + '?action=getScanCache&_cb=' + Date.now()
-        );
-        // Accept only a fresh payload — one written AFTER we called bustCache
-        const writtenAt = (result && result.ok && typeof result.age_s === 'number')
-          ? Date.now() - result.age_s * 1000
-          : 0;
-        if (result && result.ok && result.payload && result.payload.movies && writtenAt >= bustTime) {
-          clearInterval(progressInterval);
-          // Clear stale local state, then apply the fresh server payload
-          requestCounts = {}; ratingCounts = {};
-          try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
-          try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
-          try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
-          applyDriveData(result.payload, csvRows);
-          setProgress(100);
-          setTimeout(() => scanBar.classList.add('hidden'), 400);
-          updateLastUpdated();
-          const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
-          const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
-          const availEps    = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
-          pushSnapshot(totalMovies + totalEps, availMovies + availEps);
-          refreshBtn.classList.remove('spinning');
-          return;
-        }
-      } catch(e) {}
-      setTimeout(poll, POLL_INTERVAL);
-    };
-
-    setTimeout(poll, POLL_INTERVAL);
+    requestCounts = {}; ratingCounts = {};
+    try { localStorage.removeItem('thedrive_cache_v3'); } catch(e) {}
+    try { localStorage.removeItem('thedrive_requests_v1'); } catch(e) {}
+    try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
+    await loadData(SHEET_CSV_URL, DRIVE_SCRIPT_URL, true);
+    updateLastUpdated();
+    refreshBtn.classList.remove('spinning');
   });
 }
 
