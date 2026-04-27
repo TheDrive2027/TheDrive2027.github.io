@@ -5,9 +5,9 @@
 
 // ─── CONFIG ───────────────────────────────────────────────────
 // Movies sheet (gid=121928462)
-const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=121928462';
+const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=121928462&single=true&output=csv';
 // Shows sheet (gid=1799938400)
-const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/1N30xtjyc2xgfDstYp1BOOWqrPpoWlSmS9L-iYafYBUU/export?format=csv&gid=1799938400';
+const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=1799938400&single=true&output=csv';
 const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEC-U9MSVjwzu65mh9WB1lUL28cSFeUm01zqrYngp4joOAOD0iC1itKw-tYk5TgSm7zg/exec';
 
 // Auto-reload the full tab every 30 minutes
