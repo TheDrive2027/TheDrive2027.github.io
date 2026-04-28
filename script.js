@@ -1,6 +1,6 @@
 /* =============================================================
    THE DRIVE — script.js
-   4/20/2026 — Sidebar + Row-based browse view
+   4/27/2026 — 10:25 PM
    ============================================================= */
 
 // ─── CONFIG ───────────────────────────────────────────────────
@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=121928462&single=true&output=csv';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=1799938400&single=true&output=csv';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxEC-U9MSVjwzu65mh9WB1lUL28cSFeUm01zqrYngp4joOAOD0iC1itKw-tYk5TgSm7zg/exec';
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxgKO6Y_AHpp8sIkR-OuenqA4grUNOBxiHVCJjSm2Jnee0mtcDSA6noeJ4UAYXqBjFirg/exec';
 
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
