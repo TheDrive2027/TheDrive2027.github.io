@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=121928462&single=true&output=csv';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=1799938400&single=true&output=csv';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzvHKYJPtRYrNFBmkhTEzxh_41fny3GkslY-EiaIE7P7tDU0foqRB7Wc_gUXNqujOBTMw/exec'
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz62Va1oIRwOltm9Kl2fQ1OEpnYgLtGd_IbUmSSXbO0Au1Q-lytgGp8nZL_RLfD5HZ6Pg/exec'
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
 setTimeout(() => location.reload(), AUTO_RELOAD_MS);
