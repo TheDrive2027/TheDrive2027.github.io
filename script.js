@@ -1,5 +1,3 @@
-[file name]: script.js
-[file content begin]
 /* =============================================================
    THE DRIVE — script.js
    4/27/2026 — 10:54 PM
