@@ -1,3 +1,5 @@
+[file name]: script.js
+[file content begin]
 /* =============================================================
    THE DRIVE — script.js
    4/27/2026 — 10:54 PM
@@ -740,6 +742,11 @@ function openShowOverlay(show) {
     overlay.removeAttribute('hidden');
     requestAnimationFrame(() => overlay.classList.add('show-overlay--open'));
   }
+
+  // --- NEW: log that a show was opened ---
+  logClientEvent('Open Show', show.title);
+  // ---------------------------------------
+
   document.body.style.overflow = 'hidden';
 }
 
@@ -787,7 +794,11 @@ function renderOverlayEpisodes() {
              : `<div class="ep-thumb-placeholder">E${ep.num}</div>`}
            
            ${ep.available && ep.link
-             ? `<a class="ep-play-btn" href="${escHtml(ep.link)}" target="_blank" rel="noopener" data-title="${escHtml(overlayCurrentShow.title)}">&#9654;</a>`
+             ? `<a class="ep-play-btn" href="${escHtml(ep.link)}" target="_blank" rel="noopener"
+                    data-show="${escHtml(overlayCurrentShow.title)}"
+                    data-season="${padS}"
+                    data-episode="${padE}"
+                    data-title="${escHtml(overlayCurrentShow.title)}">&#9654;</a>`
              : ''}
         </div>
         <div class="ep-details">
@@ -816,6 +827,19 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closeBtn)  closeBtn.addEventListener('click', closeShowOverlay);
   if (backdrop)  backdrop.addEventListener('click', closeShowOverlay);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShowOverlay(); });
+
+  // --- NEW: log episode link clicks ---
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.ep-play-btn');
+    if (!btn) return;
+    const showTitle = btn.dataset.show;
+    const season    = btn.dataset.season;
+    const episode   = btn.dataset.episode;
+    if (showTitle && season && episode) {
+      logClientEvent('Open Episode Link', `${showTitle} S${season} E${episode}`);
+    }
+  });
+  // ------------------------------------
 });
 
 
@@ -2309,3 +2333,4 @@ function pushSnapshot(total, available) {
     }
   });
 })();
+[file content end]
