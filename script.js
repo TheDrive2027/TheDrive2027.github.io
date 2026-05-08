@@ -2202,4 +2202,87 @@ function presenceChartOptions(times) {
   return base;
 }
 
-/* ... (rest of the original script.js continues exactly as before) ... */
+
+function pushPresencePing() {
+  const onlineEl = $('online-count');
+  const selfCounts = isClientOnline() ? 1 : 0;
+  const displayedCount = onlineEl ? (parseInt(onlineEl.textContent, 10) || 0) : 0;
+  const count = Math.max(selfCounts, displayedCount);
+  const cbName = '__presencePingCallback_' + Date.now();
+  const script  = document.createElement('script');
+  const timer   = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 8000);
+  window[cbName] = function(resp) {
+    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
+    const serverCount = (resp && typeof resp.online === 'number') ? resp.online : 0;
+    const onlineEl = $('online-count');
+    if (onlineEl) onlineEl.textContent = serverCount;
+    if (chartPresence) {
+      const now = new Date(), pad = n => String(n).padStart(2, '0');
+      const hhmm = pad(now.getHours()) + ':' + pad(now.getMinutes());
+      const labels = chartPresence.data.labels, vals = chartPresence.data.datasets[0].data, times = chartPresence._times || [];
+      if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 20000) {
+        const zeroTime = new Date(lastPresenceAppendAt + 10000);
+        times.push(pad(zeroTime.getHours()) + ':' + pad(zeroTime.getMinutes())); labels.push(labels.length); vals.push(0);
+      }
+      times.push(hhmm); labels.push(labels.length); vals.push(serverCount);
+      lastPresenceAppendAt = now.getTime();
+      if (labels.length > 500) { labels.shift(); vals.shift(); times.shift(); }
+      chartPresence.update('none');
+    }
+  };
+  script.src = DRIVE_SCRIPT_URL + '?action=recordPresence&count=' + encodeURIComponent(count) + '&callback=' + cbName + '&_cb=' + Date.now();
+  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
+
+function pushSnapshot(total, available) {
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
+  const cbName = '__snapshotCallback_' + Date.now();
+  const script = document.createElement('script');
+  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 8000);
+  window[cbName] = function() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); };
+  script.src = DRIVE_SCRIPT_URL + '?action=pushSnapshot&total=' + encodeURIComponent(total) + '&available=' + encodeURIComponent(available) + '&callback=' + cbName + '&_cb=' + Date.now();
+  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
+
+// ─── DEVICE ID CORNER REVEAL ──────────────────────────────────
+(function initDeviceIdReveal() {
+  const el = document.createElement('div');
+  el.id = 'device-id-corner';
+  el.style.cssText = [
+    'position:fixed',
+    'bottom:12px',
+    'right:14px',
+    'z-index:99999',
+    'font-family:monospace',
+    'font-size:10px',
+    'color:rgba(144,144,168,0.9)',
+    'background:rgba(18,18,26,0.85)',
+    'border:1px solid rgba(80,80,110,0.4)',
+    'border-radius:5px',
+    'padding:4px 9px',
+    'letter-spacing:0.08em',
+    'pointer-events:none',
+    'opacity:0',
+    'transition:opacity 0.2s ease',
+  ].join(';');
+  document.body.appendChild(el);
+
+  const CORNER_PX = 12;
+  let hideTimer = null;
+
+  document.addEventListener('mousemove', function(e) {
+    const nearRight  = window.innerWidth  - e.clientX < CORNER_PX;
+    const nearBottom = window.innerHeight - e.clientY < CORNER_PX;
+
+    if (nearRight && nearBottom) {
+      if (!el.textContent) el.textContent = 'DID: ' + getDeviceId();
+      el.style.opacity = '1';
+      clearTimeout(hideTimer);
+    } else if (el.style.opacity !== '0') {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 300);
+    }
+  });
+})();
