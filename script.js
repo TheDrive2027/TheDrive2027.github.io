@@ -361,7 +361,7 @@ const availCount   = $('available-count');
 const resultsSummary = $('results-summary');
 const scanBar      = $('scan-bar');
 const lastUpdatedEl  = $('last-updated');
-const refreshBtn   = $('refresh-btn'); // will be repurposed as notif button
+const refreshBtn   = $('refresh-btn'); // will be repurposed as notification bell
 const scanFill     = $('scan-fill');
 const toast        = $('toast');
 const rowView      = $('row-view');
@@ -1871,9 +1871,6 @@ function hasUnreadNotifications() {
   const lastRead = localStorage.getItem(LOCAL_LAST_READ_SERVER_TIME) || '';
   if (serverNotifications.some(n => (n.time || '') > lastRead)) return true;
   if (clientNotifications.length > 0) {
-    // Client notifications are always considered unread until panel opened
-    const lastReadClient = localStorage.getItem(LOCAL_LAST_READ_SERVER_TIME) || ''; // same key? we'll treat all as read when panel opened
-    // Simpler: if there are any clientNotifications, they are unread
     return true;
   }
   return false;
@@ -2025,27 +2022,73 @@ function toggleNotificationPanel() {
   });
 })();
 
-// ── After data loads, fetch server notifications ──────────────
-(function hookIntoDataReady() {
-  const origInit = init;
-  window.init = async function() {
-    await origInit();
-    fetchServerNotifications().then(() => {
-      checkAndNotifyRequestFulfillments();
-      updateNotificationBell();
-      renderNotificationPanel();
-    });
-  };
+// ─── AFTER DATA LOADS, FETCH NOTIFICATIONS (done in init) ─────
+// We'll call this at the end of main init
+
+// ─── FOOTER FORM ──────────────────────────────────────────────
+(function() {
+  const submitBtn = document.getElementById('footer-submit');
+  const nameInput = document.getElementById('footer-name');
+  const msgInput  = document.getElementById('footer-message');
+  const statusEl  = document.getElementById('footer-form-status');
+  if (!submitBtn) return;
+
+  function setStatus(msg, type) { statusEl.textContent = msg; statusEl.className = 'footer-form-status ' + type; statusEl.hidden = false; }
+
+  submitBtn.addEventListener('click', async () => {
+    const message = (msgInput.value || '').trim();
+    if (!message) { setStatus('Please enter a message before sending.', 'error'); msgInput.focus(); return; }
+    submitBtn.disabled = true; submitBtn.textContent = 'SENDING…'; statusEl.hidden = true;
+    const name = (nameInput.value || '').trim() || 'Anonymous', key = getSavedKey() || '';
+    try {
+      await new Promise((resolve, reject) => {
+        const cbName = '__formCallback_' + Date.now();
+        const script = document.createElement('script');
+        const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 12000);
+        function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
+        window[cbName] = function(data) { cleanup(); if (data && data.ok) resolve(); else reject(new Error(data && data.error ? data.error : 'unknown')); };
+        script.src = DRIVE_SCRIPT_URL + '?action=submitForm&name=' + encodeURIComponent(name) + '&message=' + encodeURIComponent(message) + '&key=' + encodeURIComponent(key) + '&did=' + encodeURIComponent(getDeviceId()) + '&callback=' + cbName + '&_cb=' + Date.now();
+        script.onerror = () => { cleanup(); reject(new Error('network')); };
+        document.head.appendChild(script);
+      });
+      setStatus('✓ Message sent — thanks!', 'success');
+      nameInput.value = ''; msgInput.value = '';
+    } catch(err) {
+      setStatus('Something went wrong. Please try again.', 'error');
+    } finally {
+      submitBtn.disabled = false; submitBtn.textContent = 'SEND';
+    }
+  });
 })();
 
-// ── REPLACED REFRESH BUTTON HANDLER (now handled by notification bell) ──
-// The old refresh button click handler is completely removed.
-// If you still need a manual full refresh, reload the page or use browser DevTools.
+// ── Full server-side Drive scan via JSONP (still used internally) ──
+function triggerFullScan() {
+  return new Promise((resolve, reject) => {
+    const cbName = '__scanCallback_' + Date.now();
+    const script = document.createElement('script');
+    const SCAN_TIMEOUT_MS = 5 * 60 * 1000;
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('scan timeout'));
+    }, SCAN_TIMEOUT_MS);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function(data) { cleanup(); resolve(data); };
+    script.src = DRIVE_SCRIPT_URL
+      + '?bust=1'
+      + '&key='      + encodeURIComponent(getSavedKey() || '')
+      + '&did='      + encodeURIComponent(getDeviceId())
+      + '&callback=' + cbName
+      + '&_cb='      + Date.now();
+    script.onerror = () => { cleanup(); reject(new Error('script error')); };
+    document.head.appendChild(script);
+  });
+}
 
-// ── REST OF THE FILE (STATS, HEARTBEAT, PRESENCE, ETC.) ────
-// (All remaining code from the original script.js is preserved exactly,
-//  except the refresh button event listener, which has been deleted.)
-
+// ─── STATS ────────────────────────────────────────────────────
 let statsLoaded = false, statsLoadedAt = 0;
 let chartLibrary = null, chartUsers = null, chartPresence = null;
 let lastPresenceAppendAt = 0;
@@ -2202,6 +2245,89 @@ function presenceChartOptions(times) {
   return base;
 }
 
+// ─── HEARTBEAT & ONLINE COUNT ─────────────────────────────────
+const HEARTBEAT_INTERVAL_MS  = 5000;   
+const HEARTBEAT_TIMEOUT_MS   = 4500;   
+const HEARTBEAT_MISS_LIMIT   = 3;      
+
+let heartbeatMissCount  = 0;
+let heartbeatOnline     = true;  
+let heartbeatIntervalId = null;
+
+function startHeartbeat() {
+  if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+  heartbeatIntervalId = setInterval(pingHeartbeat, HEARTBEAT_INTERVAL_MS);
+  pingHeartbeat(); 
+}
+
+function pingHeartbeat() {
+  const cbName = '__heartbeatCallback_' + Date.now();
+  const script = document.createElement('script');
+
+  const timer = setTimeout(() => {
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    _heartbeatMiss();
+  }, HEARTBEAT_TIMEOUT_MS);
+
+  window[cbName] = function(data) {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    _heartbeatSuccess(data);
+  };
+
+  script.onerror = () => {
+    clearTimeout(timer);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+    _heartbeatMiss();
+  };
+
+  script.src = DRIVE_SCRIPT_URL
+    + '?action=checkDevice'
+    + '&did='      + encodeURIComponent(getDeviceId())
+    + '&key='      + encodeURIComponent(getSavedKey() || '')
+    + '&callback=' + cbName
+    + '&_cb='      + Date.now();
+  document.head.appendChild(script);
+}
+
+function _heartbeatSuccess(data) {
+  heartbeatMissCount = 0;
+  if (!heartbeatOnline) {
+    heartbeatOnline = true;
+    console.log('[heartbeat] back online');
+  }
+  if (data && data.keyCleared) {
+    localStorage.removeItem('driveAccessKey');
+    location.reload();
+  }
+}
+
+function _heartbeatMiss() {
+  heartbeatMissCount++;
+  if (heartbeatOnline && heartbeatMissCount >= HEARTBEAT_MISS_LIMIT) {
+    heartbeatOnline = false;
+    console.warn('[heartbeat] offline — ' + HEARTBEAT_MISS_LIMIT + ' consecutive missed pings');
+  }
+}
+
+function isClientOnline() { return heartbeatOnline; }
+
+function fetchOnlineCount() {
+  const cbName = '__onlineCallback_' + Date.now();
+  const script = document.createElement('script');
+  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 10000);
+  window[cbName] = function(data) {
+    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
+    const el = document.getElementById('online-count');
+    if (el && data && typeof data.online === 'number') el.textContent = data.online;
+  };
+  script.src = DRIVE_SCRIPT_URL + '?action=getOnlineCount&callback=' + cbName + '&_cb=' + Date.now();
+  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
 
 function pushPresencePing() {
   const onlineEl = $('online-count');
@@ -2285,4 +2411,92 @@ function pushSnapshot(total, available) {
       hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 300);
     }
   });
+})();
+
+// ─── MAIN INIT ────────────────────────────────────────────────
+(async function init() {
+  try { localStorage.removeItem(LOCAL_SETTINGS_KEY); } catch(e) {}
+  currentSort = 'title'; currentDir = 'asc';
+  if (sortBy) sortBy.value = 'title';
+  if (sortDirBtn) sortDirBtn.textContent = '↓';
+
+  await initWithGate();
+  loadShowsData();
+
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    try {
+      const r = await fetchURL(SHEET_CSV_URL, false);
+      const text = r.ok ? await r.text() : '';
+      allMovies = mergeData(text ? parseCSV(text) : [], {}, {});
+    } catch(e) { allMovies = mergeData([], {}, {}); }
+    render(); populateFilterCheckboxes(); updateCounts();
+    setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
+  } else {
+    scanBar.classList.remove('hidden');
+    setProgress(5);
+
+    let csvRows = [];
+    const csvPromise = fetchURL(SHEET_CSV_URL, true)
+      .then(r => r.ok ? r.text() : '')
+      .then(text => { if (text) csvRows = parseCSV(text); })
+      .catch(() => {});
+
+    const scanStart = Date.now();
+    const FAKE_DURATION_MS = 20000;
+    const progressInterval = setInterval(() => {
+      const pct = 15 + Math.min(75, ((Date.now() - scanStart) / FAKE_DURATION_MS) * 75);
+      setProgress(pct);
+    }, 500);
+
+    try {
+      const [driveData] = await Promise.all([triggerFullScan(), csvPromise]);
+      clearInterval(progressInterval);
+
+      if (driveData && driveData.movies) {
+        applyDriveData(driveData, csvRows);
+        updateLastUpdated();
+        const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
+        const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
+        const availEps    = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
+        pushSnapshot(totalMovies + totalEps, availMovies + availEps);
+      } else {
+        showToast('⚠ Scan returned no data — try refreshing.');
+      }
+    } catch(e) {
+      clearInterval(progressInterval);
+      showToast('⚠ Drive scan timed out on load — try the refresh button.');
+    }
+
+    setProgress(100);
+    setTimeout(() => scanBar.classList.add('hidden'), 300);
+  }
+
+  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    fetchOnlineCount();
+    setInterval(fetchOnlineCount, 60 * 1000);
+    startHeartbeat();
+    setInterval(pushPresencePing, 10 * 1000);
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      activeTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+      updateCounts();
+      if (tab === 'stats')  initStatsTab();
+      if (tab === 'shows')  filterAndRenderShows();
+    });
+  });
+
+  // Fetch notifications after everything is loaded
+  fetchServerNotifications().then(() => {
+    checkAndNotifyRequestFulfillments();
+    updateNotificationBell();
+    renderNotificationPanel();
+  });
+
 })();
