@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=121928462&single=true&output=csv';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=1799938400&single=true&output=csv';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz436kxk-0KJ1zxYfzrD3lnneX7lS04JNxqypmW8TI7WHy7O8g8D5UReZcBb3RoVe9zJA/exec'
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznYGNnjFaq8qDlMcBOCT2bAoz6bRA5fnTghVgIaHKiJxLrpD7DT8YTVYZsBCBYdEfB4w/exec'
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
 setTimeout(() => location.reload(), AUTO_RELOAD_MS);
@@ -2285,25 +2285,94 @@ function fetchDonationsData() {
 function renderDonationsBar(d) {
   const bar = document.getElementById('donation-bar');
   if (!bar) return;
+
   const goal    = parseFloat(d.goal)    || 0;
   const donated = parseFloat(d.donated) || 0;
   const pct     = goal > 0 ? Math.min(100, (donated / goal) * 100) : 0;
-  const headerEl  = bar.querySelector('.donation-bar-header');
-  const fillEl    = bar.querySelector('.donation-bar-fill');
-  const labelEl   = bar.querySelector('.donation-bar-label');
-  const readMoreEl = bar.querySelector('.donation-bar-readmore');
-  const bodyEl    = document.getElementById('donation-modal-body');
 
-  if (headerEl)   headerEl.textContent = d.header || 'Support The Drive';
-  if (fillEl)     fillEl.style.width   = pct + '%';
-  if (labelEl)    labelEl.textContent  = '$' + donated.toFixed(0) + ' / $' + goal.toFixed(0);
-  if (bodyEl)     bodyEl.textContent   = d.body || '';
+  // ── Color: dark red → orange → yellow-green → green based on progress ──
+  // 0% = #8b1a1a (dark red), 50% = #e8a020 (amber), 100% = #3ecf74 (green)
+  function lerpColor(a, b, t) {
+    const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
+    const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
+    const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
+    const r = Math.round(ar + (br - ar) * t);
+    const g = Math.round(ag + (bg - ag) * t);
+    const bv = Math.round(ab + (bb - ab) * t);
+    return '#' + [r, g, bv].map(x => x.toString(16).padStart(2, '0')).join('');
+  }
+  const t = pct / 100;
+  const barColor = t <= 0.5
+    ? lerpColor('#8b1a1a', '#e8a020', t * 2)
+    : lerpColor('#e8a020', '#3ecf74', (t - 0.5) * 2);
+
+  // ── Smart decimal formatting: show cents only when non-zero ──
+  function fmtAmount(n) {
+    return Number.isInteger(n) || Math.round(n * 100) % 100 === 0
+      ? '$' + n.toFixed(0)
+      : '$' + n.toFixed(2);
+  }
+
+  // ── Deadline formatting ──
+  function fmtDeadline(iso) {
+    if (!iso) return '';
+    try {
+      // Parse as local date (avoid UTC offset shifting the day)
+      const [y, m, day] = iso.split('-').map(Number);
+      const d = new Date(y, m - 1, day);
+      if (isNaN(d.getTime())) return '';
+      const now   = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffMs = d - today;
+      const diffDays = Math.round(diffMs / 86400000);
+
+      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const dateStr = monthNames[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+
+      if (diffDays < 0)  return 'ENDED ' + dateStr;
+      if (diffDays === 0) return 'DUE TODAY';
+      if (diffDays === 1) return '1 DAY LEFT · ' + dateStr;
+      if (diffDays <= 7)  return diffDays + ' DAYS LEFT · ' + dateStr;
+      return 'BY ' + dateStr;
+    } catch(e) { return iso; }
+  }
+
+  const headerEl   = bar.querySelector('.donation-bar-header');
+  const fillEl     = bar.querySelector('.donation-bar-fill');
+  const labelEl    = bar.querySelector('.donation-bar-label');
+  const deadlineEl = bar.querySelector('.donation-bar-deadline');
+  const readMoreEl = bar.querySelector('.donation-bar-readmore');
+  const bodyEl     = document.getElementById('donation-modal-body');
+  const modalHeaderEl = document.getElementById('donation-modal-header');
+  const modalDeadlineEl = document.getElementById('donation-modal-deadline');
+
+  if (headerEl)    headerEl.textContent = d.header || 'Support The Drive';
+  if (modalHeaderEl) modalHeaderEl.textContent = d.header || 'Support The Drive';
+
+  if (fillEl) {
+    fillEl.style.width      = pct + '%';
+    fillEl.style.background = barColor;
+  }
+
+  if (labelEl) labelEl.textContent = fmtAmount(donated) + ' / ' + fmtAmount(goal);
+
+  const deadlineText = fmtDeadline(d.deadline || '');
+  if (deadlineEl) {
+    deadlineEl.textContent = deadlineText;
+    deadlineEl.style.display = deadlineText ? '' : 'none';
+    // Urgent coloring when ≤ 7 days left
+    const isUrgent = deadlineText.includes('DAY') || deadlineText.includes('TODAY');
+    deadlineEl.classList.toggle('donation-bar-deadline--urgent', isUrgent);
+  }
+  if (modalDeadlineEl) {
+    modalDeadlineEl.textContent = deadlineText ? '⏱ ' + deadlineText : '';
+    modalDeadlineEl.style.display = deadlineText ? '' : 'none';
+  }
+
+  if (bodyEl) bodyEl.textContent = d.body || '';
+
   if (readMoreEl) {
-    if (d.body && d.body.trim()) {
-      readMoreEl.style.display = '';
-    } else {
-      readMoreEl.style.display = 'none';
-    }
+    readMoreEl.style.display = (d.body && d.body.trim()) ? '' : 'none';
   }
 
   bar.style.display = goal > 0 ? 'flex' : 'none';
