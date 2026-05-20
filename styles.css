@@ -1049,28 +1049,80 @@ tbody tr:hover td { background: var(--surface2); }
 }
 
 /* ── RATING BUTTONS ── */
-.rating-wrap { display: flex; align-items: center; gap: 4px; }
+.rating-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rating-prompt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-right: 2px;
+  white-space: nowrap;
+}
+
+.rating-pct {
+  color: var(--accent);
+  font-weight: 600;
+}
 
 .rating-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 7px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--fg-dim);
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  background: var(--surface2);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 140ms ease, color 140ms ease,
+              border-color 140ms ease, transform 80ms ease;
   white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.rating-btn:hover { border-color: var(--fg-dim); color: var(--fg); }
-.rating-btn--up.active   { background: rgba(74,222,128,0.12); border-color: #4ade80; color: #4ade80; }
-.rating-btn--down.active { background: rgba(248,113,113,0.12); border-color: #f87171; color: #f87171; }
-.rating-count { font-size: 10px; line-height: 1; }
+.rating-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.rating-btn:active { transform: scale(0.93); }
+
+.rating-btn--up.active {
+  background: rgba(62, 207, 116, 0.15);
+  border-color: var(--green);
+  color: var(--green);
+}
+.rating-btn--down.active {
+  background: rgba(240, 79, 79, 0.15);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Pop animation on the icon when a vote is cast */
+.rating-btn.just-voted .rating-icon {
+  animation: ratingPop 220ms cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes ratingPop {
+  from { transform: scale(0.6); opacity: .4; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.rating-count {
+  font-size: 10px;
+  line-height: 1;
+  min-width: 10px; /* prevents layout shift when count changes digit length */
+  text-align: left;
+}
 
 .td-link-inner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .card-rating-row { display: flex; align-items: center; }
