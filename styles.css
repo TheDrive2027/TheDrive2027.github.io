@@ -1058,14 +1058,14 @@ tbody tr:hover td { background: var(--surface2); }
 .rating-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 3px;
+  padding: 3px 7px;
   border: 1px solid var(--border2);
-  border-radius: 20px;
+  border-radius: 99px;
   background: var(--surface2);
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 9px;
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease,
               border-color 140ms ease, transform 80ms ease;
@@ -1590,7 +1590,7 @@ tbody tr:hover td { background: var(--surface2); }
 .row-card .card-row,
 .row-card .card-footer { overflow: hidden; }
 .row-card .card-title { white-space: nowrap; text-overflow: ellipsis; }
-.row-card .card-footer { flex-wrap: wrap; gap: 6px; }
+.row-card .card-footer { overflow: hidden; flex-wrap: nowrap; gap: 6px; }
 
 /* ── GRID VIEW ── */
 #grid-view .movie-grid {
