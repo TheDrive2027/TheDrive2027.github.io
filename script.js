@@ -2369,7 +2369,19 @@ function renderDonationsBar(d) {
     modalDeadlineEl.style.display = deadlineText ? '' : 'none';
   }
 
-  if (bodyEl) bodyEl.textContent = d.body || '';
+  if (bodyEl) {
+    bodyEl.innerHTML = '';
+    const chunks = (d.body || '').split('---').map(s => s.trim()).filter(Boolean);
+    if (chunks.length === 0) {
+      bodyEl.textContent = '';
+    } else {
+      chunks.forEach(chunk => {
+        const p = document.createElement('p');
+        p.textContent = chunk;
+        bodyEl.appendChild(p);
+      });
+    }
+  }
 
   if (readMoreEl) {
     readMoreEl.style.display = (d.body && d.body.trim()) ? '' : 'none';
