@@ -304,9 +304,6 @@ function getRatingCount(title, type) { return (ratingCounts[normalize(title)] ||
  * clickedBtn (optional) — the button the user just tapped; receives the pop animation.
  */
 function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
-  const totalVotes = upCount + downCount;
-  const pct = totalVotes > 0 ? Math.round((upCount / totalVotes) * 100) : null;
-
   document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
     const bType    = b.dataset.ratingType;
     const isActive = nextVote === bType;
@@ -322,14 +319,7 @@ function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
     if (countEl) countEl.textContent = bType === 'up' ? upCount : downCount;
   });
 
-  // Update the "Rate" / "94%" prompt label on all matching cards
-  document.querySelectorAll(`.movie-card[data-key="${CSS.escape(normalize(title))}"] .rating-prompt`).forEach(el => {
-    if (pct !== null) {
-      el.innerHTML = `<span class="rating-pct">${pct}%</span>`;
-    } else {
-      el.textContent = 'Rate';
-    }
-  });
+  // (rating-prompt label removed — buttons sit inline with the status pill)
 }
 
 /**
@@ -1684,25 +1674,18 @@ function buildCard(m, i, isRowCard) {
       <span class="status-pill ${m.available ? 'status-available' : 'status-missing'}">
         ${m.available ? 'AVAILABLE' : 'NOT UPLOADED'}
       </span>
-      ${m.driveLink ? `<div class="card-rating-row">${ratingHTML(m.title)}</div>` : ''}
+      ${m.driveLink ? ratingHTML(m.title) : ''}
     </div>
   `;
   return card;
 }
 
 function ratingHTML(title) {
-  const userVote   = getUserRating(title);
-  const ups        = getRatingCount(title, 'up');
-  const downs      = getRatingCount(title, 'down');
-  const totalVotes = ups + downs;
-  const pct        = totalVotes > 0 ? Math.round((ups / totalVotes) * 100) : null;
-
-  const promptHTML = pct !== null
-    ? `<span class="rating-pct">${pct}%</span>`
-    : 'Rate';
+  const userVote = getUserRating(title);
+  const ups      = getRatingCount(title, 'up');
+  const downs    = getRatingCount(title, 'down');
 
   return `<div class="rating-wrap">
-    <span class="rating-prompt">${promptHTML}</span>
     <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}"
             data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it">
       <span class="rating-icon">👍</span><span class="rating-count">${ups || 0}</span>
