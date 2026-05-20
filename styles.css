@@ -474,24 +474,12 @@ tbody tr:hover td { background: var(--surface2); }
 .imdb-low  { color: var(--text-dim); }
 
 /* ── STATUS PILL ── */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 99px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 1.2px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 .status-pill::before {
   content: '';
   width: 5px;
   height: 5px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .status-available {
@@ -749,10 +737,26 @@ tbody tr:hover td { background: var(--surface2); }
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
   margin-top: auto;
   padding-top: 10px;
   border-top: 1px solid var(--border);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 99px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ── MODAL ── */
@@ -1052,14 +1056,15 @@ tbody tr:hover td { background: var(--surface2); }
 .rating-wrap {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .rating-btn {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 3px 7px;
+  padding: 3px 6px;
   border: 1px solid var(--border2);
   border-radius: 99px;
   background: var(--surface2);
@@ -1072,6 +1077,7 @@ tbody tr:hover td { background: var(--surface2); }
   white-space: nowrap;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  line-height: 1;
 }
 
 .rating-btn:hover {
@@ -1102,10 +1108,15 @@ tbody tr:hover td { background: var(--surface2); }
   to   { transform: scale(1);   opacity: 1; }
 }
 
-.rating-count {
+.rating-icon {
   font-size: 10px;
   line-height: 1;
-  min-width: 10px; /* prevents layout shift when count changes digit length */
+}
+
+.rating-count {
+  font-size: 9px;
+  line-height: 1;
+  min-width: 8px;
   text-align: left;
 }
 
