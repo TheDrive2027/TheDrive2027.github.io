@@ -8,7 +8,7 @@
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=121928462&single=true&output=csv';
 // Shows sheet (gid=1799938400)
 const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=1799938400&single=true&output=csv';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywfHZ5_TeuOvJSMoXY21Rihxivi2jbJNe-GNoqZ7UpNITeLB0j82PcTviCs9NkXi0wxQ/exec'
+const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz436kxk-0KJ1zxYfzrD3lnneX7lS04JNxqypmW8TI7WHy7O8g8D5UReZcBb3RoVe9zJA/exec'
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
 setTimeout(() => location.reload(), AUTO_RELOAD_MS);
@@ -1810,18 +1810,32 @@ function setRequestedState(title, count) {
 }
 
 // ─── NOTIFICATIONS ─────────────────────────────────────────────
-const LOCAL_LAST_READ_SERVER_TIME = 'thedrive_lastReadServerTime';
-const LOCAL_FULFILLED_NOTIFICATIONS = 'thedrive_fulfilledNotifications';
+const LOCAL_LAST_READ_SERVER_TIME    = 'thedrive_lastReadServerTime';
+const LOCAL_FULFILLED_NOTIFICATIONS  = 'thedrive_fulfilledNotifications';
+const LOCAL_READ_NOTIF_IDS           = 'thedrive_readNotifIds_v1';
 
 let serverNotifications = [];    // raw from server
 let clientNotifications = [];    // fulfilled requests
 
+// ── Stable fingerprint for a notification ──
+function notifId(n) {
+  return (n.name || '') + '||' + (n.message || '') + '||' + (n.time || '');
+}
+
+function getReadNotifIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(LOCAL_READ_NOTIF_IDS) || '[]')); } catch(e) { return new Set(); }
+}
+function saveReadNotifIds(set) {
+  try { localStorage.setItem(LOCAL_READ_NOTIF_IDS, JSON.stringify([...set])); } catch(e) {}
+}
+
 // Fetch server-wide notifications
 function fetchServerNotifications() {
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return Promise.resolve();
   return jsonpAction(DRIVE_SCRIPT_URL + '?action=getNotifications&_cb=' + Date.now())
     .then(data => {
       serverNotifications = (data && data.notifications) ? data.notifications : [];
+      updateNotificationBell();
     })
     .catch(() => {});
 }
@@ -1866,13 +1880,11 @@ function saveFulfilledNotificationSet(set) {
   } catch(e) {}
 }
 
-// Unread status: either there are server notifications newer than last read, or there are new client notifications
+// Unread status: any notification whose ID isn't in the read set
 function hasUnreadNotifications() {
-  const lastRead = localStorage.getItem(LOCAL_LAST_READ_SERVER_TIME) || '';
-  if (serverNotifications.some(n => (n.time || '') > lastRead)) return true;
-  if (clientNotifications.length > 0) {
-    return true;
-  }
+  const readIds = getReadNotifIds();
+  if (serverNotifications.some(n => !readIds.has(notifId(n)))) return true;
+  if (clientNotifications.some(n => !readIds.has(notifId(n)))) return true;
   return false;
 }
 
@@ -1884,14 +1896,12 @@ function updateNotificationBell() {
 }
 
 function markAllAsRead() {
-  const latestServerTime = serverNotifications.reduce((max, n) => (n.time && n.time > max) ? n.time : max, '');
-  if (latestServerTime) {
-    localStorage.setItem(LOCAL_LAST_READ_SERVER_TIME, latestServerTime);
-  }
-  // Clear client notifications (fulfillments) when read
-  clientNotifications = [];
-  // Also clear the persistent set so they won't reappear on next reload
-  try { localStorage.removeItem(LOCAL_FULFILLED_NOTIFICATIONS); } catch(e) {}
+  const readIds = getReadNotifIds();
+  serverNotifications.forEach(n => readIds.add(notifId(n)));
+  clientNotifications.forEach(n => readIds.add(notifId(n)));
+  saveReadNotifIds(readIds);
+  // Keep client notifications visible after read — don't wipe them so
+  // the user can still see them; they just lose the unread dot.
   updateNotificationBell();
 }
 
@@ -1902,16 +1912,22 @@ function renderNotificationPanel() {
   const listEl = panel.querySelector('.notif-list');
   if (!listEl) return;
 
+  const readIds = getReadNotifIds();
   let html = '';
 
   // Server notifications
   if (serverNotifications.length) {
     html += '<div class="notif-section-title">SERVER</div>';
     serverNotifications.forEach(n => {
-      html += `<div class="notif-item">
-        <div class="notif-name">${escHtml(n.name || '')}</div>
+      const isRead = readIds.has(notifId(n));
+      // Use fileDate if present, else fall back to n.time
+      const displayDate = n.fileDate && n.fileDate.trim() ? n.fileDate : n.time;
+      html += `<div class="notif-item${isRead ? ' notif-item--read' : ''}">
+        <div class="notif-header-row">
+          <span class="notif-type-label">${escHtml(n.name || 'Notice')}</span>
+          <span class="notif-timestamp">${formatNotifTimestamp(displayDate)}</span>
+        </div>
         <div class="notif-msg">${escHtml(n.message || '')}</div>
-        <div class="notif-time">${n.time ? formatShortTime(n.time) : ''}</div>
       </div>`;
     });
   }
@@ -1920,10 +1936,14 @@ function renderNotificationPanel() {
   if (clientNotifications.length) {
     html += '<div class="notif-section-title">YOUR REQUESTS</div>';
     clientNotifications.forEach(n => {
-      html += `<div class="notif-item">
-        <div class="notif-name">${escHtml(n.name)}</div>
+      const isRead = readIds.has(notifId(n));
+      const displayDate = n.fileDate && n.fileDate.trim() ? n.fileDate : n.time;
+      html += `<div class="notif-item${isRead ? ' notif-item--read' : ''}">
+        <div class="notif-header-row">
+          <span class="notif-type-label">${escHtml(n.name)}</span>
+          <span class="notif-timestamp">${formatNotifTimestamp(displayDate)}</span>
+        </div>
         <div class="notif-msg">${escHtml(n.message)}</div>
-        <div class="notif-time">${n.time ? formatShortTime(n.time) : ''}</div>
       </div>`;
     });
   }
@@ -1935,16 +1955,24 @@ function renderNotificationPanel() {
   listEl.innerHTML = html;
 }
 
-function formatShortTime(ts) {
+function formatNotifTimestamp(ts) {
+  if (!ts) return '';
   try {
     const d = new Date(String(ts).replace(' ', 'T'));
-    if (isNaN(d.getTime())) return '';
-    const h = d.getHours(), m = d.getMinutes();
+    if (isNaN(d.getTime())) return String(ts);
+    let h = d.getHours(), m = d.getMinutes();
     const ampm = h >= 12 ? 'PM' : 'AM';
-    const hour12 = h % 12 || 12;
-    return hour12 + ':' + String(m).padStart(2, '0') + ' ' + ampm;
-  } catch(e) { return ''; }
+    h = h % 12 || 12;
+    const mm = String(m).padStart(2, '0');
+    const month = d.getMonth() + 1;
+    const day   = d.getDate();
+    const year  = d.getFullYear();
+    return `${h}:${mm}${ampm} · ${month}/${day}/${year}`;
+  } catch(e) { return String(ts); }
 }
+
+// Keep for any legacy callers
+function formatShortTime(ts) { return formatNotifTimestamp(ts); }
 
 function toggleNotificationPanel() {
   const panel = document.getElementById('notif-panel');
@@ -2004,12 +2032,6 @@ function toggleNotificationPanel() {
   refreshBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleNotificationPanel();
-    // Load notifications if not already loaded (server ones)
-    fetchServerNotifications().then(() => {
-      checkAndNotifyRequestFulfillments();
-      updateNotificationBell();
-      renderNotificationPanel();
-    });
   });
 
   // Close panel when clicking outside
@@ -2245,6 +2267,65 @@ function presenceChartOptions(times) {
   return base;
 }
 
+// ─── DONATIONS BAR ────────────────────────────────────────────
+function fetchDonationsData() {
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
+  const cbName = '__donationsCallback_' + Date.now();
+  const script = document.createElement('script');
+  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 10000);
+  window[cbName] = function(data) {
+    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
+    if (data && data.ok && data.donations) renderDonationsBar(data.donations);
+  };
+  script.src = DRIVE_SCRIPT_URL + '?action=getDonations&callback=' + cbName + '&_cb=' + Date.now();
+  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
+  document.head.appendChild(script);
+}
+
+function renderDonationsBar(d) {
+  const bar = document.getElementById('donation-bar');
+  if (!bar) return;
+  const goal    = parseFloat(d.goal)    || 0;
+  const donated = parseFloat(d.donated) || 0;
+  const pct     = goal > 0 ? Math.min(100, (donated / goal) * 100) : 0;
+  const headerEl  = bar.querySelector('.donation-bar-header');
+  const fillEl    = bar.querySelector('.donation-bar-fill');
+  const labelEl   = bar.querySelector('.donation-bar-label');
+  const readMoreEl = bar.querySelector('.donation-bar-readmore');
+  const bodyEl    = document.getElementById('donation-modal-body');
+
+  if (headerEl)   headerEl.textContent = d.header || 'Support The Drive';
+  if (fillEl)     fillEl.style.width   = pct + '%';
+  if (labelEl)    labelEl.textContent  = '$' + donated.toFixed(0) + ' / $' + goal.toFixed(0);
+  if (bodyEl)     bodyEl.textContent   = d.body || '';
+  if (readMoreEl) {
+    if (d.body && d.body.trim()) {
+      readMoreEl.style.display = '';
+    } else {
+      readMoreEl.style.display = 'none';
+    }
+  }
+
+  bar.style.display = goal > 0 ? 'flex' : 'none';
+}
+
+// ─── DONATION MODAL ───────────────────────────────────────────
+(function() {
+  const overlay   = document.getElementById('donation-modal-overlay');
+  const closeBtn  = document.getElementById('donation-modal-close');
+  const readMore  = document.getElementById('donation-readmore-btn');
+
+  if (readMore && overlay) {
+    readMore.addEventListener('click', () => { overlay.style.display = 'flex'; });
+  }
+  if (closeBtn && overlay) {
+    closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
+  }
+  if (overlay) {
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
+  }
+})();
+
 // ─── HEARTBEAT & ONLINE COUNT ─────────────────────────────────
 const HEARTBEAT_INTERVAL_MS  = 5000;   
 const HEARTBEAT_TIMEOUT_MS   = 4500;   
@@ -2421,6 +2502,17 @@ function pushSnapshot(total, available) {
   if (sortDirBtn) sortDirBtn.textContent = '↓';
 
   await initWithGate();
+
+  // ── Eagerly load notifications right after auth — no waiting for the bell ──
+  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    fetchServerNotifications().then(() => {
+      checkAndNotifyRequestFulfillments();
+      renderNotificationPanel();
+    });
+    // Also fetch donations data for the progress bar
+    fetchDonationsData();
+  }
+
   loadShowsData();
 
   if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
@@ -2490,13 +2582,6 @@ function pushSnapshot(total, available) {
       if (tab === 'stats')  initStatsTab();
       if (tab === 'shows')  filterAndRenderShows();
     });
-  });
-
-  // Fetch notifications after everything is loaded
-  fetchServerNotifications().then(() => {
-    checkAndNotifyRequestFulfillments();
-    updateNotificationBell();
-    renderNotificationPanel();
   });
 
 })();
