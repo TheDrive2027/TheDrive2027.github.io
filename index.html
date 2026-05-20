@@ -63,6 +63,18 @@
       </div>
     </div>
 
+    <!-- DONATION PROGRESS BAR -->
+    <div id="donation-bar" style="display:none;" class="donation-bar">
+      <span class="donation-bar-header">Support The Drive</span>
+      <div class="donation-bar-track-wrap">
+        <div class="donation-bar-track">
+          <div class="donation-bar-fill"></div>
+        </div>
+        <span class="donation-bar-label">$0 / $0</span>
+      </div>
+      <button class="donation-bar-readmore" id="donation-readmore-btn">READ MORE</button>
+    </div>
+
     <!-- TAB NAV -->
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="movies">MOVIES</button>
@@ -288,6 +300,19 @@
     </div>
   </div><!-- /tab-stats -->
 
+  <!-- DONATION MODAL -->
+  <div class="modal-overlay donation-modal-overlay" id="donation-modal-overlay" style="display:none;">
+    <div class="modal-box donation-modal-box">
+      <button class="donation-modal-close" id="donation-modal-close">✕</button>
+      <div class="gate-logo">
+        <span class="logo-mark">▶</span>
+        <span class="gate-logo-text">THE DRIVE</span>
+      </div>
+      <h2 class="modal-title" id="donation-modal-header">Support The Drive</h2>
+      <p class="donation-modal-body" id="donation-modal-body"></p>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
@@ -302,8 +327,8 @@
       <div class="footer-form-wrap">
         <p class="footer-form-label">LEAVE A COMMENT OR QUESTION</p>
         <div class="footer-form">
-          <input type="text" id="footer-name" placeholder="Your name (optional)" autocomplete="off" spellcheck="false" maxlength="80" />
-          <textarea id="footer-message" placeholder="Message, question, request anything…" rows="3" maxlength="1000" spellcheck="false"></textarea>
+          <input type="text" id="footer-name" placeholder="Your name (optional)" autocomplete="off" spellcheck="false" />
+          <textarea id="footer-message" placeholder="Message, question, request anything…" rows="3" spellcheck="false"></textarea>
           <button class="footer-submit-btn" id="footer-submit">SEND</button>
           <small class="footer-form-status" id="footer-form-status" hidden></small>
         </div>
