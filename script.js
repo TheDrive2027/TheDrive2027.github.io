@@ -229,6 +229,10 @@ function hasActiveFilters() {
     || activeFilters.resolution.size > 0;
 }
 
+// ─── RATING INFLIGHT GUARD ────────────────────────────────────
+// Prevents double-tap race conditions on rating buttons
+const ratingInflight = new Set();
+
 // ─── REQUEST COUNTS ───────────────────────────────────────────
 let requestCounts = {};
 const LOCAL_USER_REQ_KEY = 'thedrive_user_reqs_v1';
@@ -295,33 +299,91 @@ let userRatings = loadUserRatings();
 function getUserRating(title) { return userRatings[normalize(title)] || null; }
 function getRatingCount(title, type) { return (ratingCounts[normalize(title)] || {})[type] || 0; }
 
-async function postRating(title, type) {
-  const key = normalize(title);
-  const prev = userRatings[key];
-  if (prev === type) delete userRatings[key];
-  else userRatings[key] = type;
-  saveUserRatings();
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
-  return new Promise(resolve => {
-    const cbName = '__ratingCallback_' + Date.now();
-    const script = document.createElement('script');
-    const timer = setTimeout(() => { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); resolve(); }, 10000);
-    window[cbName] = function(data) {
-      clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
-      if (data && typeof data.up === 'number' && typeof data.down === 'number') ratingCounts[key] = { up: data.up, down: data.down };
-      resolve(data);
-    };
-    script.src = DRIVE_SCRIPT_URL
-      + '?action=rateMovie'
-      + '&title=' + encodeURIComponent(title)
-      + '&type='  + encodeURIComponent(type)
-      + '&prev='  + encodeURIComponent(prev || '')
-      + '&key='   + encodeURIComponent(getSavedKey() || '')
-      + '&did='   + encodeURIComponent(getDeviceId())
-      + '&callback=' + cbName;
-    script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); resolve(); };
-    document.head.appendChild(script);
+/**
+ * Immediately updates all rating DOM elements for a given title.
+ * clickedBtn (optional) — the button the user just tapped; receives the pop animation.
+ */
+function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
+  const totalVotes = upCount + downCount;
+  const pct = totalVotes > 0 ? Math.round((upCount / totalVotes) * 100) : null;
+
+  document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
+    const bType    = b.dataset.ratingType;
+    const isActive = nextVote === bType;
+    b.classList.toggle('active', isActive);
+
+    if (b === clickedBtn && isActive) {
+      b.classList.remove('just-voted');
+      void b.offsetWidth; // reflow to retrigger animation
+      b.classList.add('just-voted');
+    }
+
+    const countEl = b.querySelector('.rating-count');
+    if (countEl) countEl.textContent = bType === 'up' ? upCount : downCount;
   });
+
+  // Update the "Rate" / "94%" prompt label on all matching cards
+  document.querySelectorAll(`.movie-card[data-key="${CSS.escape(normalize(title))}"] .rating-prompt`).forEach(el => {
+    if (pct !== null) {
+      el.innerHTML = `<span class="rating-pct">${pct}%</span>`;
+    } else {
+      el.textContent = 'Rate';
+    }
+  });
+}
+
+/**
+ * Fires the rating to the server in the background.
+ * prevVote is captured before mutation so the server gets the correct previous state.
+ * On response, reconciles if server counts differ from our optimistic values.
+ */
+function postRatingBackground(title, type, prevVote, key, prevUp, prevDown) {
+  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
+    ratingInflight.delete(key);
+    return;
+  }
+
+  const cbName = '__ratingCallback_' + Date.now();
+  const script  = document.createElement('script');
+  const timer   = setTimeout(() => {
+    ratingInflight.delete(key);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+  }, 10000);
+
+  window[cbName] = function(data) {
+    clearTimeout(timer);
+    ratingInflight.delete(key);
+    delete window[cbName];
+    if (script.parentNode) script.parentNode.removeChild(script);
+
+    if (data && typeof data.up === 'number' && typeof data.down === 'number') {
+      const serverUp   = data.up;
+      const serverDown = data.down;
+      // Reconcile only if server disagrees with our optimistic counts
+      const localUp   = getRatingCount(title, 'up');
+      const localDown = getRatingCount(title, 'down');
+      if (serverUp !== localUp || serverDown !== localDown) {
+        ratingCounts[key] = { up: serverUp, down: serverDown };
+        applyRatingDOM(title, getUserRating(title), serverUp, serverDown, null);
+      }
+    }
+  };
+
+  script.src = DRIVE_SCRIPT_URL
+    + '?action=rateMovie'
+    + '&title=' + encodeURIComponent(title)
+    + '&type='  + encodeURIComponent(type)
+    + '&prev='  + encodeURIComponent(prevVote || '') // captured before mutation — always correct
+    + '&key='   + encodeURIComponent(getSavedKey() || '')
+    + '&did='   + encodeURIComponent(getDeviceId())
+    + '&callback=' + cbName;
+  script.onerror = () => {
+    ratingInflight.delete(key);
+    if (script.parentNode) script.parentNode.removeChild(script);
+    // On network error we silently keep the optimistic state
+  };
+  document.head.appendChild(script);
 }
 
 // ─── SETTINGS PERSISTENCE ─────────────────────────────────────
@@ -1629,14 +1691,25 @@ function buildCard(m, i, isRowCard) {
 }
 
 function ratingHTML(title) {
-  const userVote = getUserRating(title);
-  const ups = getRatingCount(title, 'up'), downs = getRatingCount(title, 'down');
+  const userVote   = getUserRating(title);
+  const ups        = getRatingCount(title, 'up');
+  const downs      = getRatingCount(title, 'down');
+  const totalVotes = ups + downs;
+  const pct        = totalVotes > 0 ? Math.round((ups / totalVotes) * 100) : null;
+
+  const promptHTML = pct !== null
+    ? `<span class="rating-pct">${pct}%</span>`
+    : 'Rate';
+
   return `<div class="rating-wrap">
-    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it">
-      ▲<span class="rating-count">${ups || 0}</span>
+    <span class="rating-prompt">${promptHTML}</span>
+    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}"
+            data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it">
+      <span class="rating-icon">👍</span><span class="rating-count">${ups || 0}</span>
     </button>
-    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="down" title="Didn't like it">
-      ▼<span class="rating-count">${downs || 0}</span>
+    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}"
+            data-rating-title="${escHtml(title)}" data-rating-type="down" title="Didn't like it">
+      <span class="rating-icon">👎</span><span class="rating-count">${downs || 0}</span>
     </button>
   </div>`;
 }
@@ -1763,22 +1836,51 @@ if (mainContent) {
     document.head.appendChild(script);
   });
 
-  mainContent.addEventListener('click', async e => {
+  mainContent.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn');
     if (!btn) return;
-    const title = btn.dataset.ratingTitle, type = btn.dataset.ratingType;
+
+    const title = btn.dataset.ratingTitle;
+    const type  = btn.dataset.ratingType;
     if (!title || !type) return;
-    await postRating(title, type);
-    document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
-      const userVote = getUserRating(title);
-      b.classList.toggle('active', userVote === b.dataset.ratingType);
-      const countEl = b.querySelector('.rating-count');
-      if (countEl) countEl.textContent = getRatingCount(title, b.dataset.ratingType) || 0;
-    });
-    const userVote = getUserRating(title);
-    if (userVote === 'up') showToast('▲ You liked ' + title);
-    else if (userVote === 'down') showToast('▼ You disliked ' + title);
-    else showToast('Rating removed for ' + title);
+
+    const key = normalize(title);
+
+    // Prevent double-tap races — ignore if a request is already in flight for this title
+    if (ratingInflight.has(key)) return;
+    ratingInflight.add(key);
+
+    // ── Capture previous state BEFORE any mutation ─────────────
+    const prevVote = getUserRating(title);
+    const prevUp   = getRatingCount(title, 'up');
+    const prevDown = getRatingCount(title, 'down');
+
+    // ── Compute next state ─────────────────────────────────────
+    const nextVote = prevVote === type ? null : type; // toggle off if same type
+
+    // Optimistically update ratingCounts in memory
+    const delta = { up: prevUp, down: prevDown };
+    if (prevVote === 'up')   delta.up   = Math.max(0, delta.up   - 1);
+    if (prevVote === 'down') delta.down = Math.max(0, delta.down - 1);
+    if (nextVote === 'up')   delta.up   += 1;
+    if (nextVote === 'down') delta.down += 1;
+    ratingCounts[key] = { up: delta.up, down: delta.down };
+
+    // Optimistically update userRatings
+    if (nextVote) userRatings[key] = nextVote;
+    else          delete userRatings[key];
+    saveUserRatings();
+
+    // ── Immediately repaint all matching buttons ───────────────
+    applyRatingDOM(title, nextVote, delta.up, delta.down, btn);
+
+    // Toast feedback
+    if (nextVote === 'up')        showToast('👍 Liked ' + title);
+    else if (nextVote === 'down') showToast('👎 Disliked ' + title);
+    else                          showToast('Rating removed for ' + title);
+
+    // ── Fire network call in background ───────────────────────
+    postRatingBackground(title, type, prevVote, key, prevUp, prevDown);
   });
 
   mainContent.addEventListener('click', async e => {
