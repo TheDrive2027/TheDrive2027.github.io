@@ -340,12 +340,14 @@ function clearAllFilters() {
 function updateCounts() {
   const totalMovies = allMovies.length;
   const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
-  let totalText, availText;
-  if (activeTab === 'shows') { totalText = totalEps + ' Episodes'; availText = '0 Available'; } 
-  else if (activeTab === 'stats') { totalText = (totalMovies + totalEps) + ' Files'; availText = totalMovies + ' Available'; } 
-  else { totalText = totalMovies + ' Movies'; availText = totalMovies + ' Available'; }
+  let totalText;
+  
+  if (activeTab === 'shows') { totalText = totalEps + ' Episodes'; } 
+  else if (activeTab === 'stats') { totalText = (totalMovies + totalEps) + ' Files'; } 
+  else { totalText = totalMovies + ' Movies'; }
+  
   if (movieCount) movieCount.textContent = totalText;
-  if (availCount) availCount.textContent = availText;
+  if (availCount) availCount.style.display = 'none'; // Hide available count entirely
 }
 
 // ─── SORT & FILTER ────────────────────────────────────────────
@@ -673,7 +675,7 @@ async function loadData() {
     allMovies = videos.map(v => ({
       title:           v.title,
       runtime:         v.runtime || '',
-      resolution:      '', 
+      resolution:      v.resolution || '', 
       maturityRating:  v.maturityRating || '',
       releaseDate:     v.year || '',
       year:            v.year || '—',
@@ -750,15 +752,18 @@ function renderLocalStats() {
   if (!allMovies.length && !allShows.length) return;
   const total = allMovies.length;
   const totalAll = total;
-  const availAll = total;
 
-  const pct = totalAll > 0 ? ((availAll / totalAll) * 100).toFixed(2) : '0.00';
+  const pct = 100; // Always 100% available now
   const fracEl = $('upload-fraction'), pctEl = $('upload-pct'), fillEl = $('upload-fill');
-  if (fracEl)  fracEl.textContent  = availAll + ' / ' + totalAll + ' movies uploaded';
+  if (fracEl)  fracEl.textContent  = totalAll + ' movies uploaded';
   if (pctEl)   pctEl.textContent   = pct + '%';
   if (fillEl)  fillEl.style.width  = parseFloat(pct) + '%';
   setText('stat-total-films', totalAll);
-  setText('stat-available', availAll);
+  
+  // Hide the "Available" stat card entirely
+  const availEl = $('stat-available');
+  if (availEl && availEl.parentElement) availEl.parentElement.style.display = 'none';
+  
   setText('stat-total-size', '—');
   
   let totalMins = 0;
@@ -800,7 +805,17 @@ async function fetchStatsData() {
 function renderLibraryChart(snapshots) {
   if (!window.Chart) return;
   const canvas = $('chart-library'); if (!canvas) return;
-  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Files', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available Files', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Files') };
+  // Removed "Available Files" dataset entirely
+  const cfg = { 
+    type: 'line', 
+    data: { 
+      labels: snapshots.map(s => s.date), 
+      datasets: [
+        { label: 'Total Files', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }
+      ] 
+    }, 
+    options: chartOptions('Files') 
+  };
   if (chartLibrary) chartLibrary.destroy();
   chartLibrary = new Chart(canvas, cfg);
 }
