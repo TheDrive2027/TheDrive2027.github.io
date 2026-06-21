@@ -30,12 +30,89 @@ function getDeviceId() {
 }
 
 async function initWithGate() {
-  // Access gate bypassed — local backend has no auth server.
   const overlay = document.getElementById('gate-overlay');
-  if (overlay) {
-    overlay.classList.add('gate-overlay-hidden');
-    overlay.style.display = 'none';
+  const input = document.getElementById('gate-key-input');
+  const submitBtn = document.getElementById('gate-submit');
+  const errorEl = document.getElementById('gate-error');
+  const did = getDeviceId();
+  const savedKey = getSavedKey();
+
+  // 1. Check if device is blocked globally
+  try {
+    const blockRes = await fetch(`${API_BASE}/api/keys/check-device?did=${did}`);
+    const blockData = await blockRes.json();
+    if (blockData.blocked) {
+      if (overlay) overlay.classList.remove('gate-overlay-hidden');
+      const titleEl = overlay.querySelector('.gate-title');
+      if (titleEl) titleEl.textContent = 'ACCESS DENIED';
+      return;
+    }
+  } catch(e) { console.warn("Device check failed", e); }
+
+  // 2. If saved key exists, validate it silently
+  if (savedKey) {
+    try {
+      const valRes = await fetch(`${API_BASE}/api/keys/validate?code=${savedKey}&did=${did}`);
+      const valData = await valRes.json();
+      if (valData.valid) {
+        if (overlay) { overlay.classList.add('gate-overlay-hidden'); overlay.style.display = 'none'; }
+        return; // Gate passed!
+      }
+    } catch(e) { console.warn("Key validation failed", e); }
+    localStorage.removeItem(LOCAL_KEY_STORE); // Clear bad key
   }
+
+  // 3. Show gate and wait for user input
+  if (overlay) overlay.classList.remove('gate-overlay-hidden');
+  return new Promise(resolve => {
+    if (!submitBtn || !input) { resolve(); return; }
+
+    async function attempt() {
+      const keyStr = input.value.trim().toUpperCase();
+      if (!keyStr) return;
+      
+      submitBtn.classList.add('loading');
+      submitBtn.textContent = 'CHECKING…';
+      errorEl.hidden = true;
+
+      try {
+        const valRes = await fetch(`${API_BASE}/api/keys/validate?code=${keyStr}&did=${did}`);
+        const valData = await valRes.json();
+        
+        if (!valData.valid) {
+          errorEl.textContent = valData.reason === 'expired' ? 'Key has reached device limit.' : 'Invalid key.';
+          errorEl.hidden = false;
+          submitBtn.classList.remove('loading');
+          submitBtn.textContent = 'ENTER THE DRIVE';
+          return;
+        }
+
+        const useRes = await fetch(`${API_BASE}/api/keys/use?code=${keyStr}&did=${did}`);
+        const useData = await useRes.json();
+        
+        if (useData.success) {
+          saveKey(keyStr);
+          overlay.classList.add('gate-overlay-hidden');
+          setTimeout(() => { overlay.style.display = 'none'; }, 350);
+          resolve();
+        } else {
+          errorEl.textContent = 'Failed to activate key.';
+          errorEl.hidden = false;
+          submitBtn.classList.remove('loading');
+          submitBtn.textContent = 'ENTER THE DRIVE';
+        }
+      } catch(e) {
+        errorEl.textContent = 'Cannot reach server.';
+        errorEl.hidden = false;
+        submitBtn.classList.remove('loading');
+        submitBtn.textContent = 'ENTER THE DRIVE';
+      }
+    }
+
+    submitBtn.addEventListener('click', attempt, { once: true });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); }, { once: true });
+    setTimeout(() => input.focus(), 100);
+  });
 }
 
 // ─── STATE ────────────────────────────────────────────────────
