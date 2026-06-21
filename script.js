@@ -3,20 +3,7 @@
    ============================================================= */
 
 // ─── CONFIG ───────────────────────────────────────────────────
-// Fetch the live backend URL from config.json (auto-updated by Python)
-// If it fails, default to relative paths (for local hosting).
-let API_BASE = '';
-try {
-  const configResponse = await fetch('config.json?t=' + Date.now());
-  if (configResponse.ok) {
-      const config = await configResponse.json();
-      API_BASE = config.API_BASE || '';
-  }
-} catch (e) {
-  console.log('No config.json found, defaulting to local backend.');
-  API_BASE = ''; 
-}
-
+let API_BASE = ''; // Will be populated inside init()
 const SHEET_CSV_URL    = '';
 const SHOWS_CSV_URL    = '';
 const DRIVE_SCRIPT_URL = '';
