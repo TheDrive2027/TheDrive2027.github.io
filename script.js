@@ -1,14 +1,26 @@
 /* =============================================================
    THE DRIVE — script.js
-   4/27/2026 — 10:54 PM
    ============================================================= */
 
 // ─── CONFIG ───────────────────────────────────────────────────
-// Movies sheet (gid=121928462)
-const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=121928462&single=true&output=csv';
-// Shows sheet (gid=1799938400)
-const SHOWS_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRk-WuFbb7q-_ZNbCjC6AaeV5yR6cGDuVCBJp0-wQI3zRQmdSaw87uzsUwI3dFgXTvsO_qBs6ach1C/pub?gid=1799938400&single=true&output=csv';
-const DRIVE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwva4Fk5o7ElVFMSDEq8La0hyWZBu1Ly5XuMFyStqjoM2vjJWB4vwGcVNAtIGv4hPRJGg/exec'
+// Fetch the live backend URL from config.json (auto-updated by Python)
+// If it fails, default to relative paths (for local hosting).
+let API_BASE = '';
+try {
+  const configResponse = await fetch('config.json?t=' + Date.now());
+  if (configResponse.ok) {
+      const config = await configResponse.json();
+      API_BASE = config.API_BASE || '';
+  }
+} catch (e) {
+  console.log('No config.json found, defaulting to local backend.');
+  API_BASE = ''; 
+}
+
+const SHEET_CSV_URL    = '';
+const SHOWS_CSV_URL    = '';
+const DRIVE_SCRIPT_URL = '';
+
 // Auto-reload the full tab every 30 minutes
 const AUTO_RELOAD_MS = 30 * 60 * 1000;
 setTimeout(() => location.reload(), AUTO_RELOAD_MS);
@@ -17,188 +29,24 @@ setTimeout(() => location.reload(), AUTO_RELOAD_MS);
 const LOCAL_KEY_STORE = 'thedrive_access_key_v1';
 const LOCAL_DEVICE_ID = 'thedrive_device_id_v1';
 
-function getSavedKey() {
-  try { return localStorage.getItem(LOCAL_KEY_STORE) || null; } catch(e) { return null; }
-}
-function saveKey(key) {
-  try { localStorage.setItem(LOCAL_KEY_STORE, key); } catch(e) {}
-}
-
+function getSavedKey() { try { return localStorage.getItem(LOCAL_KEY_STORE) || null; } catch(e) { return null; } }
+function saveKey(key) { try { localStorage.setItem(LOCAL_KEY_STORE, key); } catch(e) {} }
 function getDeviceId() {
   try {
     let did = localStorage.getItem(LOCAL_DEVICE_ID);
     if (!did) {
-      if (crypto && crypto.randomUUID) {
-        did = 'did-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
-      } else {
-        did = 'did-' + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
-      }
+      did = 'did-' + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
       localStorage.setItem(LOCAL_DEVICE_ID, did);
     }
     return did;
   } catch(e) { return 'did-UNKNOWN'; }
 }
 
-function callKeyAction(action, keyStr, existing) {
-  return new Promise((resolve) => {
-    const cbName = '__keyCallback_' + Date.now();
-    const script = document.createElement('script');
-    const timer  = setTimeout(() => { cleanup(); resolve({ error: 'timeout' }); }, 12000);
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
-    window[cbName] = function(data) { cleanup(); resolve(data); };
-    script.src = DRIVE_SCRIPT_URL
-      + '?action=' + action
-      + '&key='    + encodeURIComponent(keyStr)
-      + (existing ? '&existing=1' : '')
-      + '&did='    + encodeURIComponent(getDeviceId())
-      + '&callback=' + cbName
-      + '&_cb=' + Date.now();
-    script.onerror = () => { cleanup(); resolve({ error: 'network' }); };
-    document.head.appendChild(script);
-  });
-}
-
-let gateResolveFn = null;
-
-function showDenied() {
-  const overlay   = document.getElementById('gate-overlay');
-  const titleEl   = overlay && overlay.querySelector('.gate-title');
-  const fieldEl   = overlay && overlay.querySelector('.modal-field');
-  const submitBtn = document.getElementById('gate-submit');
-  if (overlay) overlay.classList.remove('gate-overlay-hidden');
-  if (titleEl) {
-    titleEl.textContent = 'ACCESS DENIED';
-    if (!overlay.querySelector('.gate-denied-msg')) {
-      const msg = document.createElement('p');
-      msg.className = 'gate-denied-msg';
-      msg.textContent = 'Your device has been blocked';
-      titleEl.insertAdjacentElement('afterend', msg);
-    }
-  }
-  if (fieldEl) fieldEl.style.display = 'none';
-  if (submitBtn) {
-    submitBtn.classList.remove('loading');
-    submitBtn.classList.add('denied');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-  }
-}
-
-function showGate() {
-  return new Promise(resolve => {
-    gateResolveFn = resolve;
-    const overlay   = document.getElementById('gate-overlay');
-    const input     = document.getElementById('gate-key-input');
-    const submitBtn = document.getElementById('gate-submit');
-    const errorEl   = document.getElementById('gate-error');
-    if (!overlay) { resolve(); return; }
-    overlay.classList.remove('gate-overlay-hidden');
-
-    function showError(msg) {
-      errorEl.textContent = msg;
-      errorEl.hidden = false;
-      input.style.borderColor = 'var(--red)';
-      submitBtn.classList.remove('loading');
-      submitBtn.textContent = 'ENTER THE DRIVE';
-    }
-    function clearError() { errorEl.hidden = true; input.style.borderColor = ''; }
-
-    input.addEventListener('input', () => {
-      const start = input.selectionStart, end = input.selectionEnd;
-      input.value = input.value.toUpperCase();
-      input.setSelectionRange(start, end);
-      clearError();
-    });
-
-    async function attempt() {
-      const keyStr = input.value.trim().toUpperCase();
-      if (!keyStr) { showError('Please enter your access key.'); return; }
-      submitBtn.classList.add('loading');
-      submitBtn.textContent = 'CHECKING…';
-      clearError();
-      const validation = await callKeyAction('validateKey', keyStr);
-      if (validation.error) { showError('Could not reach the server. Check your connection and try again.'); return; }
-      if (!validation.valid) {
-        if (validation.reason === 'device_blocked') showDenied();
-        else if (validation.reason === 'expired') showError('This key has reached its device limit. Please request a new key.');
-        else showError('Invalid key. Please check and try again.');
-        return;
-      }
-      const consume = await callKeyAction('useKey', keyStr);
-      if (!consume.success && consume.reason === 'device_blocked') { showDenied(); return; }
-      if (!consume.success && consume.reason === 'expired') { showError('This key just hit its device limit. Please request a new key.'); return; }
-      saveKey(keyStr);
-      overlay.classList.add('gate-overlay-hidden');
-      setTimeout(() => { overlay.style.display = 'none'; }, 350);
-      resolve();
-    }
-
-    submitBtn.addEventListener('click', attempt);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
-    setTimeout(() => input.focus(), 100);
-  });
-}
-
 async function initWithGate() {
   const overlay = document.getElementById('gate-overlay');
-  const earlySavedKey = getSavedKey();
-  if (earlySavedKey && overlay) {
-    const earlyInput = document.getElementById('gate-key-input');
-    const earlyBtn   = document.getElementById('gate-submit');
-    if (earlyInput) { earlyInput.value = earlySavedKey; earlyInput.disabled = true; }
-    if (earlyBtn)   { earlyBtn.textContent = 'CHECKING PERMISSIONS…'; earlyBtn.classList.add('loading'); }
-  }
-
-  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    const deviceCheck = await new Promise(resolve => {
-      const cbName = '__deviceCheckCallback_' + Date.now();
-      const script  = document.createElement('script');
-      const timer   = setTimeout(() => { cleanup(); resolve({ allowed: true }); }, 8000);
-      function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
-      window[cbName] = function(data) { cleanup(); resolve(data); };
-      script.src = DRIVE_SCRIPT_URL
-        + '?action=checkDevice'
-        + '&did='      + encodeURIComponent(getDeviceId())
-        + '&key='      + encodeURIComponent(getSavedKey() || '')
-        + '&callback=' + cbName
-        + '&_cb='      + Date.now();
-      script.onerror = () => { cleanup(); resolve({ allowed: true }); };
-      document.head.appendChild(script);
-    });
-    if (deviceCheck.allowed === false) { showDenied(); return; }
-    if (deviceCheck.keyCleared) { try { localStorage.removeItem(LOCAL_KEY_STORE); } catch(e) {} }
-  }
-
-  const savedKey = getSavedKey();
-  if (savedKey) {
-    if (overlay) {
-      overlay.classList.remove('gate-overlay-hidden');
-      const submitBtn = document.getElementById('gate-submit');
-      const input     = document.getElementById('gate-key-input');
-      if (submitBtn) { submitBtn.textContent = 'CHECKING KEY…'; submitBtn.classList.add('loading'); }
-      if (input)     { input.value = savedKey; input.disabled = true; }
-    }
-    const validation = await callKeyAction('validateKey', savedKey, true);
-    if (validation.reason === 'device_blocked') {
-      showDenied();
-    } else if (validation.valid || validation.error) {
-      if (overlay) { overlay.classList.add('gate-overlay-hidden'); overlay.style.display = 'none'; }
-    } else {
-      try { localStorage.removeItem(LOCAL_KEY_STORE); } catch(e) {}
-      const submitBtn = document.getElementById('gate-submit');
-      const input     = document.getElementById('gate-key-input');
-      const errorEl   = document.getElementById('gate-error');
-      if (submitBtn) { submitBtn.textContent = 'ENTER THE DRIVE'; submitBtn.classList.remove('loading'); }
-      if (input)     { input.value = ''; input.disabled = false; }
-      if (errorEl)   { errorEl.textContent = 'Your access key is no longer valid. Please enter a new one.'; errorEl.hidden = false; }
-      await showGate();
-    }
-  } else {
-    await showGate();
+  if (overlay) {
+    overlay.classList.add('gate-overlay-hidden');
+    overlay.style.display = 'none';
   }
 }
 
@@ -211,10 +59,9 @@ let currentDir  = 'asc';
 let isDemoMode  = false;
 let activeTab   = 'movies'; 
 let posterMap   = {};
-let thumbMap    = {};  // Map for storing episode thumbnail files
-let showDriveMerged = false; // true once getShowFiles has merged Drive links into allShows
+let thumbMap    = {};
+let showDriveMerged = false;
 
-// Active sidebar filters
 let activeFilters = {
   maturity:   new Set(),
   status:     new Set(),
@@ -229,80 +76,32 @@ function hasActiveFilters() {
     || activeFilters.resolution.size > 0;
 }
 
-// ─── RATING INFLIGHT GUARD ────────────────────────────────────
-// Prevents double-tap race conditions on rating buttons
 const ratingInflight = new Set();
-
-// ─── REQUEST COUNTS ───────────────────────────────────────────
 let requestCounts = {};
 const LOCAL_USER_REQ_KEY = 'thedrive_user_reqs_v1';
 
-function loadUserRequested() {
-  try { return new Set(JSON.parse(localStorage.getItem(LOCAL_USER_REQ_KEY) || '[]')); } catch(e) { return new Set(); }
-}
-function saveUserRequested() {
-  try { localStorage.setItem(LOCAL_USER_REQ_KEY, JSON.stringify([...userRequested])); } catch(e) {}
-}
+function loadUserRequested() { try { return new Set(JSON.parse(localStorage.getItem(LOCAL_USER_REQ_KEY) || '[]')); } catch(e) { return new Set(); } }
+function saveUserRequested() { try { localStorage.setItem(LOCAL_USER_REQ_KEY, JSON.stringify([...userRequested])); } catch(e) {} }
 let userRequested = loadUserRequested();
 
 function hasUserRequested(title) { return userRequested.has(normalize(title)); }
-
 function getRatingScore(title) {
   const r = ratingCounts[normalize(title)];
   if (!r) return 0;
   return (r.up || 0) - (r.down || 0);
 }
-
 function getRequestCount(title) { return requestCounts[normalize(title)] || 0; }
 
-async function postRequest(title) {
-  const key = normalize(title);
-  userRequested.add(key);
-  saveUserRequested();
-  requestCounts[key] = (requestCounts[key] || 0) + 1;
-  const localCount = requestCounts[key];
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return localCount;
-  return new Promise(resolve => {
-    const cbName = '__requestCallback_' + Date.now();
-    const script = document.createElement('script');
-    const timer = setTimeout(() => { cleanup(); resolve(localCount); }, 10000);
-    function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
-    window[cbName] = function(data) {
-      cleanup();
-      if (data && data.count !== undefined) { requestCounts[key] = data.count; resolve(data.count); }
-      else resolve(localCount);
-    };
-    const url = DRIVE_SCRIPT_URL
-      + '?action=request'
-      + '&title=' + encodeURIComponent(title)
-      + '&key='   + encodeURIComponent(getSavedKey() || '')
-      + '&did='   + encodeURIComponent(getDeviceId())
-      + '&callback=' + cbName;
-    script.src = url;
-    script.onerror = () => { cleanup(); resolve(localCount); };
-    document.head.appendChild(script);
-  });
-}
-
-// ─── RATINGS ─────────────────────────────────────────────────
 const LOCAL_RATINGS_KEY = 'thedrive_ratings_v1';
 let ratingCounts = {};
 
-function loadUserRatings() {
-  try { return JSON.parse(localStorage.getItem(LOCAL_RATINGS_KEY) || '{}'); } catch(e) { return {}; }
-}
-function saveUserRatings() {
-  try { localStorage.setItem(LOCAL_RATINGS_KEY, JSON.stringify(userRatings)); } catch(e) {}
-}
+function loadUserRatings() { try { return JSON.parse(localStorage.getItem(LOCAL_RATINGS_KEY) || '{}'); } catch(e) { return {}; } }
+function saveUserRatings() { try { localStorage.setItem(LOCAL_RATINGS_KEY, JSON.stringify(userRatings)); } catch(e) {} }
 let userRatings = loadUserRatings();
 
 function getUserRating(title) { return userRatings[normalize(title)] || null; }
 function getRatingCount(title, type) { return (ratingCounts[normalize(title)] || {})[type] || 0; }
 
-/**
- * Immediately updates all rating DOM elements for a given title.
- * clickedBtn (optional) — the button the user just tapped; receives the pop animation.
- */
 function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
   document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
     const bType    = b.dataset.ratingType;
@@ -311,95 +110,19 @@ function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
 
     if (b === clickedBtn && isActive) {
       b.classList.remove('just-voted');
-      void b.offsetWidth; // reflow to retrigger animation
+      void b.offsetWidth;
       b.classList.add('just-voted');
     }
 
     const countEl = b.querySelector('.rating-count');
     if (countEl) countEl.textContent = bType === 'up' ? upCount : downCount;
   });
-
-  // (rating-prompt label removed — buttons sit inline with the status pill)
 }
 
-/**
- * Fires the rating to the server in the background.
- * prevVote is captured before mutation so the server gets the correct previous state.
- * On response, reconciles if server counts differ from our optimistic values.
- */
-function postRatingBackground(title, type, prevVote, key, prevUp, prevDown) {
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    ratingInflight.delete(key);
-    return;
-  }
-
-  const cbName = '__ratingCallback_' + Date.now();
-  const script  = document.createElement('script');
-  const timer   = setTimeout(() => {
-    ratingInflight.delete(key);
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-  }, 10000);
-
-  window[cbName] = function(data) {
-    clearTimeout(timer);
-    ratingInflight.delete(key);
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-
-    if (data && typeof data.up === 'number' && typeof data.down === 'number') {
-      const serverUp   = data.up;
-      const serverDown = data.down;
-      // Reconcile only if server disagrees with our optimistic counts
-      const localUp   = getRatingCount(title, 'up');
-      const localDown = getRatingCount(title, 'down');
-      if (serverUp !== localUp || serverDown !== localDown) {
-        ratingCounts[key] = { up: serverUp, down: serverDown };
-        applyRatingDOM(title, getUserRating(title), serverUp, serverDown, null);
-      }
-    }
-  };
-
-  script.src = DRIVE_SCRIPT_URL
-    + '?action=rateMovie'
-    + '&title=' + encodeURIComponent(title)
-    + '&type='  + encodeURIComponent(type)
-    + '&prev='  + encodeURIComponent(prevVote || '') // captured before mutation — always correct
-    + '&key='   + encodeURIComponent(getSavedKey() || '')
-    + '&did='   + encodeURIComponent(getDeviceId())
-    + '&callback=' + cbName;
-  script.onerror = () => {
-    ratingInflight.delete(key);
-    if (script.parentNode) script.parentNode.removeChild(script);
-    // On network error we silently keep the optimistic state
-  };
-  document.head.appendChild(script);
-}
-
-// ─── SETTINGS PERSISTENCE ─────────────────────────────────────
 const LOCAL_SETTINGS_KEY = 'thedrive_settings_v2';
-
-function saveSettings() {
-  // Filter persistence disabled — always resets to defaults on load.
-}
-
-function loadSettings() {
-  // Always return null so defaults are applied on every page load.
-  return null;
-}
-
-function applySettings(s) {
-  if (!s) return;
-  if (s.search && searchInput) {
-    searchInput.value = s.search;
-    if (clearSearch) clearSearch.classList.toggle('visible', s.search.length > 0);
-  }
-  if (s.sort) { currentSort = s.sort; if (sortBy) sortBy.value = s.sort; }
-  if (s.dir)  { currentDir = s.dir; if (sortDirBtn) sortDirBtn.textContent = currentDir === 'desc' ? '↓' : '↑'; }
-  if (s.maturity)   s.maturity.forEach(v => activeFilters.maturity.add(v));
-  if (s.status)     s.status.forEach(v => activeFilters.status.add(v));
-  if (s.resolution) s.resolution.forEach(v => activeFilters.resolution.add(v));
-}
+function saveSettings() { }
+function loadSettings() { return null; }
+function applySettings(s) { if (!s) return; }
 
 // ─── DOM REFS ─────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -413,7 +136,7 @@ const availCount   = $('available-count');
 const resultsSummary = $('results-summary');
 const scanBar      = $('scan-bar');
 const lastUpdatedEl  = $('last-updated');
-const refreshBtn   = $('refresh-btn'); // will be repurposed as notification bell
+const refreshBtn   = $('refresh-btn');
 const scanFill     = $('scan-fill');
 const toast        = $('toast');
 const rowView      = $('row-view');
@@ -424,932 +147,48 @@ const sidebarClearBtn = $('sidebar-clear-btn');
 
 // ─── UTILITIES ────────────────────────────────────────────────
 function normalize(str) { return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
-
-function levenshtein(a, b) {
-  if (a === b) return 0;
-  const m = a.length, n = b.length;
-  if (!m) return n; if (!n) return m;
-  const dp = Array.from({length: m + 1}, (_, i) =>
-    Array.from({length: n + 1}, (_, j) => i === 0 ? j : j === 0 ? i : 0));
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
-  return dp[m][n];
-}
-
-function normalizeFilename(str) {
-  return normalize(String(str || '').replace(/\(\d{4}\)/g, '').replace(/\[.*?\]/g, ''));
-}
-
-function findDriveMatch(title, driveMap) {
-  const key = normalizeFilename(title);
-  for (const [driveKey, val] of Object.entries(driveMap)) {
-    if (normalizeFilename(driveKey) === key) return val;
-  }
-  return null;
-}
-
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
-  const headers = splitCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
-  return lines.slice(1).map(line => {
-    const vals = splitCSVLine(line);
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
-    return obj;
-  }).filter(r => r[headers[0]]);
-}
-
-function splitCSVLine(line) {
-  const result = [];
-  let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
-    else cur += c;
-  }
-  result.push(cur);
-  return result;
-}
-
-function extractYear(dateStr) {
-  if (!dateStr) return '—';
-  const m = String(dateStr).match(/\d{4}/);
-  return m ? m[0] : '—';
-}
-
-function parseSizeGB(sizeStr) {
-  if (!sizeStr) return 0;
-  const n = parseFloat(sizeStr), s = sizeStr.toUpperCase();
-  if (s.includes('TB')) return n * 1024;
-  if (s.includes('GB')) return n;
-  if (s.includes('MB')) return n / 1024;
-  return n;
-}
-
-function parseRuntimeMinutes(str) {
-  if (!str) return 0;
-  const hm = str.match(/(\d+)\s*h(?:r|ours?)?\s*(\d+)?\s*m?/i);
-  if (hm) return parseInt(hm[1]) * 60 + (parseInt(hm[2]) || 0);
-  const m = str.match(/(\d+)/);
-  return m ? parseInt(m[1]) : 0;
-}
-
-function formatEpRuntime(str) {
-  const mins = parseRuntimeMinutes(str);
-  if (!mins) return '';
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h > 0 && m > 0) return h + 'h ' + m + 'm';
-  if (h > 0)          return h + 'h';
-  return m + 'm';
-}
+function extractYear(dateStr) { if (!dateStr) return '—'; const m = String(dateStr).match(/\d{4}/); return m ? m[0] : '—'; }
+function parseSizeGB(sizeStr) { if (!sizeStr) return 0; const n = parseFloat(sizeStr), s = sizeStr.toUpperCase(); if (s.includes('TB')) return n * 1024; if (s.includes('GB')) return n; if (s.includes('MB')) return n / 1024; return n; }
+function parseRuntimeMinutes(str) { if (!str) return 0; const hm = str.match(/(\d+)\s*h(?:r|ours?)?\s*(\d+)?\s*m?/i); if (hm) return parseInt(hm[1]) * 60 + (parseInt(hm[2]) || 0); const m = str.match(/(\d+)/); return m ? parseInt(m[1]) : 0; }
+function formatEpRuntime(str) { const mins = parseRuntimeMinutes(str); if (!mins) return ''; const h = Math.floor(mins / 60); const m = mins % 60; if (h > 0 && m > 0) return h + 'h ' + m + 'm'; if (h > 0) return h + 'h'; return m + 'm'; }
 
 const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'PG13': 3, 'R': 4, 'NC-17': 5, 'NR': 6 };
-
-function parseResolutionScore(res) {
-  if (!res) return 0;
-  const s = String(res).toUpperCase().trim();
-  if (s === '4K' || s === 'UHD' || s.includes('2160')) return 2160;
-  const m = s.match(/(\d+)/);
-  return m ? parseInt(m[1], 10) : 0;
-}
-
-function imdbClass(rating) {
-  const r = parseFloat(rating);
-  if (r >= 8) return 'imdb-high';
-  if (r >= 6.5) return 'imdb-mid';
-  return 'imdb-low';
-}
-
-function resClass(res) {
-  const r = String(res).toUpperCase();
-  if (r.includes('4K') || r.includes('2160')) return 'res-4k';
-  if (r.includes('1080')) return 'res-1080';
-  if (r.includes('720') || r.includes('576')) return 'res-720';
-  return 'res-other';
-}
-
-function ratingClass(rating) {
-  const r = String(rating || '').toUpperCase().replace(/[\s-]/g, '');
-  if (r === 'G')    return 'rating-g';
-  if (r === 'PG')   return 'rating-pg';
-  if (r === 'PG13') return 'rating-pg13';
-  if (r === 'R')    return 'rating-r';
-  return '';
-}
+function parseResolutionScore(res) { if (!res) return 0; const s = String(res).toUpperCase().trim(); if (s === '4K' || s === 'UHD' || s.includes('2160')) return 2160; const m = s.match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
+function imdbClass(rating) { const r = parseFloat(rating); if (r >= 8) return 'imdb-high'; if (r >= 6.5) return 'imdb-mid'; return 'imdb-low'; }
+function resClass(res) { const r = String(res).toUpperCase(); if (r.includes('4K') || r.includes('2160')) return 'res-4k'; if (r.includes('1080')) return 'res-1080'; if (r.includes('720') || r.includes('576')) return 'res-720'; return 'res-other'; }
+function ratingClass(rating) { const r = String(rating || '').toUpperCase().replace(/[\s-]/g, ''); if (r === 'G') return 'rating-g'; if (r === 'PG') return 'rating-pg'; if (r === 'PG13') return 'rating-pg13'; if (r === 'R') return 'rating-r'; return ''; }
 
 let toastTimer;
-
-function logClientEvent(event, detail) {
-  if (!DRIVE_SCRIPT_URL) return;
-  const cbName = '__logCallback_' + Date.now();
-  const script = document.createElement('script');
-  window[cbName] = function() { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); };
-  script.src = DRIVE_SCRIPT_URL
-    + '?action=logEvent'
-    + '&event='  + encodeURIComponent(event)
-    + '&detail=' + encodeURIComponent(detail || '')
-    + '&key='    + encodeURIComponent(getSavedKey() || '')
-    + '&did='    + encodeURIComponent(getDeviceId())
-    + '&callback=' + cbName;
-  script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); };
-  document.head.appendChild(script);
-}
-
-function showToast(msg, duration = 3000) {
-  toast.textContent = msg;
-  toast.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
-}
-
-function updateLastUpdated(date) {
-  const d = (date instanceof Date && !isNaN(date)) ? date : new Date();
-  let h = d.getHours(), m = d.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  const mm = String(m).padStart(2, '0');
-  if (lastUpdatedEl) lastUpdatedEl.textContent = h + ':' + mm + ' ' + ampm;
-}
-
+function showToast(msg, duration = 3000) { toast.textContent = msg; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), duration); }
+function updateLastUpdated(date) { const d = (date instanceof Date && !isNaN(date)) ? date : new Date(); let h = d.getHours(), m = d.getMinutes(); const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; const mm = String(m).padStart(2, '0'); if (lastUpdatedEl) lastUpdatedEl.textContent = h + ':' + mm + ' ' + ampm; }
 function setProgress(pct) { scanFill.style.width = pct + '%'; }
 
-// ─── SHOWS SHEET PARSER ───────────────────────────────────────
-function parseShowsCSV(text) {
-  const rows = parseCSV(text);
-  const showMap = new Map();
+// ─── SHOWS (Local Stubs) ──────────────────────────────────────
+function showAvailableCount(show) { return show.seasons.reduce((t, s) => t + s.episodes.filter(e => e.available).length, 0); }
+function showTotalCount(show) { return show.seasons.reduce((t, s) => t + s.episodes.length, 0); }
 
-  for (const row of rows) {
-    const showTitle  = (row.show_title  || row['show title']  || '').trim();
-    const season     = parseInt(row.season     || row.s  || '0', 10);
-    const episode    = parseInt(row.episode    || row.ep || row.e || '0', 10);
-    const epTitle    = (row.episode_title || row['episode title'] || row.ep_title || '').trim();
-    const driveLink  = (row.drive_link  || row['drive link']  || row.link   || '').trim();
-    const posterUrl  = (row.poster_url  || row['poster url']  || row.poster || '').trim();
-    const imdbRating = (row.imdb_rating || row['imdb rating'] || row.imdb   || '').trim();
-    const status     = (row.status      || '').trim().toLowerCase();
-    const epRuntime  = (row.runtime     || row.run_time  || row.duration || '').trim();
-    const epFileSize = (row.file_size   || row.filesize  || row.size     || '').trim();
-    if (!showTitle || !season || !episode) continue;
-
-    if (!showMap.has(showTitle)) {
-      showMap.set(showTitle, { title: showTitle, poster: posterUrl || null, imdbRating: imdbRating || '', seasons: new Map() });
-    }
-    const show = showMap.get(showTitle);
-    if (!show.poster && posterUrl)       show.poster      = posterUrl;
-    if (!show.imdbRating && imdbRating)  show.imdbRating  = imdbRating;
-
-    if (!show.seasons.has(season)) show.seasons.set(season, []);
-    show.seasons.get(season).push({
-      num:       episode,
-      title:     epTitle,
-      link:      driveLink || null,
-      available: status === 'uploaded' || (status === '' && !!driveLink),
-      runtime:   epRuntime || null,
-      fileSize:  epFileSize || null
-    });
-  }
-
-  return Array.from(showMap.values()).map(show => ({
-    ...show,
-    seasons: Array.from(show.seasons.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([num, eps]) => ({ num, episodes: eps.sort((a, b) => a.num - b.num) }))
-  }));
-}
-
-function showAvailableCount(show) {
-  return show.seasons.reduce((t, s) => t + s.episodes.filter(e => e.available).length, 0);
-}
-function showTotalCount(show) {
-  return show.seasons.reduce((t, s) => t + s.episodes.length, 0);
-}
-
-// ─── SHOWS: load from sheet ────────────────────────────────────
 async function loadShowsData(forceRefresh = false) {
-  try {
-    const r = await fetchURL(SHOWS_CSV_URL, forceRefresh);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const text = await r.text();
-    allShows = parseShowsCSV(text);
-  } catch(e) {
-    console.warn('Shows CSV fetch error:', e);
-    allShows = [];
-  }
-
-  // Fetch the Drive file map and merge links onto episodes
-  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    try {
-      const data = await jsonpAction(
-        DRIVE_SCRIPT_URL + '?action=getShowFiles&key=' +
-        encodeURIComponent(getSavedKey() || '') +
-        '&did=' + encodeURIComponent(getDeviceId())
-      );
-      if (data && data.ok && data.shows) mergeShowDriveFiles(data.shows);
-      showDriveMerged = true;
-    } catch(e) {
-      console.warn('getShowFiles error:', e);
-    }
-  }
-
-  // Apply any posters already in posterMap before rendering
-  if (Object.keys(posterMap).length) {
-    allShows.forEach(show => {
-      const p = findPosterMatch(show.title, posterMap);
-      if (p) show.poster = p;
-    });
-  }
-
+  allShows = [];
   renderShows();
 }
 
-function mergeShowDriveFiles(showFileMap) {
-  allShows.forEach(show => {
-    const showNorm = normalize(show.title);
-    show.seasons.forEach(season => {
-      const padS = String(season.num).padStart(2, '0');
-      season.episodes.forEach(ep => {
-        if (ep.link) return; // already has a link from the sheet
-        const padE = String(ep.num).padStart(2, '0');
-        const epCode = normalize('s' + padS + 'e' + padE);
-        for (const [key, val] of Object.entries(showFileMap)) {
-          if (key.startsWith(showNorm) && key.includes(epCode)) {
-            ep.link      = val.link;
-            ep.available = true;
-            break;
-          }
-        }
-      });
-    });
-  });
-}
-
-// ─── SHOWS: render the shows tab ─────────────────────────────
 function renderShows() {
   const container = document.getElementById('shows-grid');
   if (!container) return;
   container.innerHTML = '';
-
   if (!allShows.length) {
     container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No shows found.</p></div>';
     return;
   }
-
-  const frag = document.createDocumentFragment();
-  allShows.forEach((show, i) => {
-    const availEps = showAvailableCount(show);
-    const totalEps = showTotalCount(show);
-    const card = document.createElement('div');
-    card.className = 'movie-card show-card-item';
-    card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
-    card.dataset.showIndex = i;
-    card.style.cursor = 'pointer';
-
-    card.innerHTML = `
-      <div class="card-poster card-poster--playable">
-        ${show.poster ? `<img src="${escHtml(show.poster)}" alt="${escHtml(show.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
-        <div class="card-play-overlay show-card-click-overlay">
-          <div class="card-play-btn">
-            <span class="card-play-icon" style="font-size:11px;letter-spacing:.5px;font-family:var(--font-mono)">EPISODES</span>
-          </div>
-        </div>
-        <div class="show-poster-overlay">
-          <span class="show-ep-badge">${availEps}/${totalEps} eps</span>
-        </div>
-      </div>
-      <div class="card-title">${escHtml(show.title)}</div>
-      <div class="card-meta">
-        <span class="card-year">${show.seasons.length} Season${show.seasons.length !== 1 ? 's' : ''}</span>
-        ${show.imdbRating ? `<span class="card-sep">·</span><span class="card-imdb imdb-${parseFloat(show.imdbRating) >= 8 ? 'high' : parseFloat(show.imdbRating) >= 6.5 ? 'mid' : 'low'}">★ ${escHtml(show.imdbRating)}</span>` : ''}
-      </div>
-      <div class="card-footer">
-        <span class="status-pill ${availEps > 0 ? 'status-available' : 'status-missing'}">
-          ${availEps > 0 ? 'AVAILABLE' : 'NOT UPLOADED'}
-        </span>
-      </div>
-    `;
-
-    card.addEventListener('click', () => openShowOverlay(show));
-    frag.appendChild(card);
-  });
-  container.appendChild(frag);
   updateCounts();
 }
 
-// ─── SHOW OVERLAY ─────────────────────────────────────────────
-let overlayCurrentShow = null;
-let overlayCurrentSeason = 0;
-
-function openShowOverlay(show) {
-  overlayCurrentShow = show;
-  overlayCurrentSeason = show.seasons[0] ? show.seasons[0].num : 1;
-
-  const overlay = document.getElementById('show-overlay');
-  const titleEl  = document.getElementById('show-overlay-title');
-  const metaEl   = document.getElementById('show-overlay-meta');
-  const seasonsEl = document.getElementById('show-overlay-seasons');
-
-  if (titleEl)  titleEl.textContent = show.title;
-  if (metaEl) {
-    const totalEps = showTotalCount(show), availEps = showAvailableCount(show);
-    metaEl.innerHTML = `
-      <span>${show.seasons.length} Season${show.seasons.length !== 1 ? 's' : ''}</span>
-      <span class="card-sep">·</span>
-      <span>${availEps}/${totalEps} eps available</span>
-      ${show.imdbRating ? `<span class="card-sep">·</span><span style="color:var(--accent)">★ ${escHtml(show.imdbRating)}</span>` : ''}
-    `;
-  }
-
-  // Generate Season tabs (Column left)
-  if (seasonsEl) {
-    seasonsEl.innerHTML = show.seasons.map(s => {
-      const total = s.episodes.length;
-      const avail = s.episodes.filter(e => e.available).length;
-      const pillClass = avail === total ? 'season-pill--full' : avail === 0 ? 'season-pill--none' : 'season-pill--partial';
-      return `
-      <button class="show-overlay-season-btn ${s.num === overlayCurrentSeason ? 'active' : ''}" data-season="${s.num}">
-        <span class="season-btn-label">Season ${s.num}</span>
-        <span class="season-pill ${pillClass}">${avail}/${total}</span>
-      </button>`;
-    }).join('');
-    seasonsEl.querySelectorAll('.show-overlay-season-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        overlayCurrentSeason = parseInt(btn.dataset.season, 10);
-        seasonsEl.querySelectorAll('.show-overlay-season-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.season, 10) === overlayCurrentSeason));
-        renderOverlayEpisodes();
-        fetchThumbsForSeason(overlayCurrentShow, overlayCurrentSeason);
-      });
-    });
-  }
-
-  renderOverlayEpisodes();
-  fetchThumbsForSeason(show, overlayCurrentSeason);
-
-  if (overlay) {
-    overlay.removeAttribute('hidden');
-    requestAnimationFrame(() => overlay.classList.add('show-overlay--open'));
-  }
-
-  // Log show open
-  logClientEvent('Open Show', show.title);
-
-  document.body.style.overflow = 'hidden';
-}
-
-function renderOverlayEpisodes() {
-  const episodesEl = document.getElementById('show-overlay-episodes');
-  if (!episodesEl || !overlayCurrentShow) return;
-  const season = overlayCurrentShow.seasons.find(s => s.num === overlayCurrentSeason);
-  if (!season) { episodesEl.innerHTML = ''; return; }
-
-  const padS = String(season.num).padStart(2, '0');
-
-  episodesEl.innerHTML = season.episodes.map(ep => {
-    const padE = String(ep.num).padStart(2, '0');
-    const showNorm = normalize(overlayCurrentShow.title);
-    const epCode   = normalize(`s${padS}e${padE}`);
-
-    let thumbUrl = '';
-    // Check thumbMap first (image files stored outside the Posters folder — have .id)
-    for (const key of Object.keys(thumbMap)) {
-      if (key.startsWith(showNorm) && key.includes(epCode) && key.includes('thumb')) {
-        if (thumbMap[key].id) {
-          thumbUrl = `https://drive.google.com/thumbnail?id=${thumbMap[key].id}&sz=w400`;
-        }
-        break;
-      }
-    }
-    // Fall back to posterMap
-    if (!thumbUrl) {
-      for (const [rawKey, val] of Object.entries(posterMap)) {
-        const key = normalize(rawKey.replace(/\.[a-z0-9]{2,5}$/i, ''));
-        if (key.startsWith(showNorm) && key.includes(epCode) && key.includes('thumb')) {
-          thumbUrl = String(val).replace(/sz=w\d+/, 'sz=w400');
-          break;
-        }
-      }
-    }
-
-    const epTitleStr = ep.title ? escHtml(ep.title) : 'Episode ' + ep.num;
-
-    return `
-      <div class="show-overlay-ep ${ep.available ? 'show-overlay-ep--available' : 'show-overlay-ep--missing'}">
-        <div class="ep-thumb-wrapper">
-           ${thumbUrl 
-             ? `<img src="${thumbUrl}" class="ep-thumb" alt="${epTitleStr}" loading="lazy" />` 
-             : `<div class="ep-thumb-placeholder">E${ep.num}</div>`}
-           
-           ${ep.available && ep.link
-             ? `<a class="ep-play-btn" href="${escHtml(ep.link)}" target="_blank" rel="noopener"
-                    data-show="${escHtml(overlayCurrentShow.title)}"
-                    data-season="${padS}"
-                    data-episode="${padE}"
-                    data-title="${escHtml(overlayCurrentShow.title)}">&#9654;</a>`
-             : ''}
-        </div>
-        <div class="ep-details">
-           <span class="ep-num-badge">S${padS} E${padE}${formatEpRuntime(ep.runtime) ? '  ·  ' + formatEpRuntime(ep.runtime) : ''}</span>
-           <span class="ep-title-text">${epTitleStr}</span>
-           <span class="status-pill ${ep.available ? 'status-available' : 'status-missing'}">${ep.available ? 'AVAILABLE' : 'NOT UPLOADED'}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-function closeShowOverlay() {
-  const overlay = document.getElementById('show-overlay');
-  if (!overlay) return;
-  overlay.classList.remove('show-overlay--open');
-  setTimeout(() => { overlay.setAttribute('hidden', ''); }, 280);
-  document.body.style.overflow = '';
-  overlayCurrentShow = null;
-}
-
-// Wire up overlay close & episode link logging
-document.addEventListener('DOMContentLoaded', () => {
-  const closeBtn = document.getElementById('show-overlay-close');
-  const backdrop = document.getElementById('show-overlay-backdrop');
-  if (closeBtn)  closeBtn.addEventListener('click', closeShowOverlay);
-  if (backdrop)  backdrop.addEventListener('click', closeShowOverlay);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShowOverlay(); });
-
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.ep-play-btn');
-    if (!btn) return;
-    const showTitle = btn.dataset.show;
-    const season    = btn.dataset.season;
-    const episode   = btn.dataset.episode;
-    if (showTitle && season && episode) {
-      logClientEvent('Open Episode Link', `${showTitle} S${season} E${episode}`);
-    }
-  });
-});
-
-
-
-// ─── SHOWS: filtered render ───────────────────────────────────
-function filterAndRenderShows() {
-  const q = normalize(searchInput ? searchInput.value : '');
-
-  const visible = q
-    ? allShows.filter(s => normalize(s.title).includes(q))
-    : allShows;
-
-  const saved = allShows;
-  allShows = visible;
-  renderShows();
-  allShows = saved;
-}
+function filterAndRenderShows() { renderShows(); }
 
 // ─── FETCH & MERGE ────────────────────────────────────────────
 async function fetchURL(url, bustCache = false) {
   if (bustCache) url += (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
   return fetch(url, { redirect: 'follow', cache: bustCache ? 'no-store' : 'default' });
-}
-
-function fetchScriptJSON(url, bustCache = false) {
-  return new Promise((resolve, reject) => {
-    fetchURL(url, bustCache)
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(resolve)
-      .catch(() => {
-        const cbName = '__driveCallback_' + Date.now();
-        const script = document.createElement('script');
-        const timer = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, 15000);
-        function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
-        window[cbName] = function(data) { cleanup(); resolve(data); };
-        const jsonpUrl = bustCache ? url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now() : url;
-        script.src = jsonpUrl + (jsonpUrl.includes('?') ? '&' : '?') + 'callback=' + cbName;
-        script.onerror = () => { cleanup(); reject(new Error('JSONP script error')); };
-        document.head.appendChild(script);
-      });
-  });
-}
-
-function applyDriveData(rawData, csvRows) {
-  const rawMovies = rawData.movies || rawData;
-  posterMap = {};
-  for (const [k, v] of Object.entries(rawData.posters || {})) {
-    posterMap[normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''))] = v;
-  }
-  if (rawData.requests) {
-    requestCounts = {};
-    for (const [k, v] of Object.entries(rawData.requests)) requestCounts[normalize(k)] = v;
-  }
-  if (rawData.ratings) {
-    ratingCounts = {};
-    try { localStorage.removeItem('thedrive_rating_counts_v1'); } catch(e) {}
-    for (const [k, v] of Object.entries(rawData.ratings)) ratingCounts[normalize(k)] = v;
-    try { localStorage.setItem('thedrive_rating_counts_v1', JSON.stringify(ratingCounts)); } catch(e) {}
-  } else {
-    try { const stored = JSON.parse(localStorage.getItem('thedrive_rating_counts_v1') || '{}'); ratingCounts = stored; } catch(e) {}
-  }
-
-  // Extract all Image files for dynamic thumbnails
-  thumbMap = {};
-  for (const [k, v] of Object.entries(rawMovies)) {
-    if (typeof v === 'object' && v !== null && v.mimeType && v.mimeType.startsWith('image/')) {
-      thumbMap[k] = v;
-    }
-  }
-
-  const videoMimeTypes = ['video/', 'application/octet-stream'];
-  const driveMap = Object.fromEntries(
-    Object.entries(rawMovies).filter(([, val]) =>
-      typeof val === 'object' && val !== null &&
-      (!val.mimeType || videoMimeTypes.some(t => val.mimeType.startsWith(t)))
-    )
-  );
-
-  allMovies = mergeData(csvRows, driveMap, posterMap);
-  render();
-  populateFilterCheckboxes();
-  updateCounts();
-  updateLastUpdated();
-
-  // Auto-match show posters from the Drive folder
-  if (allShows.length > 0) {
-    allShows.forEach(show => {
-      const autoPoster = findPosterMatch(show.title, posterMap);
-      if (!show.poster && autoPoster) {
-        show.poster = autoPoster;
-      }
-    });
-    if (showDriveMerged) renderShows();
-  }
-
-  // After updating movies, check for fulfilled requests
-  checkAndNotifyRequestFulfillments();
-}
-
-function fetchRatings(scriptURL, isRefresh = false) {
-  return new Promise(resolve => {
-    const cbName = '__ratingsCallback_' + Date.now();
-    const script = document.createElement('script');
-    const timer = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); resolve(); }, 10000);
-    window[cbName] = function(data) {
-      clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
-      if (data && data.ratings) {
-        ratingCounts = {};
-        for (const [k, v] of Object.entries(data.ratings)) ratingCounts[normalize(k)] = v;
-        document.querySelectorAll('.rating-btn').forEach(b => {
-          const title = b.dataset.ratingTitle, type = b.dataset.ratingType;
-          if (!title || !type) return;
-          const countEl = b.querySelector('.rating-count');
-          if (countEl) countEl.textContent = getRatingCount(title, type) || 0;
-        });
-        applySort();
-      }
-      resolve();
-    };
-    script.src = scriptURL + '?action=getRatings&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&refresh=' + (isRefresh ? '1' : '0') + '&callback=' + cbName + '&_cb=' + Date.now();
-    script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); resolve(); };
-    document.head.appendChild(script);
-  });
-}
-
-function jsonpAction(url) {
-  return new Promise((resolve, reject) => {
-    const cbName = '__cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const script = document.createElement('script');
-    const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 15000);
-    function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
-    window[cbName] = data => { cleanup(); resolve(data); };
-    script.src     = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName + '&_cb=' + Date.now();
-    script.onerror = () => { cleanup(); reject(new Error('script error')); };
-    document.head.appendChild(script);
-  });
-}
-
-const SEQUENTIAL_BATCH_SIZE = 10;
-
-// ─── SCAN STATUS MESSAGES ────────────────────────────────────
-const SCAN_STATUS_MSGS = [
-  'Scanning Drive…',
-  'Reading movie files…',
-  'Loading posters…',
-  'Almost there…',
-  'Finishing up…',
-];
-let scanStatusTimer = null;
-
-function startScanStatusCycle(labelEl) {
-  if (!labelEl) return;
-  let idx = 0;
-  labelEl.textContent = SCAN_STATUS_MSGS[0];
-  scanStatusTimer = setInterval(() => {
-    idx = (idx + 1) % SCAN_STATUS_MSGS.length;
-    labelEl.textContent = SCAN_STATUS_MSGS[idx];
-  }, 4000);
-}
-
-function stopScanStatusCycle(labelEl, finalMsg) {
-  if (scanStatusTimer) { clearInterval(scanStatusTimer); scanStatusTimer = null; }
-  if (labelEl) labelEl.textContent = finalMsg || '';
-}
-
-async function loadData(sheetURL, scriptURL, forceRefresh = false) {
-  setProgress(5);
-  let csvRows = [];
-  try {
-    const r = await fetchURL(sheetURL, forceRefresh);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const text = await r.text();
-    csvRows = parseCSV(text);
-    setProgress(15);
-  } catch (e) {
-    showToast('⚠ Could not load Sheet CSV. Check the URL & sharing settings.');
-    console.error('CSV fetch error:', e);
-  }
-
-  allMovies = mergeData(csvRows, {}, {});
-  render();
-  populateFilterCheckboxes();
-  updateCounts();
-  setProgress(20);
-
-  const driveURL = scriptURL && scriptURL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE' ? scriptURL : null;
-  if (!driveURL) { setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300); return; }
-
-  if (forceRefresh) { await loadDataBulkFallback(driveURL, csvRows, true, false); return; }
-
-  setProgress(25);
-
-  const BACKGROUND_REFRESH_THRESHOLD_S = 20 * 60; 
-
-  let serverPayload = null, cacheAgeS = null;
-  try {
-    const cacheResult = await jsonpAction(driveURL + '?action=getScanCache&_cb=' + Date.now());
-    if (cacheResult && cacheResult.ok && cacheResult.payload && cacheResult.payload.movies) {
-      serverPayload = cacheResult.payload;
-      cacheAgeS     = typeof cacheResult.age_s === 'number' ? cacheResult.age_s : null;
-    }
-  } catch (e) { console.warn('getScanCache failed:', e); }
-
-  if (serverPayload) {
-    applyDriveData(serverPayload, csvRows);
-    setProgress(100);
-    setTimeout(() => scanBar.classList.add('hidden'), 300);
-    fetchRatings(driveURL, false);
-    const cacheDate = cacheAgeS !== null ? new Date(Date.now() - cacheAgeS * 1000) : new Date();
-    updateLastUpdated(cacheDate);
-
-    if (cacheAgeS !== null && cacheAgeS > BACKGROUND_REFRESH_THRESHOLD_S) {
-      setTimeout(() => loadDataBulkFallback(driveURL, csvRows, false, true), 2000);
-    }
-    return;
-  }
-
-  await loadDataBulkFallback(driveURL, csvRows, false, false);
-}
-
-async function loadDataBulkFallback(driveURL, csvRows, forceRefresh, background = false) {
-  let files = [];
-  try {
-    const listData = await jsonpAction(driveURL + '?action=getFileList');
-    if (listData && listData.ok && Array.isArray(listData.files)) files = listData.files;
-    else throw new Error(listData && listData.error ? listData.error : 'getFileList failed');
-  } catch (e) {
-    if (!background) { showToast('⚠ Could not load Drive file list. Check the Script URL & deployment.'); setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300); }
-    console.error('getFileList error:', e);
-    fetchRatings(driveURL, forceRefresh);
-    return;
-  }
-
-  if (files.length === 0) {
-    if (!background) { setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300); }
-    fetchRatings(driveURL, forceRefresh);
-    return;
-  }
-
-  const accumMovies = {}, accumPosters = {}, accumRequests = {}, accumRatings = {};
-  const SCAN_BATCH_SIZE = 50, CONCURRENCY = 3;
-  const INTER_BATCH_DELAY_MS = 200; 
-  const total = files.length;
-  const progressStart = 25, progressEnd = 95;
-  const batches = [];
-  for (let i = 0; i < total; i += SCAN_BATCH_SIZE) batches.push(files.slice(i, i + SCAN_BATCH_SIZE));
-  let completedFiles = 0;
-  const failedFileIds = []; 
-
-  for (let i = 0; i < batches.length; i += CONCURRENCY) {
-    const concurrentBatches = batches.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(concurrentBatches.map(batch => {
-      const fileIds   = batch.map(f => f.id).join(',');
-      const isPosters = batch.map(f => f.isPosters ? '1' : '0').join(',');
-      return jsonpAction(driveURL + '?action=scanFiles&fileIds=' + encodeURIComponent(fileIds) + '&isPosters=' + encodeURIComponent(isPosters) + '&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId())).catch(err => { console.warn('scanFiles batch failed:', err); return null; });
-    }));
-    for (let r = 0; r < results.length; r++) {
-      const result = results[r];
-      if (result && result.ok) {
-        Object.assign(accumMovies, result.movies || {});
-        Object.assign(accumPosters, result.posters || {});
-        if (Array.isArray(result.failedIds)) {
-          const batchFiles = concurrentBatches[r] || [];
-          result.failedIds.forEach(fid => { const orig = batchFiles.find(f => f.id === fid); if (orig) failedFileIds.push(orig); });
-        }
-      } else if (result === null) {
-        (concurrentBatches[r] || []).forEach(f => failedFileIds.push(f));
-      }
-    }
-    completedFiles += concurrentBatches.reduce((s, b) => s + b.length, 0);
-    if (!background) setProgress(progressStart + ((completedFiles / total) * (progressEnd - progressStart)));
-    applyDriveData({ movies: accumMovies, posters: accumPosters, requests: accumRequests, ratings: accumRatings }, csvRows);
-    if (i + CONCURRENCY < batches.length) await new Promise(r => setTimeout(r, INTER_BATCH_DELAY_MS));
-  }
-
-  if (failedFileIds.length > 0) {
-    await new Promise(r => setTimeout(r, 3000));
-    const retryBatches = [];
-    for (let i = 0; i < failedFileIds.length; i += SCAN_BATCH_SIZE) retryBatches.push(failedFileIds.slice(i, i + SCAN_BATCH_SIZE));
-    for (const batch of retryBatches) {
-      try {
-        const fileIds   = batch.map(f => f.id).join(',');
-        const isPosters = batch.map(f => f.isPosters ? '1' : '0').join(',');
-        const result    = await jsonpAction(driveURL + '?action=scanFiles&fileIds=' + encodeURIComponent(fileIds) + '&isPosters=' + encodeURIComponent(isPosters) + '&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()));
-        if (result && result.ok) { Object.assign(accumMovies, result.movies || {}); Object.assign(accumPosters, result.posters || {}); applyDriveData({ movies: accumMovies, posters: accumPosters, requests: accumRequests, ratings: accumRatings }, csvRows); }
-      } catch(err) {}
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
-
-  let liveRequests = {}, liveRatings = {};
-  try {
-    const ratingsData = await new Promise((resolve) => {
-      const cbName = '__postScanRatings_' + Date.now();
-      const script = document.createElement('script');
-      const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); resolve({}); }, 10000);
-      window[cbName] = function(data) { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); resolve(data || {}); };
-      script.src = driveURL + '?action=getRatings&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&callback=' + cbName + '&_cb=' + Date.now();
-      script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); resolve({}); };
-      document.head.appendChild(script);
-    });
-    if (ratingsData.ratings) {
-      for (const [k, v] of Object.entries(ratingsData.ratings)) liveRatings[normalize(k)] = v;
-      ratingCounts = { ...liveRatings };
-    }
-  } catch(e) {}
-
-  try {
-    const reqResult = await jsonpAction(driveURL + '?action=getRequests&key=' + encodeURIComponent(getSavedKey() || '') + '&did=' + encodeURIComponent(getDeviceId()) + '&_cb=' + Date.now());
-    if (reqResult && reqResult.requests) {
-      for (const [k, v] of Object.entries(reqResult.requests)) liveRequests[normalize(k)] = v;
-      requestCounts = { ...liveRequests };
-    }
-  } catch(e) {}
-
-  const finalPayload = { movies: accumMovies, posters: accumPosters, requests: liveRequests, ratings: liveRatings };
-  applyDriveData(finalPayload, csvRows);
-
-  { const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length; const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0); const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0); pushSnapshot(totalMovies + totalEps, availMovies + availEps); }
-
-  try {
-    fetch(driveURL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'writeCache', payload: finalPayload, key: getSavedKey() || '', did: getDeviceId() }), mode: 'no-cors' }).catch(() => {});
-  } catch(e) {}
-
-  if (!background) { setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300); }
-  updateLastUpdated();
-}
-
-// ─── BACKGROUND POSTER REFRESH ────────────────────────────────
-async function refreshPostersInBackground(driveURL, csvRows) {
-  let allPosterFiles = [];
-  try {
-    const listData = await jsonpAction(driveURL + '?action=getFileList');
-    if (listData && listData.ok && Array.isArray(listData.files)) {
-      allPosterFiles = listData.files.filter(f => f.isPosters);
-    }
-  } catch(e) { return; }
-
-  if (!allPosterFiles.length) return;
-
-  const posterFiles = allPosterFiles.filter(f => !normalize(f.name || '').includes('thumb'));
-  const thumbFiles  = allPosterFiles.filter(f =>  normalize(f.name || '').includes('thumb'));
-
-  const BATCH = 10;
-
-  async function scanAndApplyBatch(batch) {
-    const fileIds   = batch.map(f => f.id).join(',');
-    const isPosters = batch.map(() => '1').join(',');
-    let result;
-    try {
-      result = await jsonpAction(
-        driveURL + '?action=scanFiles'
-        + '&fileIds='   + encodeURIComponent(fileIds)
-        + '&isPosters=' + encodeURIComponent(isPosters)
-        + '&key='       + encodeURIComponent(getSavedKey() || '')
-        + '&did='       + encodeURIComponent(getDeviceId())
-      );
-    } catch(e) { return; }
-    if (!result || !result.ok) return;
-
-    let postersChanged = false;
-    for (const [k, v] of Object.entries(result.posters || {})) {
-      const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
-      if (posterMap[cleanKey] !== v) { posterMap[cleanKey] = v; postersChanged = true; }
-    }
-
-    let thumbsChanged = false;
-    for (const [k, v] of Object.entries(result.movies || {})) {
-      if (typeof v === 'object' && v !== null && v.mimeType && v.mimeType.startsWith('image/')) {
-        if (thumbMap[k] !== v) { thumbMap[k] = v; thumbsChanged = true; }
-      }
-    }
-
-    if (!postersChanged && !thumbsChanged) return;
-
-    if (postersChanged) {
-      let showsChanged = false;
-      allShows.forEach(show => {
-        const fresh = findPosterMatch(show.title, posterMap);
-        if (fresh && show.poster !== fresh) { show.poster = fresh; showsChanged = true; }
-      });
-      if (showsChanged && showDriveMerged) renderShows();
-
-      let moviesChanged = false;
-      allMovies.forEach(m => {
-        const driveKey = m.driveResolution ? normalize(m.driveResolution) : null;
-        const fresh = (driveKey && posterMap[driveKey])
-          ? posterMap[driveKey]
-          : findPosterMatch(m.title, posterMap);
-        if (fresh && m.poster !== fresh) { m.poster = fresh; moviesChanged = true; }
-      });
-      if (moviesChanged) renderCurrentView();
-    }
-
-  }
-
-  for (let i = 0; i < posterFiles.length; i += BATCH) {
-    await scanAndApplyBatch(posterFiles.slice(i, i + BATCH));
-    if (i + BATCH < posterFiles.length) await new Promise(r => setTimeout(r, 300));
-  }
-}
-
-// ─── ON-DEMAND SEASON THUMBNAIL FETCH ────────────────────────
-const thumbFetchCache = new Set();
-
-async function fetchThumbsForSeason(show, seasonNum) {
-  const cacheKey = normalize(show.title) + ':' + seasonNum;
-  if (thumbFetchCache.has(cacheKey)) return;
-  thumbFetchCache.add(cacheKey);
-
-  const driveURL = DRIVE_SCRIPT_URL;
-  if (!driveURL || driveURL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
-
-  let allPosterFiles = [];
-  try {
-    const listData = await jsonpAction(driveURL + '?action=getFileList');
-    if (listData && listData.ok && Array.isArray(listData.files)) {
-      allPosterFiles = listData.files.filter(f => f.isPosters);
-    }
-  } catch(e) { return; }
-
-  const showNorm   = normalize(show.title);
-  const padS       = String(seasonNum).padStart(2, '0');
-  const seasonCode = 's' + padS;
-
-  const thumbFiles = allPosterFiles.filter(f => {
-    const n = normalize(f.name || '');
-    return n.includes('thumb') && n.startsWith(showNorm) && n.includes(seasonCode + 'e');
-  });
-
-  if (!thumbFiles.length) return;
-
-  const BATCH = 10;
-  for (let i = 0; i < thumbFiles.length; i += BATCH) {
-    const batch     = thumbFiles.slice(i, i + BATCH);
-    const fileIds   = batch.map(f => f.id).join(',');
-    const isPosters = batch.map(() => '1').join(',');
-    try {
-      const result = await jsonpAction(
-        driveURL + '?action=scanFiles'
-        + '&fileIds='   + encodeURIComponent(fileIds)
-        + '&isPosters=' + encodeURIComponent(isPosters)
-        + '&key='       + encodeURIComponent(getSavedKey() || '')
-        + '&did='       + encodeURIComponent(getDeviceId())
-      );
-      if (result && result.ok) {
-        let changed = false;
-        for (const [k, v] of Object.entries(result.posters || {})) {
-          const cleanKey = normalize(k.replace(/\.[a-z0-9]{2,5}$/i, ''));
-          if (posterMap[cleanKey] !== v) { posterMap[cleanKey] = v; changed = true; }
-        }
-        for (const [k, v] of Object.entries(result.movies || {})) {
-          if (typeof v === 'object' && v !== null && v.mimeType && v.mimeType.startsWith('image/')) {
-            if (thumbMap[k] !== v) { thumbMap[k] = v; changed = true; }
-          }
-        }
-        if (changed && overlayCurrentShow && normalize(overlayCurrentShow.title) === showNorm && overlayCurrentSeason === seasonNum) {
-          renderOverlayEpisodes();
-        }
-      }
-    } catch(e) { /* skip failed batch */ }
-    if (i + BATCH < thumbFiles.length) await new Promise(r => setTimeout(r, 200));
-  }
 }
 
 function findPosterMatch(title, posterMap) {
@@ -1359,39 +198,6 @@ function findPosterMatch(title, posterMap) {
     if (normalize(rawKey) === key) return val;
   }
   return null;
-}
-
-function mergeData(rows, driveMap, posterMap = {}) {
-  const mapped = rows.map(row => {
-    const title          = row.title || row.movie_title || row['movie title'] || '';
-    const runtime        = row.runtime || row.run_time || row.duration || '';
-    const resolution     = row.resolution || row.res || '';
-    const maturityRating = row.maturity_rating || row.rating || row.maturityrating || '';
-    const releaseDate    = row.release_date || row.releasedate || row.date || '';
-    const fileSize       = row.file_size || row.filesize || row.size || '';
-    const imdbRating     = row.imdb_rating || row.imdbrating || row.imdb || '';
-    const match          = findDriveMatch(title, driveMap);
-    const poster         = match
-      ? (posterMap[normalizeFilename(match.name)] ?? findPosterMatch(title, posterMap))
-      : findPosterMatch(title, posterMap);
-    return { title, runtime, resolution, maturityRating, releaseDate, year: extractYear(releaseDate), fileSize, imdbRating, available: !!match, driveLink: match ? match.link : null, driveResolution: match ? (match.name || '') : '', poster };
-  }).filter(m => m.title);
-
-  const seen = new Map();
-  for (const m of mapped) {
-    const key = normalize(m.title);
-    if (!seen.has(key)) { seen.set(key, m); }
-    else {
-      const existing = seen.get(key);
-      if (m.available && m.driveResolution) {
-        const driveRes = m.driveResolution.toUpperCase(), mRes = m.resolution.toUpperCase(), existingRes = existing.resolution.toUpperCase();
-        const mMatches = driveRes.includes(mRes) || mRes.split('P')[0] === driveRes.split('P')[0];
-        const existingMatches = driveRes.includes(existingRes) || existingRes.split('P')[0] === driveRes.split('P')[0];
-        if (mMatches && !existingMatches) seen.set(key, m);
-      }
-    }
-  }
-  return [...seen.values()];
 }
 
 // ─── SIDEBAR FILTER POPULATION ────────────────────────────────
@@ -1457,22 +263,11 @@ function clearAllFilters() {
 
 function updateCounts() {
   const totalMovies = allMovies.length;
-  const availMovies = allMovies.filter(m => m.available).length;
   const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
-  const availEps    = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
-
   let totalText, availText;
-  if (activeTab === 'shows') {
-    totalText = totalEps + ' Episodes';
-    availText = availEps + ' Available';
-  } else if (activeTab === 'stats') {
-    totalText = (totalMovies + totalEps) + ' Files';
-    availText = (availMovies + availEps) + ' Available';
-  } else {
-    totalText = totalMovies + ' Movies';
-    availText = availMovies + ' Available';
-  }
-
+  if (activeTab === 'shows') { totalText = totalEps + ' Episodes'; availText = '0 Available'; } 
+  else if (activeTab === 'stats') { totalText = (totalMovies + totalEps) + ' Files'; availText = totalMovies + ' Available'; } 
+  else { totalText = totalMovies + ' Movies'; availText = totalMovies + ' Available'; }
   if (movieCount) movieCount.textContent = totalText;
   if (availCount) availCount.textContent = availText;
 }
@@ -1480,18 +275,12 @@ function updateCounts() {
 // ─── SORT & FILTER ────────────────────────────────────────────
 function applyFilters() {
   const q = normalize(searchInput ? searchInput.value : '');
-
   filtered = allMovies.filter(m => {
     if (q && !normalize(m.title).includes(q)) return false;
     if (activeFilters.maturity.size   > 0 && !activeFilters.maturity.has(m.maturityRating))     return false;
     if (activeFilters.resolution.size > 0 && !activeFilters.resolution.has(m.resolution))       return false;
-    if (activeFilters.status.size > 0) {
-      const status = m.available ? 'Available' : 'Not Uploaded';
-      if (!activeFilters.status.has(status)) return false;
-    }
     return true;
   });
-
   applySort();
 }
 
@@ -1506,17 +295,12 @@ function applySort() {
     else if (key === 'requests') { va = getRequestCount(a.title); vb = getRequestCount(b.title); }
     else if (key === 'rating')   { va = getRatingScore(a.title); vb = getRatingScore(b.title); }
     else if (key === 'runtime')  { va = parseRuntimeMinutes(a.runtime); vb = parseRuntimeMinutes(b.runtime); }
-    else if (key === 'maturity') {
-      va = MATURITY_ORDER[a.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99;
-      vb = MATURITY_ORDER[b.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99;
-    }
-    else if (key === 'status')   { va = a.available ? 0 : 1; vb = b.available ? 0 : 1; }
+    else if (key === 'maturity') { va = MATURITY_ORDER[a.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; vb = MATURITY_ORDER[b.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; }
     else if (key === 'res')      { va = parseResolutionScore(a.resolution); vb = parseResolutionScore(b.resolution); }
     if (va < vb) return dir === 'asc' ? -1 : 1;
     if (va > vb) return dir === 'asc' ? 1 : -1;
     return 0;
   });
-
   renderCurrentView();
 }
 
@@ -1538,19 +322,10 @@ function renderCurrentView() {
   }
 }
 
-// ── Row View ──
 function renderRows() {
-  const availableMovies = [...allMovies]
-    .filter(m => m.available)
-    .sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title));
-
-  const requestedMovies = [...allMovies]
-    .filter(m => getRequestCount(m.title) > 0)
-    .sort((a, b) => getRequestCount(b.title) - getRequestCount(a.title));
-
-  const imdbMovies = [...allMovies]
-    .filter(m => parseFloat(m.imdbRating) > 0)
-    .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
+  const availableMovies = [...allMovies].sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title));
+  const requestedMovies = [...allMovies].filter(m => getRequestCount(m.title) > 0).sort((a, b) => getRequestCount(b.title) - getRequestCount(a.title));
+  const imdbMovies = [...allMovies].filter(m => parseFloat(m.imdbRating) > 0).sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
 
   const rowAvailableEl   = $('row-available-cards');
   const rowRequestedEl   = $('row-requested-cards');
@@ -1558,51 +333,37 @@ function renderRows() {
   const rowRequestedSec  = $('row-requested');
 
   if (rowAvailableEl)  renderRowCards(rowAvailableEl, availableMovies.slice(0, 30));
-
   if (rowRequestedEl && rowRequestedSec) {
-    if (requestedMovies.length > 0) {
-      rowRequestedSec.style.display = '';
-      renderRowCards(rowRequestedEl, requestedMovies.slice(0, 30));
-    } else {
-      rowRequestedSec.style.display = 'none';
-    }
+    if (requestedMovies.length > 0) { rowRequestedSec.style.display = ''; renderRowCards(rowRequestedEl, requestedMovies.slice(0, 30)); } 
+    else { rowRequestedSec.style.display = 'none'; }
   }
-
   if (rowImdbEl) renderRowCards(rowImdbEl, imdbMovies.slice(0, 30));
 }
 
 function renderRowCards(container, movies) {
   container.innerHTML = '';
   const frag = document.createDocumentFragment();
-  movies.forEach((m, i) => {
-    const card = buildCard(m, i, true);
-    frag.appendChild(card);
-  });
+  movies.forEach((m, i) => frag.appendChild(buildCard(m, i, true)));
   container.appendChild(frag);
   const scroller = container.closest('.movie-row-scroll');
   if (scroller) updateRowScrollBtns(scroller);
 }
 
-// ── Row scroll buttons ──
 (function initRowScrollBtns() {
   document.addEventListener('click', function(e) {
     const btn = e.target.closest('.row-scroll-btn');
     if (!btn) return;
-    const dir      = parseInt(btn.dataset.dir, 10);
-    const targetId = btn.dataset.target;
-    const track    = document.getElementById(targetId);
+    const dir = parseInt(btn.dataset.dir, 10);
+    const track = document.getElementById(btn.dataset.target);
     if (!track) return;
     const scroller = track.closest('.movie-row-scroll');
     if (!scroller) return;
     scroller.scrollBy({ left: dir * (214 * 3), behavior: 'smooth' });
   });
-
-  document.addEventListener('scroll', handleRowScroll, true);
-
-  function handleRowScroll(e) {
+  document.addEventListener('scroll', (e) => {
     if (!e.target.classList || !e.target.classList.contains('movie-row-scroll')) return;
     updateRowScrollBtns(e.target);
-  }
+  }, true);
 })();
 
 function updateRowScrollBtns(scroller) {
@@ -1611,53 +372,37 @@ function updateRowScrollBtns(scroller) {
   const leftBtn  = wrapper.querySelector('.row-scroll-btn--left');
   const rightBtn = wrapper.querySelector('.row-scroll-btn--right');
   if (!leftBtn || !rightBtn) return;
-  const atStart = scroller.scrollLeft <= 4;
-  const atEnd   = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 4;
-  leftBtn.dataset.hidden  = atStart ? '1' : '0';
-  rightBtn.dataset.hidden = atEnd   ? '1' : '0';
+  leftBtn.dataset.hidden  = scroller.scrollLeft <= 4 ? '1' : '0';
+  rightBtn.dataset.hidden = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 4 ? '1' : '0';
 }
 
-// ── Grid View ──
 function renderGrid() {
   if (!movieGrid) return;
   movieGrid.innerHTML = '';
-
-  if (filtered.length === 0) {
-    if (gridEmpty) gridEmpty.hidden = false;
-    return;
-  }
+  if (filtered.length === 0) { if (gridEmpty) gridEmpty.hidden = false; return; }
   if (gridEmpty) gridEmpty.hidden = true;
-
   const frag = document.createDocumentFragment();
-  filtered.forEach((m, i) => {
-    const card = buildCard(m, i, false);
-    frag.appendChild(card);
-  });
+  filtered.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
   movieGrid.appendChild(frag);
 }
 
-// ── Shared card builder ──
 function buildCard(m, i, isRowCard) {
   const card = document.createElement('div');
-  const key  = normalize(m.title);
   card.className = isRowCard ? 'movie-card row-card' : 'movie-card';
-  card.dataset.key = key;
+  card.dataset.key = normalize(m.title);
   card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
 
-  const cardReqCount   = getRequestCount(m.title);
-  const cardIRequested = hasUserRequested(m.title);
   const posterClasses  = ['card-poster'];
   if (m.driveLink) posterClasses.push('card-poster--playable');
   else posterClasses.push('card-poster--requestable');
 
+  // Removed status pill (Available/Not Uploaded)
   card.innerHTML = `
     <div class="${posterClasses.join(' ')}">
       ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
       ${m.driveLink
         ? `<a class="card-play-overlay drive-link" href="${m.driveLink}" target="_blank" rel="noopener" data-title="${escHtml(m.title)}" aria-label="Watch ${escHtml(m.title)}"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></a>`
-        : cardIRequested
-          ? `<div class="card-play-overlay card-request-overlay card-request-overlay--done"><div class="card-request-btn card-request-btn--done"><span class="card-request-icon">&#10003;</span><span class="card-request-label">REQUESTED${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></div>`
-          : `<button class="card-play-overlay card-request-overlay request-btn" data-title="${escHtml(m.title)}" aria-label="Request ${escHtml(m.title)}"><div class="card-request-btn"><span class="card-request-icon">&#65291;</span><span class="card-request-label">REQUEST${cardReqCount ? ' <span class="request-count">' + cardReqCount + '</span>' : ''}</span></div></button>`}
+        : `<div class="card-play-overlay card-request-overlay card-request-overlay--done"><div class="card-request-btn card-request-btn--done"><span class="card-request-icon">&#10003;</span><span class="card-request-label">REQUESTED</span></div></div>`}
     </div>
     <div class="card-title">${escHtml(m.title)}</div>
     <div class="card-meta">
@@ -1671,9 +416,6 @@ function buildCard(m, i, isRowCard) {
       <span class="card-res ${resClass(m.resolution)}">${escHtml(m.resolution) || '—'}</span>
     </div>
     <div class="card-footer">
-      <span class="status-pill ${m.available ? 'status-available' : 'status-missing'}">
-        ${m.available ? 'AVAILABLE' : 'NOT UPLOADED'}
-      </span>
       ${m.driveLink ? ratingHTML(m.title) : ''}
     </div>
   `;
@@ -1697,98 +439,33 @@ function ratingHTML(title) {
   </div>`;
 }
 
-function escHtml(str) {
-  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ─── REQUEST COUNT TOOLTIP ────────────────────────────────────
-(function initRequestTooltip() {
-  const tooltip = document.getElementById('req-tooltip');
-  if (!tooltip) return;
-  let hideTimer;
-
-  function showTooltipForTitle(title, anchorEl) {
-    clearTimeout(hideTimer);
-    const count = getRequestCount(title);
-    tooltip.innerHTML = count <= 0
-      ? '<span class="tt-count">0</span> requests'
-      : '<span class="tt-count">' + count + '</span> request' + (count === 1 ? '' : 's');
-    tooltip.removeAttribute('hidden');
-    tooltip.getBoundingClientRect();
-    tooltip.classList.add('visible');
-    positionTooltip(anchorEl);
-  }
-
-  function positionTooltip(el) {
-    const rect = el.getBoundingClientRect(), ttW = tooltip.offsetWidth, ttH = tooltip.offsetHeight;
-    let left = rect.left + rect.width / 2 - ttW / 2, top = rect.top - ttH - 8;
-    if (left < 8) left = 8;
-    if (left + ttW > window.innerWidth - 8) left = window.innerWidth - ttW - 8;
-    if (top < 8) top = rect.bottom + 8;
-    tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px';
-  }
-
-  function hideTooltip() {
-    clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => { tooltip.classList.remove('visible'); tooltip.setAttribute('hidden', ''); }, 80);
-  }
-
-  const mainContent = document.getElementById('main-content');
-  if (!mainContent) return;
-  mainContent.addEventListener('mouseover', e => {
-    const cardTitle = e.target.closest('.card-title');
-    if (cardTitle) { showTooltipForTitle(cardTitle.textContent.trim(), cardTitle); }
-  });
-  mainContent.addEventListener('mouseout', e => {
-    if (e.target.closest('.card-title')) hideTooltip();
-  });
-  document.addEventListener('scroll', () => { tooltip.classList.remove('visible'); }, { passive: true });
-})();
+function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ─── EVENTS ───────────────────────────────────────────────────
-
 let searchTimer, searchLogTimer;
 if (searchInput) {
   searchInput.addEventListener('input', () => {
     const query = searchInput.value;
     if (clearSearch) clearSearch.classList.toggle('visible', query.length > 0);
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
-      if (activeTab === 'shows') {
-        filterAndRenderShows();
-      } else {
-        render();
-        saveSettings();
-      }
-    }, 200);
-    clearTimeout(searchLogTimer);
-    if (query.trim().length > 0) searchLogTimer = setTimeout(() => logClientEvent('Search', query.trim()), 1500);
+    searchTimer = setTimeout(() => { if (activeTab === 'shows') filterAndRenderShows(); else { render(); saveSettings(); } }, 200);
   });
 }
-
 if (clearSearch) {
   clearSearch.addEventListener('click', () => {
     searchInput.value = '';
     clearSearch.classList.remove('visible');
-    if (activeTab === 'shows') {
-      filterAndRenderShows();
-    } else {
-      render();
-      saveSettings();
-    }
+    if (activeTab === 'shows') filterAndRenderShows(); else { render(); saveSettings(); }
     searchInput.focus();
   });
 }
-
 if (sortBy) {
   sortBy.addEventListener('change', () => {
     currentSort = sortBy.value;
     if (hasActiveFilters()) applySort();
     saveSettings();
-    logClientEvent('Sort', currentSort + '-' + currentDir);
   });
 }
-
 if (sortDirBtn) {
   sortDirBtn.addEventListener('click', () => {
     currentDir = currentDir === 'desc' ? 'asc' : 'desc';
@@ -1796,52 +473,27 @@ if (sortDirBtn) {
     sortDirBtn.title = currentDir === 'desc' ? 'Descending' : 'Ascending';
     if (hasActiveFilters()) applySort();
     saveSettings();
-    logClientEvent('Sort Direction', currentDir);
   });
 }
-
-if (sidebarClearBtn) {
-  sidebarClearBtn.addEventListener('click', clearAllFilters);
-}
+if (sidebarClearBtn) sidebarClearBtn.addEventListener('click', clearAllFilters);
 
 const mainContent = document.getElementById('main-content');
 if (mainContent) {
   mainContent.addEventListener('click', e => {
-    const link = e.target.closest('.drive-link');
-    if (!link) return;
-    const title = link.dataset.title || '', key = getSavedKey() || '';
-    if (!DRIVE_SCRIPT_URL || !key) return;
-    const cbName = '__openLinkCallback_' + Date.now();
-    const script = document.createElement('script');
-    window[cbName] = function() { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); };
-    script.src = DRIVE_SCRIPT_URL + '?action=openLink&title=' + encodeURIComponent(title) + '&key=' + encodeURIComponent(key) + '&did=' + encodeURIComponent(getDeviceId()) + '&callback=' + cbName;
-    script.onerror = () => { if (script.parentNode) script.parentNode.removeChild(script); };
-    document.head.appendChild(script);
-  });
-
-  mainContent.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn');
     if (!btn) return;
-
     const title = btn.dataset.ratingTitle;
     const type  = btn.dataset.ratingType;
     if (!title || !type) return;
-
     const key = normalize(title);
-
-    // Prevent double-tap races — ignore if a request is already in flight for this title
     if (ratingInflight.has(key)) return;
     ratingInflight.add(key);
 
-    // ── Capture previous state BEFORE any mutation ─────────────
     const prevVote = getUserRating(title);
     const prevUp   = getRatingCount(title, 'up');
     const prevDown = getRatingCount(title, 'down');
+    const nextVote = prevVote === type ? null : type;
 
-    // ── Compute next state ─────────────────────────────────────
-    const nextVote = prevVote === type ? null : type; // toggle off if same type
-
-    // Optimistically update ratingCounts in memory
     const delta = { up: prevUp, down: prevDown };
     if (prevVote === 'up')   delta.up   = Math.max(0, delta.up   - 1);
     if (prevVote === 'down') delta.down = Math.max(0, delta.down - 1);
@@ -1849,236 +501,35 @@ if (mainContent) {
     if (nextVote === 'down') delta.down += 1;
     ratingCounts[key] = { up: delta.up, down: delta.down };
 
-    // Optimistically update userRatings
     if (nextVote) userRatings[key] = nextVote;
     else          delete userRatings[key];
     saveUserRatings();
 
-    // ── Immediately repaint all matching buttons ───────────────
     applyRatingDOM(title, nextVote, delta.up, delta.down, btn);
-
-    // Toast feedback
     if (nextVote === 'up')        showToast('👍 Liked ' + title);
     else if (nextVote === 'down') showToast('👎 Disliked ' + title);
     else                          showToast('Rating removed for ' + title);
-
-    // ── Fire network call in background ───────────────────────
-    postRatingBackground(title, type, prevVote, key, prevUp, prevDown);
-  });
-
-  mainContent.addEventListener('click', async e => {
-    const btn = e.target.closest('.request-btn');
-    if (!btn || btn.classList.contains('request-btn--done')) return;
-    btn.disabled = true;
-    const title = btn.dataset.title;
-    const optimisticCount = (requestCounts[normalize(title)] || 0) + 1;
-    setRequestedState(title, optimisticCount);
-    const serverCount = await postRequest(title);
-    if (serverCount !== optimisticCount) setRequestedState(title, serverCount);
-    showToast('✓ Requested: ' + title);
+    
+    ratingInflight.delete(key);
   });
 }
 
-function setRequestedState(title, count) {
-  const countHtml = count ? ' <span class="request-count">' + count + '</span>' : '';
-  document.querySelectorAll('.request-btn[data-title="' + CSS.escape(title) + '"]:not(.card-request-overlay)').forEach(b => {
-    b.disabled = false; b.classList.add('request-btn--done');
-    b.innerHTML = '<span class="request-icon">&#10003;</span> REQUESTED' + countHtml;
-    b.dataset.title = title;
-  });
-  document.querySelectorAll('.card-request-overlay.request-btn[data-title="' + CSS.escape(title) + '"]').forEach(b => {
-    b.disabled = true; b.classList.add('card-request-overlay--done');
-    const inner = b.querySelector('.card-request-btn');
-    if (inner) { inner.classList.add('card-request-btn--done'); inner.innerHTML = '<span class="card-request-icon">&#10003;</span><span class="card-request-label">REQUESTED' + countHtml + '</span>'; }
-    b.dataset.title = title;
-  });
-}
+// ─── NOTIFICATIONS (Local Stubs) ─────────────────────────────
+let serverNotifications = []; let clientNotifications = [];
+function notifId(n) { return (n.name || '') + '||' + (n.message || '') + '||' + (n.time || ''); }
+function getReadNotifIds() { try { return new Set(JSON.parse(localStorage.getItem('thedrive_readNotifIds_v1') || '[]')); } catch(e) { return new Set(); } }
+function saveReadNotifIds(set) { try { localStorage.setItem('thedrive_readNotifIds_v1', JSON.stringify([...set])); } catch(e) {} }
+function fetchServerNotifications() { return Promise.resolve(); }
+function checkAndNotifyRequestFulfillments() { }
+function hasUnreadNotifications() { return false; }
+function updateNotificationBell() { const dot = refreshBtn ? refreshBtn.querySelector('.notif-dot') : null; if (dot) dot.style.display = 'none'; }
+function markAllAsRead() { }
+function renderNotificationPanel() { const panel = document.getElementById('notif-panel'); if (panel) { const listEl = panel.querySelector('.notif-list'); if (listEl) listEl.innerHTML = '<div class="notif-empty">No notifications</div>'; } }
+function toggleNotificationPanel() { const panel = document.getElementById('notif-panel'); if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; }
 
-// ─── NOTIFICATIONS ─────────────────────────────────────────────
-const LOCAL_LAST_READ_SERVER_TIME    = 'thedrive_lastReadServerTime';
-const LOCAL_FULFILLED_NOTIFICATIONS  = 'thedrive_fulfilledNotifications';
-const LOCAL_READ_NOTIF_IDS           = 'thedrive_readNotifIds_v1';
-
-let serverNotifications = [];    // raw from server
-let clientNotifications = [];    // fulfilled requests
-
-// ── Stable fingerprint for a notification ──
-function notifId(n) {
-  return (n.name || '') + '||' + (n.message || '') + '||' + (n.time || '');
-}
-
-function getReadNotifIds() {
-  try { return new Set(JSON.parse(localStorage.getItem(LOCAL_READ_NOTIF_IDS) || '[]')); } catch(e) { return new Set(); }
-}
-function saveReadNotifIds(set) {
-  try { localStorage.setItem(LOCAL_READ_NOTIF_IDS, JSON.stringify([...set])); } catch(e) {}
-}
-
-// Fetch server-wide notifications
-function fetchServerNotifications() {
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return Promise.resolve();
-  return jsonpAction(DRIVE_SCRIPT_URL + '?action=getNotifications&_cb=' + Date.now())
-    .then(data => {
-      serverNotifications = (data && data.notifications) ? data.notifications : [];
-      updateNotificationBell();
-    })
-    .catch(() => {});
-}
-
-// Detect which of the user's requested movies are now available
-function checkAndNotifyRequestFulfillments() {
-  if (!userRequested || userRequested.size === 0) return;
-  const alreadyNotified = getFulfilledNotificationSet();
-  let changed = false;
-
-  for (const titleKey of userRequested) {
-    const movie = allMovies.find(m => normalize(m.title) === titleKey);
-    if (movie && movie.available && !alreadyNotified.has(titleKey)) {
-      clientNotifications.push({
-        name: 'Request Filled',
-        message: `Your request for "${movie.title}" is now available!`,
-        time: new Date().toISOString()
-      });
-      alreadyNotified.add(titleKey);
-      changed = true;
-    }
-  }
-
-  if (changed) {
-    saveFulfilledNotificationSet(alreadyNotified);
-    updateNotificationBell();
-    renderNotificationPanel();
-  }
-}
-
-function getFulfilledNotificationSet() {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(LOCAL_FULFILLED_NOTIFICATIONS) || '[]'));
-  } catch(e) {
-    return new Set();
-  }
-}
-
-function saveFulfilledNotificationSet(set) {
-  try {
-    localStorage.setItem(LOCAL_FULFILLED_NOTIFICATIONS, JSON.stringify([...set]));
-  } catch(e) {}
-}
-
-// Unread status: any notification whose ID isn't in the read set
-function hasUnreadNotifications() {
-  const readIds = getReadNotifIds();
-  if (serverNotifications.some(n => !readIds.has(notifId(n)))) return true;
-  if (clientNotifications.some(n => !readIds.has(notifId(n)))) return true;
-  return false;
-}
-
-function updateNotificationBell() {
-  if (!refreshBtn) return;
-  const dot = refreshBtn.querySelector('.notif-dot');
-  if (!dot) return;
-  dot.style.display = hasUnreadNotifications() ? 'block' : 'none';
-}
-
-function markAllAsRead() {
-  const readIds = getReadNotifIds();
-  serverNotifications.forEach(n => readIds.add(notifId(n)));
-  clientNotifications.forEach(n => readIds.add(notifId(n)));
-  saveReadNotifIds(readIds);
-  // Keep client notifications visible after read — don't wipe them so
-  // the user can still see them; they just lose the unread dot.
-  updateNotificationBell();
-}
-
-function renderNotificationPanel() {
-  const panel = document.getElementById('notif-panel');
-  if (!panel) return;
-
-  const listEl = panel.querySelector('.notif-list');
-  if (!listEl) return;
-
-  const readIds = getReadNotifIds();
-  let html = '';
-
-  // Server notifications
-  if (serverNotifications.length) {
-    html += '<div class="notif-section-title">SERVER</div>';
-    serverNotifications.forEach(n => {
-      const isRead = readIds.has(notifId(n));
-      // Use fileDate if present, else fall back to n.time
-      const displayDate = n.fileDate && n.fileDate.trim() ? n.fileDate : n.time;
-      html += `<div class="notif-item${isRead ? ' notif-item--read' : ''}">
-        <div class="notif-header-row">
-          <span class="notif-type-label">${escHtml(n.name || 'Notice')}</span>
-          <span class="notif-timestamp">${formatNotifTimestamp(displayDate)}</span>
-        </div>
-        <div class="notif-msg">${escHtml(n.message || '')}</div>
-      </div>`;
-    });
-  }
-
-  // Client (fulfillment) notifications
-  if (clientNotifications.length) {
-    html += '<div class="notif-section-title">YOUR REQUESTS</div>';
-    clientNotifications.forEach(n => {
-      const isRead = readIds.has(notifId(n));
-      const displayDate = n.fileDate && n.fileDate.trim() ? n.fileDate : n.time;
-      html += `<div class="notif-item${isRead ? ' notif-item--read' : ''}">
-        <div class="notif-header-row">
-          <span class="notif-type-label">${escHtml(n.name)}</span>
-          <span class="notif-timestamp">${formatNotifTimestamp(displayDate)}</span>
-        </div>
-        <div class="notif-msg">${escHtml(n.message)}</div>
-      </div>`;
-    });
-  }
-
-  if (!serverNotifications.length && !clientNotifications.length) {
-    html = '<div class="notif-empty">No notifications</div>';
-  }
-
-  listEl.innerHTML = html;
-}
-
-function formatNotifTimestamp(ts) {
-  if (!ts) return '';
-  try {
-    const d = new Date(String(ts).replace(' ', 'T'));
-    if (isNaN(d.getTime())) return String(ts);
-    let h = d.getHours(), m = d.getMinutes();
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    const mm = String(m).padStart(2, '0');
-    const month = d.getMonth() + 1;
-    const day   = d.getDate();
-    const year  = d.getFullYear();
-    return `${h}:${mm}${ampm} · ${month}/${day}/${year}`;
-  } catch(e) { return String(ts); }
-}
-
-// Keep for any legacy callers
-function formatShortTime(ts) { return formatNotifTimestamp(ts); }
-
-function toggleNotificationPanel() {
-  const panel = document.getElementById('notif-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display === 'block';
-  if (isOpen) {
-    panel.style.display = 'none';
-  } else {
-    panel.style.display = 'block';
-    markAllAsRead();
-    renderNotificationPanel();
-    updateNotificationBell();
-  }
-}
-
-// ── Notification bell initialization (replaces refresh button) ──
 (function initNotificationBell() {
   if (!refreshBtn) return;
-
-  // Change the button appearance
-  refreshBtn.id = 'notif-btn';   // optional, but we still have the variable
+  refreshBtn.id = 'notif-btn';   
   refreshBtn.classList.remove('spinning');
   refreshBtn.innerHTML = `
     <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -2088,577 +539,143 @@ function toggleNotificationPanel() {
     <span class="notif-dot" style="display:none; position:absolute; top:4px; right:4px; width:8px; height:8px; background:var(--red); border-radius:50%; border:1px solid var(--bg);"></span>
   `;
   refreshBtn.title = 'Notifications';
-
-  // Create the notification panel (hidden)
   const panel = document.createElement('div');
   panel.id = 'notif-panel';
-  panel.style.cssText = [
-    'display:none',
-    'position:absolute',
-    'top:calc(100% + 8px)',
-    'right:0',
-    'width:320px',
-    'max-height:400px',
-    'overflow-y:auto',
-    'background:var(--surface)',
-    'border:1px solid var(--border)',
-    'border-radius:8px',
-    'box-shadow:0 8px 24px rgba(0,0,0,0.4)',
-    'z-index:1000',
-    'padding:12px',
-    'font-size:13px',
-    'color:var(--text)'
-  ].join(';');
+  panel.style.cssText = ['display:none','position:absolute','top:calc(100% + 8px)','right:0','width:320px','max-height:400px','overflow-y:auto','background:var(--surface)','border:1px solid var(--border)','border-radius:8px','box-shadow:0 8px 24px rgba(0,0,0,0.4)','z-index:1000','padding:12px','font-size:13px','color:var(--text)'].join(';');
   panel.innerHTML = '<div class="notif-list"></div>';
   refreshBtn.parentNode.style.position = 'relative';
   refreshBtn.parentNode.appendChild(panel);
-
-  // Click handler for the bell
-  refreshBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleNotificationPanel();
-  });
-
-  // Close panel when clicking outside
+  refreshBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleNotificationPanel(); });
   document.addEventListener('click', (e) => {
     const panel = document.getElementById('notif-panel');
     if (!panel || panel.style.display !== 'block') return;
-    if (!refreshBtn.contains(e.target) && !panel.contains(e.target)) {
-      panel.style.display = 'none';
-    }
+    if (!refreshBtn.contains(e.target) && !panel.contains(e.target)) panel.style.display = 'none';
   });
 })();
-
-// ─── AFTER DATA LOADS, FETCH NOTIFICATIONS (done in init) ─────
-// We'll call this at the end of main init
 
 // ─── FOOTER FORM ──────────────────────────────────────────────
 (function() {
   const submitBtn = document.getElementById('footer-submit');
-  const nameInput = document.getElementById('footer-name');
   const msgInput  = document.getElementById('footer-message');
   const statusEl  = document.getElementById('footer-form-status');
   if (!submitBtn) return;
-
   function setStatus(msg, type) { statusEl.textContent = msg; statusEl.className = 'footer-form-status ' + type; statusEl.hidden = false; }
-
   submitBtn.addEventListener('click', async () => {
     const message = (msgInput.value || '').trim();
     if (!message) { setStatus('Please enter a message before sending.', 'error'); msgInput.focus(); return; }
-    submitBtn.disabled = true; submitBtn.textContent = 'SENDING…'; statusEl.hidden = true;
-    const name = (nameInput.value || '').trim() || 'Anonymous', key = getSavedKey() || '';
-    try {
-      await new Promise((resolve, reject) => {
-        const cbName = '__formCallback_' + Date.now();
-        const script = document.createElement('script');
-        const timer  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 12000);
-        function cleanup() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }
-        window[cbName] = function(data) { cleanup(); if (data && data.ok) resolve(); else reject(new Error(data && data.error ? data.error : 'unknown')); };
-        script.src = DRIVE_SCRIPT_URL + '?action=submitForm&name=' + encodeURIComponent(name) + '&message=' + encodeURIComponent(message) + '&key=' + encodeURIComponent(key) + '&did=' + encodeURIComponent(getDeviceId()) + '&callback=' + cbName + '&_cb=' + Date.now();
-        script.onerror = () => { cleanup(); reject(new Error('network')); };
-        document.head.appendChild(script);
-      });
-      setStatus('✓ Message sent — thanks!', 'success');
-      nameInput.value = ''; msgInput.value = '';
-    } catch(err) {
-      setStatus('Something went wrong. Please try again.', 'error');
-    } finally {
-      submitBtn.disabled = false; submitBtn.textContent = 'SEND';
-    }
+    setStatus('⚠ Messaging disabled in local mode.', 'error');
   });
 })();
 
-// ── Full server-side Drive scan via JSONP (still used internally) ──
-function triggerFullScan() {
-  return new Promise((resolve, reject) => {
-    const cbName = '__scanCallback_' + Date.now();
-    const script = document.createElement('script');
-    const SCAN_TIMEOUT_MS = 5 * 60 * 1000;
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('scan timeout'));
-    }, SCAN_TIMEOUT_MS);
-    function cleanup() {
-      clearTimeout(timer);
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-    }
-    window[cbName] = function(data) { cleanup(); resolve(data); };
-    script.src = DRIVE_SCRIPT_URL
-      + '?bust=1'
-      + '&key='      + encodeURIComponent(getSavedKey() || '')
-      + '&did='      + encodeURIComponent(getDeviceId())
-      + '&callback=' + cbName
-      + '&_cb='      + Date.now();
-    script.onerror = () => { cleanup(); reject(new Error('script error')); };
-    document.head.appendChild(script);
-  });
+// ─── LOAD DATA ────────────────────────────────────────────────
+async function loadData(sheetURL, scriptURL, forceRefresh = false) {
+  setProgress(5);
+  try {
+    const url = API_BASE + '/videos' + (forceRefresh ? '?_cb=' + Date.now() : '');
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const videos = await r.json();
+
+    // Bypassed duplicate logic, mapping directly
+    allMovies = videos.map(v => ({
+      title:           v.title,
+      runtime:         v.runtime || '',
+      resolution:      '', 
+      maturityRating:  v.maturityRating || '',
+      releaseDate:     v.year || '',
+      year:            v.year || '—',
+      fileSize:        '',
+      imdbRating:      v.imdbRating || '',
+      available:       true,
+      driveLink:       API_BASE + v.video,
+      driveResolution: '',
+      poster:          v.poster ? (API_BASE + v.poster) : null
+    }));
+
+    setProgress(100);
+    render();
+    populateFilterCheckboxes();
+    updateCounts();
+    updateLastUpdated();
+    setTimeout(() => scanBar.classList.add('hidden'), 300);
+  } catch(e) {
+    console.error('Failed to load videos:', e);
+    showToast('⚠ Could not reach backend at ' + (API_BASE || 'localhost') + '. Is the server running?');
+    setProgress(100);
+    setTimeout(() => scanBar.classList.add('hidden'), 300);
+  }
 }
+
+// ─── DONATIONS BAR (Local Stub) ────────────────────────────────
+function fetchDonationsData() { }
+(function() {
+  const overlay   = document.getElementById('donation-modal-overlay');
+  const closeBtn  = document.getElementById('donation-modal-close');
+  const readMore  = document.getElementById('donation-readmore-btn');
+  if (readMore && overlay) readMore.addEventListener('click', () => { overlay.style.display = 'flex'; });
+  if (closeBtn && overlay) closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
+  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
+})();
+
+// ─── HEARTBEAT & ONLINE COUNT (Stubs) ─────────────────────────
+let heartbeatOnline = true;
+function startHeartbeat() { }
+function fetchOnlineCount() { }
+function pushPresencePing() { }
+function pushSnapshot(total, available) { }
+function isClientOnline() { return heartbeatOnline; }
+
+(function initDeviceIdReveal() {
+  const el = document.createElement('div');
+  el.id = 'device-id-corner';
+  el.style.cssText = ['position:fixed','bottom:12px','right:14px','z-index:99999','font-family:monospace','font-size:10px','color:rgba(144,144,168,0.9)','background:rgba(18,18,26,0.85)','border:1px solid rgba(80,80,110,0.4)','border-radius:5px','padding:4px 9px','letter-spacing:0.08em','pointer-events:none','opacity:0','transition:opacity 0.2s ease'].join(';');
+  document.body.appendChild(el);
+  const CORNER_PX = 12; let hideTimer = null;
+  document.addEventListener('mousemove', function(e) {
+    const nearRight  = window.innerWidth  - e.clientX < CORNER_PX;
+    const nearBottom = window.innerHeight - e.clientY < CORNER_PX;
+    if (nearRight && nearBottom) { if (!el.textContent) el.textContent = 'DID: ' + getDeviceId(); el.style.opacity = '1'; clearTimeout(hideTimer); } 
+    else if (el.style.opacity !== '0') { clearTimeout(hideTimer); hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 300); }
+  });
+})();
 
 // ─── STATS ────────────────────────────────────────────────────
 let statsLoaded = false, statsLoadedAt = 0;
 let chartLibrary = null, chartUsers = null, chartPresence = null;
 let lastPresenceAppendAt = 0;
 
-function initStatsTab() {
-  renderLocalStats();
-  if ((!statsLoaded || Date.now() - statsLoadedAt > 60000) && DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    fetchStatsData(); statsLoaded = true; statsLoadedAt = Date.now();
-  }
-}
+function initStatsTab() { renderLocalStats(); }
 
 function renderLocalStats() {
   if (!allMovies.length && !allShows.length) return;
-  const total = allMovies.length, available = allMovies.filter(m => m.available).length;
-
-  const totalEps = allShows.reduce((t, s) => t + showTotalCount(s), 0);
-  const availEps = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
-
-  const totalAll = total + totalEps;
-  const availAll = available + availEps;
+  const total = allMovies.length;
+  const totalAll = total;
+  const availAll = total;
 
   const pct = totalAll > 0 ? ((availAll / totalAll) * 100).toFixed(2) : '0.00';
   const fracEl = $('upload-fraction'), pctEl = $('upload-pct'), fillEl = $('upload-fill');
-  if (fracEl)  fracEl.textContent  = availAll + ' / ' + totalAll + ' movies & episodes uploaded';
+  if (fracEl)  fracEl.textContent  = availAll + ' / ' + totalAll + ' movies uploaded';
   if (pctEl)   pctEl.textContent   = pct + '%';
   if (fillEl)  fillEl.style.width  = parseFloat(pct) + '%';
   setText('stat-total-films', totalAll);
   setText('stat-available', availAll);
-  let totalGB = 0;
-  allMovies.forEach(m => { totalGB += parseSizeGB(m.fileSize); });
-  allShows.forEach(s => s.seasons.forEach(season => season.episodes.forEach(ep => { totalGB += parseSizeGB(ep.fileSize); })));
-  setText('stat-total-size', totalGB > 0 ? totalGB.toFixed(1) + ' GB' : '—');
+  setText('stat-total-size', '—');
+  
   let totalMins = 0;
   allMovies.forEach(m => { totalMins += parseRuntimeMinutes(m.runtime); });
-  allShows.forEach(s => s.seasons.forEach(season => season.episodes.forEach(ep => { totalMins += parseRuntimeMinutes(ep.runtime); })));
   if (totalMins > 0) setText('stat-total-runtime', Math.floor(totalMins / 60) + 'h ' + (totalMins % 60) + 'm');
+  
   const rated = allMovies.filter(m => parseFloat(m.imdbRating) > 0);
   if (rated.length) setText('stat-avg-imdb', '★ ' + (rated.reduce((s, m) => s + parseFloat(m.imdbRating), 0) / rated.length).toFixed(1));
+  
   const matNorm = r => String(r || '').toUpperCase().replace(/[\s-]/g, '');
   setText('stat-g',    allMovies.filter(m => matNorm(m.maturityRating) === 'G').length);
   setText('stat-pg',   allMovies.filter(m => matNorm(m.maturityRating) === 'PG').length);
   setText('stat-pg13', allMovies.filter(m => matNorm(m.maturityRating) === 'PG13').length);
   setText('stat-r',    allMovies.filter(m => matNorm(m.maturityRating) === 'R').length);
-  setText('stat-4k',   allMovies.filter(m => /4k|2160/i.test(m.resolution)).length);
-  setText('stat-1080', allMovies.filter(m => /1080/i.test(m.resolution)).length);
 }
 
 function setText(id, val) { const el = $(id); if (el) el.textContent = String(val); }
-
-function fetchStatsData() {
-  const cbName = '__statsCallback_' + Date.now();
-  const script = document.createElement('script');
-  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 15000);
-  window[cbName] = function(data) {
-    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
-    if (!data) return;
-    if (typeof data.uniqueDevices === 'number') setText('stat-total-users', data.uniqueDevices);
-    if (data.snapshots   && data.snapshots.length)   renderLibraryChart(data.snapshots);
-    if (data.userHistory && data.userHistory.length)  renderUserChart(data.userHistory);
-    if (data.presence    && data.presence.length)     renderPresenceChart(data.presence);
-    else showPresencePlaceholder();
-  };
-  script.src = DRIVE_SCRIPT_URL + '?action=getStatsData&callback=' + cbName + '&_cb=' + Date.now();
-  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
-  document.head.appendChild(script);
-}
-
-function renderLibraryChart(snapshots) {
-  const canvas = $('chart-library'); if (!canvas) return;
-  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Files', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available Files', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Files') };
-  if (chartLibrary) chartLibrary.destroy();
-  chartLibrary = new Chart(canvas, cfg);
-}
-
-function renderUserChart(userHistory) {
-  const canvas = $('chart-users'); if (!canvas) return;
-  const cfg = { type: 'line', data: { labels: userHistory.map(u => u.date), datasets: [{ label: 'Unique Users', data: userHistory.map(u => u.users), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Users') };
-  if (chartUsers) chartUsers.destroy();
-  chartUsers = new Chart(canvas, cfg);
-}
-
-function showPresencePlaceholder() {
-  const canvas = $('chart-presence'); if (!canvas) return;
-  const wrap = canvas.closest('.chart-wrap'); if (!wrap) return;
-  canvas.style.display = 'none';
-  if (!wrap.querySelector('.presence-placeholder')) {
-    const msg = document.createElement('div');
-    msg.className = 'presence-placeholder';
-    msg.innerHTML = `<span class="presence-placeholder-icon">◎</span><p>No history yet — data will appear here as users come online.</p>`;
-    wrap.appendChild(msg);
-  }
-}
-
-function showPresenceCanvas() {
-  const canvas = $('chart-presence'); if (!canvas) return;
-  canvas.style.display = '';
-  const wrap = canvas.closest('.chart-wrap');
-  if (wrap) { const ph = wrap.querySelector('.presence-placeholder'); if (ph) ph.remove(); }
-}
-
-function renderPresenceChart(presence) {
-  showPresenceCanvas();
-  const canvas = $('chart-presence'); if (!canvas) return;
-  const INTERVAL_MS = 10 * 1000, GAP_THRESH = INTERVAL_MS * 2;
-  function tsToMs(ts) { return new Date(ts.replace(' ', 'T')).getTime(); }
-  const filled = [];
-  for (let i = 0; i < presence.length; i++) {
-    filled.push(presence[i]);
-    if (i < presence.length - 1) {
-      const gap = tsToMs(presence[i + 1].ts) - tsToMs(presence[i].ts);
-      if (gap > GAP_THRESH) {
-        const afterTs = new Date(tsToMs(presence[i].ts) + INTERVAL_MS);
-        const pad = n => String(n).padStart(2, '0');
-        filled.push({ ts: presence[i].ts.slice(0, 11) + pad(afterTs.getHours()) + ':' + pad(afterTs.getMinutes()) + ':' + pad(afterTs.getSeconds()), online: 0 });
-      }
-    }
-  }
-  const step = Math.max(1, Math.floor(filled.length / 500));
-  const sampled = filled.filter((_, i) => i % step === 0);
-  const times = sampled.map(p => { const m = String(p.ts).match(/(\d{1,2}:\d{2})(?::\d{2})?/); return m ? m[1] : ''; });
-  const rawValues = sampled.map(p => p.online);
-  const values = rawValues.map((v, i, arr) => {
-    const p2 = arr[i-2] !== undefined ? arr[i-2] : v, p1 = arr[i-1] !== undefined ? arr[i-1] : v;
-    const n1 = arr[i+1] !== undefined ? arr[i+1] : v, n2 = arr[i+2] !== undefined ? arr[i+2] : v;
-    return Math.round((p2 + p1 + v + n1 + n2) / 5 * 100) / 100;
-  });
-  const cfg = { type: 'line', data: { labels: sampled.map((_, i) => i), datasets: [{ label: 'Online', data: values, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: presenceChartOptions(times) };
-  if (chartPresence) chartPresence.destroy();
-  chartPresence = new Chart(canvas, cfg);
-  chartPresence._times = times;
-  lastPresenceAppendAt = Date.now();
-}
-
-function chartOptions(yLabel) {
-  return {
-    responsive: true, maintainAspectRatio: true,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { labels: { color: '#9090a8', font: { family: 'DM Mono', size: 11 }, boxWidth: 12 } },
-      tooltip: { backgroundColor: '#18181f', borderColor: '#252530', borderWidth: 1, titleColor: '#e8e8f0', bodyColor: '#9090a8', titleFont: { family: 'DM Mono', size: 11 }, bodyFont: { family: 'DM Mono', size: 11 } }
-    },
-    scales: {
-      x: { ticks: { color: '#78788f', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10 }, grid: { color: 'rgba(37,37,48,0.6)' } },
-      y: { title: { display: true, text: yLabel, color: '#78788f', font: { family: 'DM Mono', size: 10 } }, ticks: { color: '#78788f', font: { family: 'DM Mono', size: 10 }, precision: 0 }, grid: { color: 'rgba(37,37,48,0.6)' }, beginAtZero: true }
-    }
-  };
-}
-
-function presenceChartOptions(times) {
-  const base = chartOptions('Users');
-  base.scales.x.type = 'category';
-  base.scales.x.ticks = { color: '#78788f', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10, callback: function(val) { return times[val] || ''; } };
-  base.plugins.tooltip.callbacks = { title: function(items) { return times[items[0].dataIndex] || ''; } };
-  return base;
-}
-
-// ─── DONATIONS BAR ────────────────────────────────────────────
-function fetchDonationsData() {
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
-  const cbName = '__donationsCallback_' + Date.now();
-  const script = document.createElement('script');
-  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 10000);
-  window[cbName] = function(data) {
-    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
-    if (data && data.ok && data.donations) renderDonationsBar(data.donations);
-  };
-  script.src = DRIVE_SCRIPT_URL + '?action=getDonations&callback=' + cbName + '&_cb=' + Date.now();
-  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
-  document.head.appendChild(script);
-}
-
-function renderDonationsBar(d) {
-  const bar = document.getElementById('donation-bar');
-  if (!bar) return;
-
-  const goal    = parseFloat(d.goal)    || 0;
-  const donated = parseFloat(d.donated) || 0;
-  const pct     = goal > 0 ? Math.min(100, (donated / goal) * 100) : 0;
-
-  // ── Color: dark red → orange → yellow-green → green based on progress ──
-  // 0% = #8b1a1a (dark red), 50% = #e8a020 (amber), 100% = #3ecf74 (green)
-  function lerpColor(a, b, t) {
-    const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
-    const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
-    const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
-    const r = Math.round(ar + (br - ar) * t);
-    const g = Math.round(ag + (bg - ag) * t);
-    const bv = Math.round(ab + (bb - ab) * t);
-    return '#' + [r, g, bv].map(x => x.toString(16).padStart(2, '0')).join('');
-  }
-  const t = pct / 100;
-  const barColor = t <= 0.5
-    ? lerpColor('#8b1a1a', '#e8a020', t * 2)
-    : lerpColor('#e8a020', '#3ecf74', (t - 0.5) * 2);
-
-  // ── Smart decimal formatting: show cents only when non-zero ──
-  function fmtAmount(n) {
-    return Number.isInteger(n) || Math.round(n * 100) % 100 === 0
-      ? '$' + n.toFixed(0)
-      : '$' + n.toFixed(2);
-  }
-
-  // ── Deadline formatting ──
-  function fmtDeadline(iso) {
-    if (!iso) return '';
-    try {
-      // Parse as local date (avoid UTC offset shifting the day)
-      const [y, m, day] = iso.split('-').map(Number);
-      const d = new Date(y, m - 1, day);
-      if (isNaN(d.getTime())) return '';
-      const now   = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const diffMs = d - today;
-      const diffDays = Math.round(diffMs / 86400000);
-
-      const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const dateStr = monthNames[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-
-      if (diffDays < 0)  return 'ENDED ' + dateStr;
-      if (diffDays === 0) return 'DUE TODAY';
-      if (diffDays === 1) return '1 DAY LEFT · ' + dateStr;
-      if (diffDays <= 7)  return diffDays + ' DAYS LEFT · ' + dateStr;
-      return 'BY ' + dateStr;
-    } catch(e) { return iso; }
-  }
-
-  const headerEl   = bar.querySelector('.donation-bar-header');
-  const fillEl     = bar.querySelector('.donation-bar-fill');
-  const labelEl    = bar.querySelector('.donation-bar-label');
-  const deadlineEl = bar.querySelector('.donation-bar-deadline');
-  const readMoreEl = bar.querySelector('.donation-bar-readmore');
-  const bodyEl     = document.getElementById('donation-modal-body');
-  const modalHeaderEl = document.getElementById('donation-modal-header');
-  const modalDeadlineEl = document.getElementById('donation-modal-deadline');
-
-  if (headerEl)    headerEl.textContent = d.header || 'Support The Drive';
-  if (modalHeaderEl) modalHeaderEl.textContent = d.header || 'Support The Drive';
-
-  if (fillEl) {
-    fillEl.style.width      = pct + '%';
-    fillEl.style.background = barColor;
-  }
-
-  if (labelEl) labelEl.textContent = fmtAmount(donated) + ' / ' + fmtAmount(goal);
-
-  const deadlineText = fmtDeadline(d.deadline || '');
-  if (deadlineEl) {
-    deadlineEl.textContent = deadlineText;
-    deadlineEl.style.display = deadlineText ? '' : 'none';
-    // Urgent coloring when ≤ 7 days left
-    const isUrgent = deadlineText.includes('DAY') || deadlineText.includes('TODAY');
-    deadlineEl.classList.toggle('donation-bar-deadline--urgent', isUrgent);
-  }
-  if (modalDeadlineEl) {
-    modalDeadlineEl.textContent = deadlineText ? '⏱ ' + deadlineText : '';
-    modalDeadlineEl.style.display = deadlineText ? '' : 'none';
-  }
-
-  if (bodyEl) {
-    bodyEl.innerHTML = '';
-    const chunks = (d.body || '').split('---').map(s => s.trim()).filter(Boolean);
-    if (chunks.length === 0) {
-      bodyEl.textContent = '';
-    } else {
-      chunks.forEach(chunk => {
-        const p = document.createElement('p');
-        p.textContent = chunk;
-        bodyEl.appendChild(p);
-      });
-    }
-  }
-
-  if (readMoreEl) {
-    readMoreEl.style.display = (d.body && d.body.trim()) ? '' : 'none';
-  }
-
-  bar.style.display = goal > 0 ? 'flex' : 'none';
-}
-
-// ─── DONATION MODAL ───────────────────────────────────────────
-(function() {
-  const overlay   = document.getElementById('donation-modal-overlay');
-  const closeBtn  = document.getElementById('donation-modal-close');
-  const readMore  = document.getElementById('donation-readmore-btn');
-
-  if (readMore && overlay) {
-    readMore.addEventListener('click', () => { overlay.style.display = 'flex'; });
-  }
-  if (closeBtn && overlay) {
-    closeBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
-  }
-  if (overlay) {
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
-  }
-})();
-
-// ─── HEARTBEAT & ONLINE COUNT ─────────────────────────────────
-const HEARTBEAT_INTERVAL_MS  = 5000;   
-const HEARTBEAT_TIMEOUT_MS   = 4500;   
-const HEARTBEAT_MISS_LIMIT   = 3;      
-
-let heartbeatMissCount  = 0;
-let heartbeatOnline     = true;  
-let heartbeatIntervalId = null;
-
-function startHeartbeat() {
-  if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
-  heartbeatIntervalId = setInterval(pingHeartbeat, HEARTBEAT_INTERVAL_MS);
-  pingHeartbeat(); 
-}
-
-function pingHeartbeat() {
-  const cbName = '__heartbeatCallback_' + Date.now();
-  const script = document.createElement('script');
-
-  const timer = setTimeout(() => {
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    _heartbeatMiss();
-  }, HEARTBEAT_TIMEOUT_MS);
-
-  window[cbName] = function(data) {
-    clearTimeout(timer);
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    _heartbeatSuccess(data);
-  };
-
-  script.onerror = () => {
-    clearTimeout(timer);
-    delete window[cbName];
-    if (script.parentNode) script.parentNode.removeChild(script);
-    _heartbeatMiss();
-  };
-
-  script.src = DRIVE_SCRIPT_URL
-    + '?action=checkDevice'
-    + '&did='      + encodeURIComponent(getDeviceId())
-    + '&key='      + encodeURIComponent(getSavedKey() || '')
-    + '&callback=' + cbName
-    + '&_cb='      + Date.now();
-  document.head.appendChild(script);
-}
-
-function _heartbeatSuccess(data) {
-  heartbeatMissCount = 0;
-  if (!heartbeatOnline) {
-    heartbeatOnline = true;
-    console.log('[heartbeat] back online');
-  }
-  if (data && data.keyCleared) {
-    localStorage.removeItem('driveAccessKey');
-    location.reload();
-  }
-}
-
-function _heartbeatMiss() {
-  heartbeatMissCount++;
-  if (heartbeatOnline && heartbeatMissCount >= HEARTBEAT_MISS_LIMIT) {
-    heartbeatOnline = false;
-    console.warn('[heartbeat] offline — ' + HEARTBEAT_MISS_LIMIT + ' consecutive missed pings');
-  }
-}
-
-function isClientOnline() { return heartbeatOnline; }
-
-function fetchOnlineCount() {
-  const cbName = '__onlineCallback_' + Date.now();
-  const script = document.createElement('script');
-  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 10000);
-  window[cbName] = function(data) {
-    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
-    const el = document.getElementById('online-count');
-    if (el && data && typeof data.online === 'number') el.textContent = data.online;
-  };
-  script.src = DRIVE_SCRIPT_URL + '?action=getOnlineCount&callback=' + cbName + '&_cb=' + Date.now();
-  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
-  document.head.appendChild(script);
-}
-
-function pushPresencePing() {
-  const onlineEl = $('online-count');
-  const selfCounts = isClientOnline() ? 1 : 0;
-  const displayedCount = onlineEl ? (parseInt(onlineEl.textContent, 10) || 0) : 0;
-  const count = Math.max(selfCounts, displayedCount);
-  const cbName = '__presencePingCallback_' + Date.now();
-  const script  = document.createElement('script');
-  const timer   = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 8000);
-  window[cbName] = function(resp) {
-    clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script);
-    const serverCount = (resp && typeof resp.online === 'number') ? resp.online : 0;
-    const onlineEl = $('online-count');
-    if (onlineEl) onlineEl.textContent = serverCount;
-    if (chartPresence) {
-      const now = new Date(), pad = n => String(n).padStart(2, '0');
-      const hhmm = pad(now.getHours()) + ':' + pad(now.getMinutes());
-      const labels = chartPresence.data.labels, vals = chartPresence.data.datasets[0].data, times = chartPresence._times || [];
-      if (lastPresenceAppendAt > 0 && (now.getTime() - lastPresenceAppendAt) > 20000) {
-        const zeroTime = new Date(lastPresenceAppendAt + 10000);
-        times.push(pad(zeroTime.getHours()) + ':' + pad(zeroTime.getMinutes())); labels.push(labels.length); vals.push(0);
-      }
-      times.push(hhmm); labels.push(labels.length); vals.push(serverCount);
-      lastPresenceAppendAt = now.getTime();
-      if (labels.length > 500) { labels.shift(); vals.shift(); times.shift(); }
-      chartPresence.update('none');
-    }
-  };
-  script.src = DRIVE_SCRIPT_URL + '?action=recordPresence&count=' + encodeURIComponent(count) + '&callback=' + cbName + '&_cb=' + Date.now();
-  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
-  document.head.appendChild(script);
-}
-
-function pushSnapshot(total, available) {
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') return;
-  const cbName = '__snapshotCallback_' + Date.now();
-  const script = document.createElement('script');
-  const timer  = setTimeout(() => { delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); }, 8000);
-  window[cbName] = function() { clearTimeout(timer); delete window[cbName]; if (script.parentNode) script.parentNode.removeChild(script); };
-  script.src = DRIVE_SCRIPT_URL + '?action=pushSnapshot&total=' + encodeURIComponent(total) + '&available=' + encodeURIComponent(available) + '&callback=' + cbName + '&_cb=' + Date.now();
-  script.onerror = () => { clearTimeout(timer); if (script.parentNode) script.parentNode.removeChild(script); };
-  document.head.appendChild(script);
-}
-
-// ─── DEVICE ID CORNER REVEAL ──────────────────────────────────
-(function initDeviceIdReveal() {
-  const el = document.createElement('div');
-  el.id = 'device-id-corner';
-  el.style.cssText = [
-    'position:fixed',
-    'bottom:12px',
-    'right:14px',
-    'z-index:99999',
-    'font-family:monospace',
-    'font-size:10px',
-    'color:rgba(144,144,168,0.9)',
-    'background:rgba(18,18,26,0.85)',
-    'border:1px solid rgba(80,80,110,0.4)',
-    'border-radius:5px',
-    'padding:4px 9px',
-    'letter-spacing:0.08em',
-    'pointer-events:none',
-    'opacity:0',
-    'transition:opacity 0.2s ease',
-  ].join(';');
-  document.body.appendChild(el);
-
-  const CORNER_PX = 12;
-  let hideTimer = null;
-
-  document.addEventListener('mousemove', function(e) {
-    const nearRight  = window.innerWidth  - e.clientX < CORNER_PX;
-    const nearBottom = window.innerHeight - e.clientY < CORNER_PX;
-
-    if (nearRight && nearBottom) {
-      if (!el.textContent) el.textContent = 'DID: ' + getDeviceId();
-      el.style.opacity = '1';
-      clearTimeout(hideTimer);
-    } else if (el.style.opacity !== '0') {
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 300);
-    }
-  });
-})();
 
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
@@ -2668,73 +685,8 @@ function pushSnapshot(total, available) {
   if (sortDirBtn) sortDirBtn.textContent = '↓';
 
   await initWithGate();
-
-  // ── Eagerly load notifications right after auth — no waiting for the bell ──
-  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    fetchServerNotifications().then(() => {
-      checkAndNotifyRequestFulfillments();
-      renderNotificationPanel();
-    });
-    // Also fetch donations data for the progress bar
-    fetchDonationsData();
-  }
-
   loadShowsData();
-
-  if (!DRIVE_SCRIPT_URL || DRIVE_SCRIPT_URL === 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    try {
-      const r = await fetchURL(SHEET_CSV_URL, false);
-      const text = r.ok ? await r.text() : '';
-      allMovies = mergeData(text ? parseCSV(text) : [], {}, {});
-    } catch(e) { allMovies = mergeData([], {}, {}); }
-    render(); populateFilterCheckboxes(); updateCounts();
-    setProgress(100); setTimeout(() => scanBar.classList.add('hidden'), 300);
-  } else {
-    scanBar.classList.remove('hidden');
-    setProgress(5);
-
-    let csvRows = [];
-    const csvPromise = fetchURL(SHEET_CSV_URL, true)
-      .then(r => r.ok ? r.text() : '')
-      .then(text => { if (text) csvRows = parseCSV(text); })
-      .catch(() => {});
-
-    const scanStart = Date.now();
-    const FAKE_DURATION_MS = 20000;
-    const progressInterval = setInterval(() => {
-      const pct = 15 + Math.min(75, ((Date.now() - scanStart) / FAKE_DURATION_MS) * 75);
-      setProgress(pct);
-    }, 500);
-
-    try {
-      const [driveData] = await Promise.all([triggerFullScan(), csvPromise]);
-      clearInterval(progressInterval);
-
-      if (driveData && driveData.movies) {
-        applyDriveData(driveData, csvRows);
-        updateLastUpdated();
-        const totalMovies = allMovies.length, availMovies = allMovies.filter(m => m.available).length;
-        const totalEps    = allShows.reduce((t, s) => t + showTotalCount(s), 0);
-        const availEps    = allShows.reduce((t, s) => t + showAvailableCount(s), 0);
-        pushSnapshot(totalMovies + totalEps, availMovies + availEps);
-      } else {
-        showToast('⚠ Scan returned no data — try refreshing.');
-      }
-    } catch(e) {
-      clearInterval(progressInterval);
-      showToast('⚠ Drive scan timed out on load — try the refresh button.');
-    }
-
-    setProgress(100);
-    setTimeout(() => scanBar.classList.add('hidden'), 300);
-  }
-
-  if (DRIVE_SCRIPT_URL && DRIVE_SCRIPT_URL !== 'YOUR_APPS_SCRIPT_EXEC_URL_HERE') {
-    fetchOnlineCount();
-    setInterval(fetchOnlineCount, 60 * 1000);
-    startHeartbeat();
-    setInterval(pushPresencePing, 10 * 1000);
-  }
+  await loadData();
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2749,5 +701,4 @@ function pushSnapshot(total, available) {
       if (tab === 'shows')  filterAndRenderShows();
     });
   });
-
 })();
