@@ -42,6 +42,18 @@ async function initWithGate() {
   const did = getDeviceId();
   const savedKey = getSavedKey();
 
+  // Helper to trigger auto-retry when server is down
+  function triggerServerRetry() {
+    if (overlay) overlay.classList.remove('gate-overlay-hidden');
+    if (submitBtn) { submitBtn.classList.add('loading'); submitBtn.textContent = 'RETRYING...'; }
+    if (input) input.disabled = true;
+    if (errorEl) { 
+      errorEl.textContent = 'Cannot reach server. Retrying in 5 seconds...'; 
+      errorEl.hidden = false; 
+    }
+    setTimeout(() => location.reload(), 5000);
+  }
+
   // 1. Check if device is blocked globally
   try {
     const blockRes = await fetch(`${API_BASE}/api/keys/check-device?did=${did}`);
@@ -52,7 +64,11 @@ async function initWithGate() {
       if (titleEl) titleEl.textContent = 'ACCESS DENIED';
       return;
     }
-  } catch(e) { console.warn("Device check failed", e); }
+  } catch(e) { 
+    console.warn("Device check failed", e);
+    triggerServerRetry();
+    return;
+  }
 
   // 2. If saved key exists, validate it silently
   if (savedKey) {
@@ -62,13 +78,22 @@ async function initWithGate() {
       if (valData.valid) {
         if (overlay) { overlay.classList.add('gate-overlay-hidden'); overlay.style.display = 'none'; }
         return; // Gate passed!
+      } else {
+        // Server reached, but key is invalid. Clear it.
+        localStorage.removeItem(LOCAL_KEY_STORE);
       }
-    } catch(e) { console.warn("Key validation failed", e); }
-    localStorage.removeItem(LOCAL_KEY_STORE); // Clear bad key
+    } catch(e) { 
+      console.warn("Key validation failed", e);
+      triggerServerRetry();
+      return;
+    }
   }
 
   // 3. Show gate and wait for user input
   if (overlay) overlay.classList.remove('gate-overlay-hidden');
+  if (submitBtn) submitBtn.classList.remove('loading');
+  if (input) input.disabled = false;
+  
   return new Promise(resolve => {
     if (!submitBtn || !input) { resolve(); return; }
 
@@ -107,10 +132,10 @@ async function initWithGate() {
           submitBtn.textContent = 'ENTER THE DRIVE';
         }
       } catch(e) {
-        errorEl.textContent = 'Cannot reach server.';
-        errorEl.hidden = false;
-        submitBtn.classList.remove('loading');
-        submitBtn.textContent = 'ENTER THE DRIVE';
+        // If manual entry fails due to network, save the key they typed and trigger retry
+        saveKey(keyStr);
+        triggerServerRetry();
+        resolve();
       }
     }
 
