@@ -2068,8 +2068,3 @@ tbody tr:hover td { background: var(--surface2); }
   padding: 16px 0;
   text-align: center;
 }
-
-/* Force hide the access gate for local testing */
-#gate-overlay {
-    display: none !important;
-}
