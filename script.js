@@ -85,7 +85,7 @@ async function initWithGate() {
         const valData = await valRes.json();
         
         if (!valData.valid) {
-          errorEl.textContent = valData.reason === 'expired' ? 'Key has reached device limit.' : 'Invalid key.';
+          errorEl.textContent = 'Invalid key.';
           errorEl.hidden = false;
           submitBtn.classList.remove('loading');
           submitBtn.textContent = 'ENTER THE DRIVE';
@@ -691,34 +691,35 @@ function fetchDonationsData() { }
   if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
 })();
 
-// ─── HEARTBEAT & ONLINE COUNT (Stubs) ─────────────────────────
+// ─── HEARTBEAT & ONLINE COUNT ─────────────────────────────────
 let heartbeatOnline = true;
 function startHeartbeat() { }
-function fetchOnlineCount() { }
-function pushPresencePing() { }
-function pushSnapshot(total, available) { }
 function isClientOnline() { return heartbeatOnline; }
 
-(function initDeviceIdReveal() {
-  const el = document.createElement('div');
-  el.id = 'device-id-corner';
-  el.style.cssText = ['position:fixed','bottom:12px','right:14px','z-index:99999','font-family:monospace','font-size:10px','color:rgba(144,144,168,0.9)','background:rgba(18,18,26,0.85)','border:1px solid rgba(80,80,110,0.4)','border-radius:5px','padding:4px 9px','letter-spacing:0.08em','pointer-events:none','opacity:0','transition:opacity 0.2s ease'].join(';');
-  document.body.appendChild(el);
-  const CORNER_PX = 12; let hideTimer = null;
-  document.addEventListener('mousemove', function(e) {
-    const nearRight  = window.innerWidth  - e.clientX < CORNER_PX;
-    const nearBottom = window.innerHeight - e.clientY < CORNER_PX;
-    if (nearRight && nearBottom) { if (!el.textContent) el.textContent = 'DID: ' + getDeviceId(); el.style.opacity = '1'; clearTimeout(hideTimer); } 
-    else if (el.style.opacity !== '0') { clearTimeout(hideTimer); hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 300); }
-  });
-})();
+async function pushPresencePing() {
+  try {
+    const res = await fetch(`${API_BASE}/api/heartbeat?did=${getDeviceId()}`);
+    const data = await res.json();
+    const onlineEl = document.getElementById('online-count');
+    if (onlineEl && data && typeof data.online === 'number') {
+      onlineEl.textContent = data.online;
+    }
+  } catch(e) { /* ignore heartbeat errors */ }
+}
 
 // ─── STATS ────────────────────────────────────────────────────
 let statsLoaded = false, statsLoadedAt = 0;
 let chartLibrary = null, chartUsers = null, chartPresence = null;
 let lastPresenceAppendAt = 0;
 
-function initStatsTab() { renderLocalStats(); }
+function initStatsTab() {
+  renderLocalStats();
+  if (!statsLoaded || Date.now() - statsLoadedAt > 60000) {
+    fetchStatsData();
+    statsLoaded = true;
+    statsLoadedAt = Date.now();
+  }
+}
 
 function renderLocalStats() {
   if (!allMovies.length && !allShows.length) return;
@@ -751,6 +752,142 @@ function renderLocalStats() {
 
 function setText(id, val) { const el = $(id); if (el) el.textContent = String(val); }
 
+async function fetchStatsData() {
+  try {
+    const res = await fetch(`${API_BASE}/api/stats`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data) return;
+    
+    if (typeof data.uniqueDevices === 'number') setText('stat-total-users', data.uniqueDevices);
+    if (data.snapshots && data.snapshots.length) renderLibraryChart(data.snapshots);
+    if (data.userHistory && data.userHistory.length) renderUserChart(data.userHistory);
+    if (data.presence && data.presence.length) renderPresenceChart(data.presence);
+    else showPresencePlaceholder();
+    
+    const onlineEl = document.getElementById('online-count');
+    if (onlineEl && typeof data.online === 'number') onlineEl.textContent = data.online;
+  } catch(e) {
+    console.error('Stats fetch failed', e);
+  }
+}
+
+function renderLibraryChart(snapshots) {
+  const canvas = $('chart-library'); if (!canvas) return;
+  const cfg = { type: 'line', data: { labels: snapshots.map(s => s.date), datasets: [{ label: 'Total Files', data: snapshots.map(s => s.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }, { label: 'Available Files', data: snapshots.map(s => s.available), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Files') };
+  if (chartLibrary) chartLibrary.destroy();
+  chartLibrary = new Chart(canvas, cfg);
+}
+
+function renderUserChart(userHistory) {
+  const canvas = $('chart-users'); if (!canvas) return;
+  const cfg = { type: 'line', data: { labels: userHistory.map(u => u.date), datasets: [{ label: 'Unique Users', data: userHistory.map(u => u.users), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Users') };
+  if (chartUsers) chartUsers.destroy();
+  chartUsers = new Chart(canvas, cfg);
+}
+
+function showPresencePlaceholder() {
+  const canvas = $('chart-presence'); if (!canvas) return;
+  const wrap = canvas.closest('.chart-wrap'); if (!wrap) return;
+  canvas.style.display = 'none';
+  if (!wrap.querySelector('.presence-placeholder')) {
+    const msg = document.createElement('div');
+    msg.className = 'presence-placeholder';
+    msg.innerHTML = `<span class="presence-placeholder-icon">◎</span><p>No history yet — data will appear here as users come online.</p>`;
+    wrap.appendChild(msg);
+  }
+}
+
+function showPresenceCanvas() {
+  const canvas = $('chart-presence'); if (!canvas) return;
+  canvas.style.display = '';
+  const wrap = canvas.closest('.chart-wrap');
+  if (wrap) { const ph = wrap.querySelector('.presence-placeholder'); if (ph) ph.remove(); }
+}
+
+function renderPresenceChart(presence) {
+  showPresenceCanvas();
+  const canvas = $('chart-presence'); if (!canvas) return;
+  const INTERVAL_MS = 10 * 1000, GAP_THRESH = INTERVAL_MS * 2;
+  function tsToMs(ts) { return new Date(ts.replace(' ', 'T')).getTime(); }
+  const filled = [];
+  for (let i = 0; i < presence.length; i++) {
+    filled.push(presence[i]);
+    if (i < presence.length - 1) {
+      const gap = tsToMs(presence[i + 1].ts) - tsToMs(presence[i].ts);
+      if (gap > GAP_THRESH) {
+        const afterTs = new Date(tsToMs(presence[i].ts) + INTERVAL_MS);
+        const pad = n => String(n).padStart(2, '0');
+        filled.push({ ts: presence[i].ts.slice(0, 11) + pad(afterTs.getHours()) + ':' + pad(afterTs.getMinutes()) + ':' + pad(afterTs.getSeconds()), online: 0 });
+      }
+    }
+  }
+  const step = Math.max(1, Math.floor(filled.length / 500));
+  const sampled = filled.filter((_, i) => i % step === 0);
+  const times = sampled.map(p => { const m = String(p.ts).match(/(\d{1,2}:\d{2})(?::\d{2})?/); return m ? m[1] : ''; });
+  const rawValues = sampled.map(p => p.online);
+  const values = rawValues.map((v, i, arr) => {
+    const p2 = arr[i-2] !== undefined ? arr[i-2] : v, p1 = arr[i-1] !== undefined ? arr[i-1] : v;
+    const n1 = arr[i+1] !== undefined ? arr[i+1] : v, n2 = arr[i+2] !== undefined ? arr[i+2] : v;
+    return Math.round((p2 + p1 + v + n1 + n2) / 5 * 100) / 100;
+  });
+  const cfg = { type: 'line', data: { labels: sampled.map((_, i) => i), datasets: [{ label: 'Online', data: values, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: presenceChartOptions(times) };
+  if (chartPresence) chartPresence.destroy();
+  chartPresence = new Chart(canvas, cfg);
+  chartPresence._times = times;
+  lastPresenceAppendAt = Date.now();
+}
+
+function chartOptions(yLabel) {
+  return {
+    responsive: true, maintainAspectRatio: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: '#9090a8', font: { family: 'DM Mono', size: 11 }, boxWidth: 12 } },
+      tooltip: { backgroundColor: '#18181f', borderColor: '#252530', borderWidth: 1, titleColor: '#e8e8f0', bodyColor: '#9090a8', titleFont: { family: 'DM Mono', size: 11 }, bodyFont: { family: 'DM Mono', size: 11 } }
+    },
+    scales: {
+      x: { ticks: { color: '#78788f', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10 }, grid: { color: 'rgba(37,37,48,0.6)' } },
+      y: { title: { display: true, text: yLabel, color: '#78788f', font: { family: 'DM Mono', size: 10 } }, ticks: { color: '#78788f', font: { family: 'DM Mono', size: 10 }, precision: 0 }, grid: { color: 'rgba(37,37,48,0.6)' }, beginAtZero: true }
+    }
+  };
+}
+
+function presenceChartOptions(times) {
+  const base = chartOptions('Users');
+  base.scales.x.type = 'category';
+  base.scales.x.ticks = { color: '#78788f', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10, callback: function(val) { return times[val] || ''; } };
+  base.plugins.tooltip.callbacks = { title: function(items) { return times[items[0].dataIndex] || ''; } };
+  return base;
+}
+
+// ─── DEVICE ID CORNER REVEAL ──────────────────────────────────
+(function initDeviceIdReveal() {
+  const el = document.createElement('div');
+  el.id = 'device-id-corner';
+  el.style.cssText = [
+    'position:fixed','bottom:12px','right:14px','z-index:99999','font-family:monospace','font-size:10px','color:rgba(144,144,168,0.9)','background:rgba(18,18,26,0.85)','border:1px solid rgba(80,80,110,0.4)','border-radius:5px','padding:4px 9px','letter-spacing:0.08em','pointer-events:none','opacity:0','transition:opacity 0.2s ease'
+  ].join(';');
+  document.body.appendChild(el);
+
+  const CORNER_PX = 12;
+  let hideTimer = null;
+
+  document.addEventListener('mousemove', function(e) {
+    const nearRight  = window.innerWidth  - e.clientX < CORNER_PX;
+    const nearBottom = window.innerHeight - e.clientY < CORNER_PX;
+
+    if (nearRight && nearBottom) {
+      if (!el.textContent) el.textContent = 'DID: ' + getDeviceId();
+      el.style.opacity = '1';
+      clearTimeout(hideTimer);
+    } else if (el.style.opacity !== '0') {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function() { el.style.opacity = '0'; }, 300);
+    }
+  });
+})();
+
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
   try { localStorage.removeItem(LOCAL_SETTINGS_KEY); } catch(e) {}
@@ -773,6 +910,10 @@ function setText(id, val) { const el = $(id); if (el) el.textContent = String(va
   await initWithGate();
   loadShowsData();
   await loadData();
+
+  // Start presence heartbeat
+  pushPresencePing();
+  setInterval(pushPresencePing, 10000);
 
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
