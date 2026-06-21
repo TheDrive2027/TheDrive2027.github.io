@@ -43,6 +43,7 @@ function getDeviceId() {
 }
 
 async function initWithGate() {
+  // Access gate bypassed — local backend has no auth server.
   const overlay = document.getElementById('gate-overlay');
   if (overlay) {
     overlay.classList.add('gate-overlay-hidden');
