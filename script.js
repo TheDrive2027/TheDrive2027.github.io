@@ -3,7 +3,7 @@
    ============================================================= */
 
 // ─── CONFIG ───────────────────────────────────────────────────
-let API_BASE = ''; // Will be populated inside init()
+let API_BASE = ''; // Populated by config.json in init()
 const SHEET_CSV_URL    = '';
 const SHOWS_CSV_URL    = '';
 const DRIVE_SCRIPT_URL = '';
@@ -18,11 +18,16 @@ const LOCAL_DEVICE_ID = 'thedrive_device_id_v1';
 
 function getSavedKey() { try { return localStorage.getItem(LOCAL_KEY_STORE) || null; } catch(e) { return null; } }
 function saveKey(key) { try { localStorage.setItem(LOCAL_KEY_STORE, key); } catch(e) {} }
+
 function getDeviceId() {
   try {
     let did = localStorage.getItem(LOCAL_DEVICE_ID);
     if (!did) {
-      did = 'did-' + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
+      if (crypto && crypto.randomUUID) {
+        did = 'did-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
+      } else {
+        did = 'did-' + Array.from({ length: 12 }, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
+      }
       localStorage.setItem(LOCAL_DEVICE_ID, did);
     }
     return did;
@@ -121,12 +126,7 @@ let allShows    = [];
 let filtered    = [];
 let currentSort = 'title';
 let currentDir  = 'asc';
-let isDemoMode  = false;
 let activeTab   = 'movies'; 
-let posterMap   = {};
-let thumbMap    = {};
-let showDriveMerged = false;
-
 let activeFilters = {
   maturity:   new Set(),
   status:     new Set(),
@@ -141,22 +141,8 @@ function hasActiveFilters() {
     || activeFilters.resolution.size > 0;
 }
 
+// ─── RATINGS ─────────────────────────────────────────────────
 const ratingInflight = new Set();
-let requestCounts = {};
-const LOCAL_USER_REQ_KEY = 'thedrive_user_reqs_v1';
-
-function loadUserRequested() { try { return new Set(JSON.parse(localStorage.getItem(LOCAL_USER_REQ_KEY) || '[]')); } catch(e) { return new Set(); } }
-function saveUserRequested() { try { localStorage.setItem(LOCAL_USER_REQ_KEY, JSON.stringify([...userRequested])); } catch(e) {} }
-let userRequested = loadUserRequested();
-
-function hasUserRequested(title) { return userRequested.has(normalize(title)); }
-function getRatingScore(title) {
-  const r = ratingCounts[normalize(title)];
-  if (!r) return 0;
-  return (r.up || 0) - (r.down || 0);
-}
-function getRequestCount(title) { return requestCounts[normalize(title)] || 0; }
-
 const LOCAL_RATINGS_KEY = 'thedrive_ratings_v1';
 let ratingCounts = {};
 
@@ -166,6 +152,11 @@ let userRatings = loadUserRatings();
 
 function getUserRating(title) { return userRatings[normalize(title)] || null; }
 function getRatingCount(title, type) { return (ratingCounts[normalize(title)] || {})[type] || 0; }
+function getRatingScore(title) {
+  const r = ratingCounts[normalize(title)];
+  if (!r) return 0;
+  return (r.up || 0) - (r.down || 0);
+}
 
 function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
   document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
@@ -184,6 +175,16 @@ function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
   });
 }
 
+// ─── REQUEST COUNTS (Local) ───────────────────────────────────
+let requestCounts = {};
+const LOCAL_USER_REQ_KEY = 'thedrive_user_reqs_v1';
+function loadUserRequested() { try { return new Set(JSON.parse(localStorage.getItem(LOCAL_USER_REQ_KEY) || '[]')); } catch(e) { return new Set(); } }
+function saveUserRequested() { try { localStorage.setItem(LOCAL_USER_REQ_KEY, JSON.stringify([...userRequested])); } catch(e) {} }
+let userRequested = loadUserRequested();
+function hasUserRequested(title) { return userRequested.has(normalize(title)); }
+function getRequestCount(title) { return requestCounts[normalize(title)] || 0; }
+
+// ─── SETTINGS PERSISTENCE ─────────────────────────────────────
 const LOCAL_SETTINGS_KEY = 'thedrive_settings_v2';
 function saveSettings() { }
 function loadSettings() { return null; }
@@ -249,21 +250,6 @@ function renderShows() {
 }
 
 function filterAndRenderShows() { renderShows(); }
-
-// ─── FETCH & MERGE ────────────────────────────────────────────
-async function fetchURL(url, bustCache = false) {
-  if (bustCache) url += (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
-  return fetch(url, { redirect: 'follow', cache: bustCache ? 'no-store' : 'default' });
-}
-
-function findPosterMatch(title, posterMap) {
-  const key = normalize(title);
-  if (posterMap[key] !== undefined) return posterMap[key];
-  for (const [rawKey, val] of Object.entries(posterMap)) {
-    if (normalize(rawKey) === key) return val;
-  }
-  return null;
-}
 
 // ─── SIDEBAR FILTER POPULATION ────────────────────────────────
 function populateFilterCheckboxes() {
@@ -461,7 +447,6 @@ function buildCard(m, i, isRowCard) {
   if (m.driveLink) posterClasses.push('card-poster--playable');
   else posterClasses.push('card-poster--requestable');
 
-  // Removed status pill (Available/Not Uploaded)
   card.innerHTML = `
     <div class="${posterClasses.join(' ')}">
       ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
@@ -547,9 +532,11 @@ if (mainContent) {
   mainContent.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn');
     if (!btn) return;
+
     const title = btn.dataset.ratingTitle;
     const type  = btn.dataset.ratingType;
     if (!title || !type) return;
+
     const key = normalize(title);
     if (ratingInflight.has(key)) return;
     ratingInflight.add(key);
@@ -557,8 +544,9 @@ if (mainContent) {
     const prevVote = getUserRating(title);
     const prevUp   = getRatingCount(title, 'up');
     const prevDown = getRatingCount(title, 'down');
-    const nextVote = prevVote === type ? null : type;
+    const nextVote = prevVote === type ? null : type; // toggle off if same
 
+    // Optimistically update counts
     const delta = { up: prevUp, down: prevDown };
     if (prevVote === 'up')   delta.up   = Math.max(0, delta.up   - 1);
     if (prevVote === 'down') delta.down = Math.max(0, delta.down - 1);
@@ -571,11 +559,26 @@ if (mainContent) {
     saveUserRatings();
 
     applyRatingDOM(title, nextVote, delta.up, delta.down, btn);
+
     if (nextVote === 'up')        showToast('👍 Liked ' + title);
     else if (nextVote === 'down') showToast('👎 Disliked ' + title);
     else                          showToast('Rating removed for ' + title);
-    
-    ratingInflight.delete(key);
+
+    // Send to server
+    fetch(`${API_BASE}/api/rate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, type: nextVote, prev: prevVote, did: getDeviceId() })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.ratings) {
+        ratingCounts[key] = data.ratings;
+        applyRatingDOM(title, getUserRating(title), data.ratings.up, data.ratings.down, null);
+      }
+    })
+    .catch(e => console.error('Rating failed:', e))
+    .finally(() => ratingInflight.delete(key));
   });
 }
 
@@ -633,15 +636,15 @@ function toggleNotificationPanel() { const panel = document.getElementById('noti
 })();
 
 // ─── LOAD DATA ────────────────────────────────────────────────
-async function loadData(sheetURL, scriptURL, forceRefresh = false) {
+async function loadData() {
   setProgress(5);
   try {
-    const url = API_BASE + '/videos' + (forceRefresh ? '?_cb=' + Date.now() : '');
+    // Fetch videos
+    const url = API_BASE + '/videos' + ('?_cb=' + Date.now());
     const r = await fetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const videos = await r.json();
 
-    // Bypassed duplicate logic, mapping directly
     allMovies = videos.map(v => ({
       title:           v.title,
       runtime:         v.runtime || '',
@@ -656,6 +659,12 @@ async function loadData(sheetURL, scriptURL, forceRefresh = false) {
       driveResolution: '',
       poster:          v.poster ? (API_BASE + v.poster) : null
     }));
+
+    // Fetch ratings
+    try {
+      const ratingsRes = await fetch(`${API_BASE}/api/ratings`);
+      if (ratingsRes.ok) ratingCounts = await ratingsRes.json();
+    } catch(e) { console.warn("Failed to fetch ratings", e); }
 
     setProgress(100);
     render();
