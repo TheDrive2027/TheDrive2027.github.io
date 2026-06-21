@@ -672,6 +672,18 @@ function setText(id, val) { const el = $(id); if (el) el.textContent = String(va
   if (sortBy) sortBy.value = 'title';
   if (sortDirBtn) sortDirBtn.textContent = '↓';
 
+  // ── Fetch live backend URL from config.json ──
+  try {
+    const configResponse = await fetch('config.json?t=' + Date.now());
+    if (configResponse.ok) {
+        const config = await configResponse.json();
+        API_BASE = config.API_BASE || '';
+    }
+  } catch (e) {
+    console.log('No config.json found, defaulting to local backend.');
+    API_BASE = ''; 
+  }
+
   await initWithGate();
   loadShowsData();
   await loadData();
