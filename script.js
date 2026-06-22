@@ -363,7 +363,12 @@ function buildCard(m, i, isRowCard) {
     </div>
     <div class="card-footer">${ratingHTML(m.title)}</div>
   `;
-  card.addEventListener('click', () => openMovieViewer(m));
+  
+  // BUG FIX: Ignore clicks on rating buttons so they don't open the viewer
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.rating-btn')) return;
+    openMovieViewer(m);
+  });
   return card;
 }
 
@@ -376,7 +381,7 @@ function ratingHTML(title) {
 }
 function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// ─── MOVIE VIEWER & PLAYER LOGIC ──────────────────────────────
+// ─── MOVIE VIEWER, PLAYER & COMMENTS LOGIC ────────────────────
 function getVideoProgress(title) { 
   try { return JSON.parse(localStorage.getItem('thedrive_progress_' + normalize(title)) || '{}'); } catch(e) { return {}; }
 }
@@ -385,14 +390,15 @@ function saveVideoProgress(title, time, duration) {
 }
 
 let currentViewerMovie = null;
+let currentViewerComments = [];
 const viewer = $('movie-viewer');
 const viewerContent = $('viewer-content');
 const videoEl = $('video-el');
 
-function openMovieViewer(m) {
+async function openMovieViewer(m) {
   currentViewerMovie = m;
   viewerContent.classList.remove('player-active'); // Ensure compact info size
-  $('viewer-details').style.display = 'block';
+  $('viewer-details').style.display = 'flex';
   $('viewer-player').style.display = 'none';
   viewer.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -427,6 +433,10 @@ function openMovieViewer(m) {
     progContainer.style.display = 'none';
     $('play-btn-text').textContent = 'Play';
   }
+
+  // Fetch comments
+  currentViewerComments = await fetchComments(m.title);
+  renderComments();
 }
 
 function closeMovieViewer() {
@@ -478,6 +488,67 @@ videoEl.addEventListener('pause', () => $('ctrl-play-pause').innerHTML = '&#9654
  $('viewer-close').addEventListener('click', closeMovieViewer);
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && viewer.style.display === 'flex') closeMovieViewer(); });
+
+// Comments Logic
+async function fetchComments(title) {
+  try {
+    const res = await fetch(`${API_BASE}/api/comments?title=${encodeURIComponent(title)}`);
+    return res.ok ? await res.json() : [];
+  } catch(e) { return []; }
+}
+
+function renderComments() {
+  const list = $('review-list');
+  if (!list) return;
+  const filter = $('review-filter').value;
+  
+  let displayed = currentViewerComments;
+  if (filter !== 'All') displayed = displayed.filter(c => c.type === filter);
+  
+  // Sort newest first
+  displayed.sort((a,b) => new Date(b.time) - new Date(a.time));
+  
+  if (displayed.length === 0) {
+    list.innerHTML = '<div class="review-empty">No reviews yet.</div>';
+    return;
+  }
+  
+  list.innerHTML = displayed.map(c => `
+    <div class="review-item review-type-${c.type.toLowerCase()}">
+      <div class="review-meta">
+        <span>${c.type}</span>
+        <span>${c.time}</span>
+      </div>
+      <div class="review-text">${escHtml(c.text)}</div>
+    </div>
+  `).join('');
+}
+
+async function submitComment() {
+  const text = $('review-text').value.trim();
+  const type = $('review-type').value;
+  if (!text || !currentViewerMovie) return;
+  
+  $('review-text').value = '';
+  try {
+    const res = await fetch(`${API_BASE}/api/comment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: currentViewerMovie.title, text, type, did: getDeviceId() })
+    });
+    
+    if (res.ok) {
+      showToast('✓ Review submitted');
+      currentViewerComments = await fetchComments(currentViewerMovie.title);
+      renderComments();
+    }
+  } catch(e) {
+    showToast('⚠ Failed to submit review');
+  }
+}
+
+ $('submit-review-btn').addEventListener('click', submitComment);
+ $('review-filter').addEventListener('change', renderComments);
 
 // ─── EVENTS ───────────────────────────────────────────────────
 let searchTimer;
