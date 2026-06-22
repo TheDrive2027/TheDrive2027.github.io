@@ -104,11 +104,11 @@ async function initWithGate() {
 // ─── STATE ────────────────────────────────────────────────────
 let allMovies   = [], allShows = [], filtered = [];
 let currentSort = 'title', currentDir = 'asc', activeTab = 'movies'; 
-let activeFilters = { maturity: new Set(), status: new Set(), resolution: new Set() };
+let activeFilters = { maturity: new Set(), status: new Set(), resolution: new Set(), genre: new Set() };
 
 function hasActiveFilters() {
   const search = searchInput ? searchInput.value.trim() : '';
-  return search.length > 0 || activeFilters.maturity.size > 0 || activeFilters.status.size > 0 || activeFilters.resolution.size > 0;
+  return search.length > 0 || activeFilters.maturity.size > 0 || activeFilters.status.size > 0 || activeFilters.resolution.size > 0 || activeFilters.genre.size > 0;
 }
 
 // ─── RATINGS ─────────────────────────────────────────────────
@@ -141,7 +141,6 @@ const gridEmpty = $('grid-empty'), sidebarClearBtn = $('sidebar-clear-btn');
 // ─── UTILITIES ────────────────────────────────────────────────
 function normalize(str) { return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 function extractYear(dateStr) { if (!dateStr) return '—'; const m = String(dateStr).match(/\d{4}/); return m ? m[0] : '—'; }
-function parseSizeGB(sizeStr) { if (!sizeStr) return 0; const n = parseFloat(sizeStr), s = sizeStr.toUpperCase(); if (s.includes('TB')) return n * 1024; if (s.includes('GB')) return n; if (s.includes('MB')) return n / 1024; return n; }
 function parseRuntimeMinutes(str) { if (!str) return 0; const hm = str.match(/(\d+)\s*h(?:r|ours?)?\s*(\d+)?\s*m?/i); if (hm) return parseInt(hm[1]) * 60 + (parseInt(hm[2]) || 0); const m = str.match(/(\d+)/); return m ? parseInt(m[1]) : 0; }
 const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'PG13': 3, 'R': 4, 'NC-17': 5, 'NR': 6 };
 function parseResolutionScore(res) { if (!res) return 0; const s = String(res).toUpperCase().trim(); if (s === '4K' || s === 'UHD' || s.includes('2160')) return 2160; const m = s.match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
@@ -175,6 +174,11 @@ function populateFilterCheckboxes() {
     const resolutions = [...new Set(allMovies.map(m => m.resolution).filter(Boolean))].sort((a, b) => parseResolutionScore(b) - parseResolutionScore(a));
     resEl.innerHTML = resolutions.map(r => `<label class="check-row"><input type="checkbox" value="${escHtml(r)}" data-filter="resolution" ${activeFilters.resolution.has(r) ? 'checked' : ''} /><span class="check-label ${resClass(r)}">${escHtml(r)}</span></label>`).join('');
   }
+  const genreEl = $('filter-genre-checks');
+  if (genreEl) {
+    const genres = [...new Set(allMovies.flatMap(m => m.genres).filter(Boolean))].sort();
+    genreEl.innerHTML = genres.map(r => `<label class="check-row"><input type="checkbox" value="${escHtml(r)}" data-filter="genre" ${activeFilters.genre.has(r) ? 'checked' : ''} /><span class="check-label">${escHtml(r)}</span></label>`).join('');
+  }
   bindSidebarCheckboxes(); updateClearBtn();
 }
 function bindSidebarCheckboxes() {
@@ -186,8 +190,8 @@ function bindSidebarCheckboxes() {
     });
   });
 }
-function updateClearBtn() { if (sidebarClearBtn) sidebarClearBtn.hidden = !(activeFilters.maturity.size > 0 || activeFilters.status.size > 0 || activeFilters.resolution.size > 0); }
-function clearAllFilters() { activeFilters.maturity.clear(); activeFilters.status.clear(); activeFilters.resolution.clear(); if (searchInput) { searchInput.value = ''; clearSearch && clearSearch.classList.remove('visible'); } document.querySelectorAll('.sidebar-checks input[type="checkbox"]').forEach(cb => cb.checked = false); updateClearBtn(); render(); saveSettings(); }
+function updateClearBtn() { if (sidebarClearBtn) sidebarClearBtn.hidden = !(activeFilters.maturity.size > 0 || activeFilters.status.size > 0 || activeFilters.resolution.size > 0 || activeFilters.genre.size > 0); }
+function clearAllFilters() { activeFilters.maturity.clear(); activeFilters.status.clear(); activeFilters.resolution.clear(); activeFilters.genre.clear(); if (searchInput) { searchInput.value = ''; clearSearch && clearSearch.classList.remove('visible'); } document.querySelectorAll('.sidebar-checks input[type="checkbox"]').forEach(cb => cb.checked = false); updateClearBtn(); render(); saveSettings(); }
 function updateCounts() {
   const totalMovies = allMovies.length, totalEps = 0;
   let totalText = activeTab === 'shows' ? totalEps + ' Episodes' : activeTab === 'stats' ? (totalMovies + totalEps) + ' Files' : totalMovies + ' Movies';
@@ -202,6 +206,9 @@ function applyFilters() {
     if (q && !normalize(m.title).includes(q)) return false;
     if (activeFilters.maturity.size > 0 && !activeFilters.maturity.has(m.maturityRating)) return false;
     if (activeFilters.resolution.size > 0 && !activeFilters.resolution.has(m.resolution)) return false;
+    if (activeFilters.genre.size > 0) {
+      if (!m.genres || !m.genres.some(g => activeFilters.genre.has(g))) return false;
+    }
     return true;
   });
   applySort();
@@ -232,13 +239,69 @@ function renderCurrentView() {
     if (resultsSummary) resultsSummary.textContent = `${allMovies.length} movies in the library`;
   }
 }
-function renderRows() {
-  const availableMovies = [...allMovies].sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title));
-  const imdbMovies = [...allMovies].filter(m => parseFloat(m.imdbRating) > 0).sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
-  if ($('row-available-cards')) renderRowCards($('row-available-cards'), availableMovies.slice(0, 30));
-  if ($('row-requested')) $('row-requested').style.display = 'none';
-  if ($('row-imdb-cards')) renderRowCards($('row-imdb-cards'), imdbMovies.slice(0, 30));
+
+function createRowHtml(id, title, subtitle) {
+  return `
+    <section class="movie-row-section">
+      <div class="row-header">
+        <h2 class="row-title">${title}</h2>
+        ${subtitle ? `<span class="row-subtitle">${subtitle}</span>` : ''}
+      </div>
+      <div class="movie-row-scroll">
+        <div class="row-scroll-wrapper">
+          <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="${id}">‹</button>
+          <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="${id}">›</button>
+          <div id="${id}" class="movie-row"></div>
+        </div>
+      </div>
+    </section>
+  `;
 }
+
+function renderRows() {
+  let html = '';
+  
+  // 1. Continue Watching
+  const continueMovies = allMovies.filter(m => {
+    const p = getVideoProgress(m.title);
+    return p.time > 10 && p.duration > 0;
+  }).sort((a,b) => getVideoProgress(b.title).time - getVideoProgress(a.title).time);
+  
+  if (continueMovies.length > 0) {
+    html += createRowHtml('row-continue-cards', 'CONTINUE WATCHING', 'PICK UP WHERE YOU LEFT OFF');
+  }
+
+  // 2. Available Films
+  html += createRowHtml('row-available-cards', 'AVAILABLE FILMS', 'SORTED BY RATING');
+  
+  // 3. Top Rated
+  html += createRowHtml('row-imdb-cards', 'TOP RATED', 'IMDB');
+
+  // 4. Genres
+  const genres = [...new Set(allMovies.flatMap(m => m.genres).filter(Boolean))].sort();
+  genres.forEach(g => {
+    html += createRowHtml('row-genre-' + normalize(g), g.toUpperCase(), 'GENRE');
+  });
+
+  rowView.innerHTML = html;
+
+  // Populate rows
+  if ($('row-continue-cards')) renderRowCards($('row-continue-cards'), continueMovies.slice(0, 20));
+  if ($('row-available-cards')) {
+    const availableMovies = [...allMovies].sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title));
+    renderRowCards($('row-available-cards'), availableMovies.slice(0, 30));
+  }
+  if ($('row-imdb-cards')) {
+    const imdbMovies = [...allMovies].filter(m => parseFloat(m.imdbRating) > 0).sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
+    renderRowCards($('row-imdb-cards'), imdbMovies.slice(0, 30));
+  }
+  genres.forEach(g => {
+    const id = 'row-genre-' + normalize(g);
+    const cards = allMovies.filter(m => m.genres.includes(g)).sort((a,b) => getRatingScore(b.title) - getRatingScore(a.title)).slice(0, 30);
+    if ($(id)) renderRowCards($(id), cards);
+  });
+}
+
 function renderRowCards(container, movies) {
   container.innerHTML = '';
   const frag = document.createDocumentFragment();
@@ -277,8 +340,10 @@ function buildCard(m, i, isRowCard) {
   card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
   card.style.cursor = 'pointer';
 
-  const progress = getVideoProgress(m.title);
-  const progressHtml = progress > 5 ? `<div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.min(100, (progress / m.duration) * 100)}%"></div></div>` : '';
+  const progObj = getVideoProgress(m.title);
+  const progress = progObj.time || 0;
+  const duration = progObj.duration || 0;
+  const progressHtml = (progress > 10 && duration > 0) ? `<div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.min(100, (progress / duration) * 100)}%"></div></div>` : '';
 
   card.innerHTML = `
     <div class="card-poster card-poster--playable">
@@ -312,8 +377,12 @@ function ratingHTML(title) {
 function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ─── MOVIE VIEWER & PLAYER LOGIC ──────────────────────────────
-function getVideoProgress(title) { return parseFloat(localStorage.getItem('thedrive_progress_' + normalize(title)) || '0'); }
-function saveVideoProgress(title, time) { localStorage.setItem('thedrive_progress_' + normalize(title), String(time)); }
+function getVideoProgress(title) { 
+  try { return JSON.parse(localStorage.getItem('thedrive_progress_' + normalize(title)) || '{}'); } catch(e) { return {}; }
+}
+function saveVideoProgress(title, time, duration) { 
+  localStorage.setItem('thedrive_progress_' + normalize(title), JSON.stringify({time, duration})); 
+}
 
 let currentViewerMovie = null;
 const viewer = $('movie-viewer');
@@ -342,8 +411,20 @@ function openMovieViewer(m) {
   $('viewer-plot').textContent = m.plot || 'No plot available.';
   $('viewer-cast').innerHTML = m.cast.length ? `<b>CAST:</b> ${m.cast.join(', ')}` : '';
   
-  const progress = getVideoProgress(m.title);
-  $('play-btn-text').textContent = progress > 10 ? 'Resume' : 'Play';
+  const progObj = getVideoProgress(m.title);
+  const progress = progObj.time || 0;
+  const duration = progObj.duration || 0;
+  const progContainer = $('viewer-progress-container');
+  
+  if (progress > 10 && duration > 0) {
+    progContainer.style.display = 'block';
+    $('viewer-progress-fill').style.width = Math.min(100, (progress / duration) * 100) + '%';
+    $('viewer-progress-time').textContent = `${formatTime(progress)} / ${formatTime(duration)}`;
+    $('play-btn-text').textContent = 'Resume';
+  } else {
+    progContainer.style.display = 'none';
+    $('play-btn-text').textContent = 'Play';
+  }
 }
 
 function closeMovieViewer() {
@@ -359,7 +440,7 @@ function playVideo() {
   $('viewer-player').style.display = 'flex';
   videoEl.src = currentViewerMovie.driveLink;
   
-  const startTime = getVideoProgress(currentViewerMovie.title);
+  const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
   videoEl.addEventListener('loadedmetadata', () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
       videoEl.currentTime = startTime;
@@ -370,7 +451,7 @@ function playVideo() {
 
 // Video controls
 videoEl.addEventListener('timeupdate', () => {
-  if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime);
+  if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime, videoEl.duration);
   $('ctrl-progress-played').style.width = ((videoEl.currentTime / videoEl.duration) * 100) + '%';
   $('ctrl-time').textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
 });
@@ -468,7 +549,7 @@ async function loadData() {
     const videos = await r.json();
     allMovies = videos.map(v => ({
       title: v.title, runtime: v.runtime || '', resolution: v.resolution || '', maturityRating: v.maturityRating || '',
-      year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [],
+      year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
       driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null
     }));
     try { const rR = await fetch(`${API_BASE}/api/ratings`); if (rR.ok) ratingCounts = await rR.json(); } catch(e) {}
