@@ -341,5 +341,43 @@
   <div class="req-tooltip" id="req-tooltip" hidden></div>
 
   <script src="script.js"></script>
+  <!-- Movie Viewer & Player Overlay -->
+<div id="movie-viewer" hidden>
+    <div id="viewer-backdrop"></div>
+    <div id="viewer-content">
+        <button id="viewer-close" aria-label="Close">&times;</button>
+        
+        <!-- Details View -->
+        <div id="viewer-details">
+            <div class="viewer-hero">
+                <img id="viewer-poster" src="" alt="">
+                <div class="viewer-info">
+                    <h1 id="viewer-title"></h1>
+                    <div id="viewer-meta"></div>
+                    <p id="viewer-plot"></p>
+                    <div id="viewer-cast"></div>
+                    <div class="viewer-actions">
+                        <button id="viewer-play-btn">
+                            <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Player View -->
+        <div id="viewer-player" hidden>
+            <video id="video-el" preload="metadata" playsinline></video>
+            <div class="custom-controls">
+                <button id="ctrl-play-pause" class="ctrl-btn">&#9654;</button>
+                <div id="ctrl-progress-track">
+                    <div id="ctrl-progress-played"></div>
+                </div>
+                <span id="ctrl-time">0:00 / 0:00</span>
+                <button id="ctrl-fullscreen" class="ctrl-btn">⛶</button>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
