@@ -94,8 +94,10 @@ async function initWithGate() {
         }
       } catch(e) { saveKey(keyStr); triggerServerRetry(); resolve(); }
     }
-    submitBtn.addEventListener('click', attempt, { once: true });
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); }, { once: true });
+    
+    // Removed { once: true } so the user can click multiple times if needed
+    submitBtn.addEventListener('click', attempt);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
     setTimeout(() => input.focus(), 100);
   });
 }
@@ -411,8 +413,7 @@ const mainContent = document.getElementById('main-content');
 if (mainContent) {
   mainContent.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn'); if (!btn) return;
-    // Prevent rating click from triggering card open
-    e.stopPropagation(); 
+    e.stopPropagation(); // Prevent rating click from triggering card open
     
     const title = btn.dataset.ratingTitle, type = btn.dataset.ratingType; if (!title || !type) return;
     const key = normalize(title); if (ratingInflight.has(key)) return; ratingInflight.add(key);
