@@ -387,6 +387,7 @@ let currentViewerComments = [];
 const viewer = $('movie-viewer');
 const viewerContent = $('viewer-content');
 const videoEl = $('video-el');
+let progressRaf = null;
 
 async function openMovieViewer(m) {
   currentViewerMovie = m;
@@ -455,31 +456,109 @@ function playVideo() {
   }, { once: true });
 }
 
+// Live smooth progress bar using requestAnimationFrame
+function updateProgressBar() {
+  if (videoEl.duration) {
+    const pct = (videoEl.currentTime / videoEl.duration) * 100;
+    $('ctrl-progress-played').style.width = pct + '%';
+    $('ctrl-time').textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
+  }
+  progressRaf = requestAnimationFrame(updateProgressBar);
+}
+
+// Save progress to localStorage quietly in background
 videoEl.addEventListener('timeupdate', () => {
   if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime, videoEl.duration);
-  $('ctrl-progress-played').style.width = ((videoEl.currentTime / videoEl.duration) * 100) + '%';
-  $('ctrl-time').textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
 });
- $('ctrl-play-pause').addEventListener('click', () => {
-  if (videoEl.paused) { videoEl.play(); $('ctrl-play-pause').innerHTML = '&#10074;&#10074;'; } 
-  else { videoEl.pause(); $('ctrl-play-pause').innerHTML = '&#9654;'; }
+
+// Click video to play/pause
+videoEl.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (videoEl.paused) videoEl.play(); 
+  else videoEl.pause();
 });
-videoEl.addEventListener('play', () => $('ctrl-play-pause').innerHTML = '&#10074;&#10074;');
-videoEl.addEventListener('pause', () => $('ctrl-play-pause').innerHTML = '&#9654;');
+
+// Custom Control Listeners
+ $('ctrl-play-pause').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (videoEl.paused) videoEl.play(); 
+  else videoEl.pause();
+});
+videoEl.addEventListener('play', () => {
+  $('ctrl-play-pause').innerHTML = '&#10074;&#10074;';
+  if (!progressRaf) progressRaf = requestAnimationFrame(updateProgressBar);
+});
+videoEl.addEventListener('pause', () => {
+  $('ctrl-play-pause').innerHTML = '&#9654;';
+  if (progressRaf) { cancelAnimationFrame(progressRaf); progressRaf = null; }
+  updateProgressBar(); // Update one last time on pause
+});
  $('ctrl-progress-track').addEventListener('click', (e) => {
+  e.stopPropagation();
   const rect = e.currentTarget.getBoundingClientRect();
   const pct = (e.clientX - rect.left) / rect.width;
   if (videoEl.duration) videoEl.currentTime = videoEl.duration * pct;
 });
- $('ctrl-fullscreen').addEventListener('click', () => {
+ $('ctrl-fullscreen').addEventListener('click', (e) => {
+  e.stopPropagation();
   if (!document.fullscreenElement) $('viewer-player').requestFullscreen();
   else document.exitFullscreen();
 });
  $('viewer-play-btn').addEventListener('click', playVideo);
  $('viewer-close').addEventListener('click', closeMovieViewer);
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && viewer.style.display === 'flex') closeMovieViewer(); });
 
+// Keyboard Shortcuts for Video Player
+let seekInterval = null;
+let seekTimeout = null;
+
+document.addEventListener('keydown', (e) => {
+  // Close viewer on Escape
+  if (e.key === 'Escape' && viewer.style.display === 'flex') {
+    closeMovieViewer();
+    return;
+  }
+
+  // Ignore other shortcuts if player isn't open or user is typing
+  if (viewer.style.display !== 'flex' || $('viewer-player').style.display === 'none') return;
+  const tag = e.target.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (videoEl.paused) videoEl.play(); else videoEl.pause();
+  } else if (e.code === 'ArrowRight' && !e.repeat) {
+    e.preventDefault();
+    videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 5);
+    // Start fast forward if held
+    seekTimeout = setTimeout(() => {
+      seekInterval = setInterval(() => {
+        videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 2);
+      }, 100);
+    }, 300);
+  } else if (e.code === 'ArrowLeft' && !e.repeat) {
+    e.preventDefault();
+    videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
+    // Start rewind if held
+    seekTimeout = setTimeout(() => {
+      seekInterval = setInterval(() => {
+        videoEl.currentTime = Math.max(0, videoEl.currentTime - 2);
+      }, 100);
+    }, 300);
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowRight' || e.code === 'ArrowLeft') {
+    clearTimeout(seekTimeout);
+    if (seekInterval) {
+      clearInterval(seekInterval);
+      seekInterval = null;
+    }
+  }
+});
+
+// Comments Logic
 async function fetchComments(title) {
   try {
     const res = await fetch(`${API_BASE}/api/comments?title=${encodeURIComponent(title)}`);
@@ -639,9 +718,9 @@ let presenceInterval = null;
 
 function initStatsTab() { 
   renderLocalStats(); 
-  fetchStatsData(); // Fetch all data once
+  fetchStatsData(); 
   if (presenceInterval) clearInterval(presenceInterval);
-  presenceInterval = setInterval(fetchPresenceData, 5000); // Only fetch presence every 5s
+  presenceInterval = setInterval(fetchPresenceData, 5000); 
 }
 
 function renderLocalStats() {
@@ -659,7 +738,6 @@ function renderLocalStats() {
 }
 function setText(id, v) { const e = $(id); if (e) e.textContent = String(v); }
 
-// Fetches ALL stats (used once on tab open)
 async function fetchStatsData() {
   try {
     const res = await fetch(`${API_BASE}/api/stats`); if (!res.ok) return; const d = await res.json(); if (!d) return;
@@ -671,7 +749,6 @@ async function fetchStatsData() {
   } catch(e) {}
 }
 
-// Fetches ONLY online presence (used every 5 seconds)
 async function fetchPresenceData() {
   try {
     const res = await fetch(`${API_BASE}/api/presence`); if (!res.ok) return; const d = await res.json(); if (!d) return;
