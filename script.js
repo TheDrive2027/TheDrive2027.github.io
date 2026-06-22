@@ -261,7 +261,6 @@ function createRowHtml(id, title, subtitle) {
 function renderRows() {
   let html = '';
   
-  // 1. Continue Watching
   const continueMovies = allMovies.filter(m => {
     const p = getVideoProgress(m.title);
     return p.time > 10 && p.duration > 0;
@@ -271,13 +270,9 @@ function renderRows() {
     html += createRowHtml('row-continue-cards', 'CONTINUE WATCHING', 'PICK UP WHERE YOU LEFT OFF');
   }
 
-  // 2. Available Films
   html += createRowHtml('row-available-cards', 'AVAILABLE FILMS', 'SORTED BY RATING');
-  
-  // 3. Top Rated
   html += createRowHtml('row-imdb-cards', 'TOP RATED', 'IMDB');
 
-  // 4. Genres
   const genres = [...new Set(allMovies.flatMap(m => m.genres).filter(Boolean))].sort();
   genres.forEach(g => {
     html += createRowHtml('row-genre-' + normalize(g), g.toUpperCase(), 'GENRE');
@@ -285,7 +280,6 @@ function renderRows() {
 
   rowView.innerHTML = html;
 
-  // Populate rows
   if ($('row-continue-cards')) renderRowCards($('row-continue-cards'), continueMovies.slice(0, 20));
   if ($('row-available-cards')) {
     const availableMovies = [...allMovies].sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title));
@@ -364,7 +358,6 @@ function buildCard(m, i, isRowCard) {
     <div class="card-footer">${ratingHTML(m.title)}</div>
   `;
   
-  // BUG FIX: Ignore clicks on rating buttons so they don't open the viewer
   card.addEventListener('click', (e) => {
     if (e.target.closest('.rating-btn')) return;
     openMovieViewer(m);
@@ -397,7 +390,7 @@ const videoEl = $('video-el');
 
 async function openMovieViewer(m) {
   currentViewerMovie = m;
-  viewerContent.classList.remove('player-active'); // Ensure compact info size
+  viewerContent.classList.remove('player-active');
   $('viewer-details').style.display = 'flex';
   $('viewer-player').style.display = 'none';
   viewer.style.display = 'flex';
@@ -434,24 +427,23 @@ async function openMovieViewer(m) {
     $('play-btn-text').textContent = 'Play';
   }
 
-  // Fetch comments
   currentViewerComments = await fetchComments(m.title);
   renderComments();
 }
 
 function closeMovieViewer() {
   viewer.style.display = 'none';
-  viewerContent.classList.remove('player-active'); // Reset size
+  viewerContent.classList.remove('player-active');
   if (!videoEl.paused) videoEl.pause();
   videoEl.removeAttribute('src'); videoEl.load();
   document.body.style.overflow = '';
-  render(); // Refresh cards to show new progress bar
+  render();
 }
 
 function playVideo() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
-  viewerContent.classList.add('player-active'); // Expand to 80% screen
+  viewerContent.classList.add('player-active');
   videoEl.src = currentViewerMovie.driveLink;
   
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
@@ -463,7 +455,6 @@ function playVideo() {
   }, { once: true });
 }
 
-// Video controls
 videoEl.addEventListener('timeupdate', () => {
   if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime, videoEl.duration);
   $('ctrl-progress-played').style.width = ((videoEl.currentTime / videoEl.duration) * 100) + '%';
@@ -489,7 +480,6 @@ videoEl.addEventListener('pause', () => $('ctrl-play-pause').innerHTML = '&#9654
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && viewer.style.display === 'flex') closeMovieViewer(); });
 
-// Comments Logic
 async function fetchComments(title) {
   try {
     const res = await fetch(`${API_BASE}/api/comments?title=${encodeURIComponent(title)}`);
@@ -504,8 +494,6 @@ function renderComments() {
   
   let displayed = currentViewerComments;
   if (filter !== 'All') displayed = displayed.filter(c => c.type === filter);
-  
-  // Sort newest first
   displayed.sort((a,b) => new Date(b.time) - new Date(a.time));
   
   if (displayed.length === 0) {
@@ -568,7 +556,7 @@ const mainContent = document.getElementById('main-content');
 if (mainContent) {
   mainContent.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn'); if (!btn) return;
-    e.stopPropagation(); // Prevent rating click from triggering card open
+    e.stopPropagation();
     
     const title = btn.dataset.ratingTitle, type = btn.dataset.ratingType; if (!title || !type) return;
     const key = normalize(title); if (ratingInflight.has(key)) return; ratingInflight.add(key);
@@ -646,14 +634,14 @@ async function pushPresencePing() {
 }
 
 // ─── STATS ────────────────────────────────────────────────────
-let statsLoaded = false, statsLoadedAt = 0, chartLibrary = null, chartUsers = null, chartPresence = null;
-let statsInterval = null;
+let statsLoaded = false, chartLibrary = null, chartUsers = null, chartPresence = null;
+let presenceInterval = null;
 
 function initStatsTab() { 
   renderLocalStats(); 
-  fetchStatsData(); // Fetch immediately
-  if (statsInterval) clearInterval(statsInterval);
-  statsInterval = setInterval(fetchStatsData, 5000); // Update every 5 seconds
+  fetchStatsData(); // Fetch all data once
+  if (presenceInterval) clearInterval(presenceInterval);
+  presenceInterval = setInterval(fetchPresenceData, 5000); // Only fetch presence every 5s
 }
 
 function renderLocalStats() {
@@ -670,6 +658,8 @@ function renderLocalStats() {
   if (r.length) setText('stat-avg-imdb', '★ ' + (r.reduce((s, v) => s + parseFloat(v.imdbRating), 0) / r.length).toFixed(1));
 }
 function setText(id, v) { const e = $(id); if (e) e.textContent = String(v); }
+
+// Fetches ALL stats (used once on tab open)
 async function fetchStatsData() {
   try {
     const res = await fetch(`${API_BASE}/api/stats`); if (!res.ok) return; const d = await res.json(); if (!d) return;
@@ -680,6 +670,16 @@ async function fetchStatsData() {
     const el = $('online-count'); if (el && typeof d.online === 'number') el.textContent = d.online;
   } catch(e) {}
 }
+
+// Fetches ONLY online presence (used every 5 seconds)
+async function fetchPresenceData() {
+  try {
+    const res = await fetch(`${API_BASE}/api/presence`); if (!res.ok) return; const d = await res.json(); if (!d) return;
+    if (d.presence?.length) renderPresenceChart(d.presence); else showPresencePlaceholder();
+    const el = $('online-count'); if (el && typeof d.online === 'number') el.textContent = d.online;
+  } catch(e) {}
+}
+
 function renderLibraryChart(s) { 
   if (!window.Chart) return; const c = $('chart-library'); if (!c) return; 
   const cfg = { type: 'line', data: { labels: s.map(x=>x.date), datasets: [{ label: 'Total Files', data: s.map(x=>x.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }] }, options: chartOptions('Files') }; 
@@ -701,7 +701,6 @@ function renderPresenceChart(p) {
   const w = c.closest('.chart-wrap'); if (w) { const ph = w.querySelector('.presence-placeholder'); if (ph) ph.remove(); } 
   const t = p.map(x=>x.ts.slice(11,16)), v = p.map(x=>x.online); 
   
-  // Update chart smoothly without destroying it every 5 seconds
   if (chartPresence) {
     chartPresence.data.labels = t;
     chartPresence.data.datasets[0].data = v;
@@ -723,7 +722,6 @@ function chartOptions(y) {
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
   await initWithGate(); await loadData(); loadShowsData();
   
-  // Heartbeat set to 5 seconds
   pushPresencePing(); setInterval(pushPresencePing, 5000);
   
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -733,10 +731,9 @@ function chartOptions(y) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active'); $( 'tab-' + tab).classList.add('active'); updateCounts();
       
-      // Clear the 5-second interval if leaving the stats tab
-      if (tab !== 'stats' && statsInterval) {
-        clearInterval(statsInterval);
-        statsInterval = null;
+      if (tab !== 'stats' && presenceInterval) {
+        clearInterval(presenceInterval);
+        presenceInterval = null;
       }
       
       if (tab === 'stats') initStatsTab(); 
