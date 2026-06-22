@@ -647,7 +647,15 @@ async function pushPresencePing() {
 
 // ─── STATS ────────────────────────────────────────────────────
 let statsLoaded = false, statsLoadedAt = 0, chartLibrary = null, chartUsers = null, chartPresence = null;
-function initStatsTab() { renderLocalStats(); if (!statsLoaded || Date.now() - statsLoadedAt > 60000) { fetchStatsData(); statsLoaded = true; statsLoadedAt = Date.now(); } }
+let statsInterval = null;
+
+function initStatsTab() { 
+  renderLocalStats(); 
+  fetchStatsData(); // Fetch immediately
+  if (statsInterval) clearInterval(statsInterval);
+  statsInterval = setInterval(fetchStatsData, 5000); // Update every 5 seconds
+}
+
 function renderLocalStats() {
   if (!allMovies.length) return;
   const t = allMovies.length;
@@ -672,11 +680,40 @@ async function fetchStatsData() {
     const el = $('online-count'); if (el && typeof d.online === 'number') el.textContent = d.online;
   } catch(e) {}
 }
-function renderLibraryChart(s) { if (!window.Chart) return; const c = $('chart-library'); if (!c) return; const cfg = { type: 'line', data: { labels: s.map(x=>x.date), datasets: [{ label: 'Total Files', data: s.map(x=>x.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }] }, options: chartOptions('Files') }; if (chartLibrary) chartLibrary.destroy(); chartLibrary = new Chart(c, cfg); }
-function renderUserChart(u) { if (!window.Chart) return; const c = $('chart-users'); if (!c) return; const cfg = { type: 'line', data: { labels: u.map(x=>x.date), datasets: [{ label: 'Unique Users', data: u.map(x=>x.users), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Users') }; if (chartUsers) chartUsers.destroy(); chartUsers = new Chart(c, cfg); }
-function showPresencePlaceholder() { const c = $('chart-presence'); if (!c) return; const w = c.closest('.chart-wrap'); if (!w) return; c.style.display = 'none'; if (!w.querySelector('.presence-placeholder')) { const m = document.createElement('div'); m.className = 'presence-placeholder'; m.innerHTML = `<span class="presence-placeholder-icon">◎</span><p>No history yet.</p>`; w.appendChild(m); } }
-function renderPresenceChart(p) { if (!window.Chart) return; const c = $('chart-presence'); if (!c) return; c.style.display = ''; const w = c.closest('.chart-wrap'); if (w) { const ph = w.querySelector('.presence-placeholder'); if (ph) ph.remove(); } const t = p.map(x=>x.ts.slice(11,16)), v = p.map(x=>x.online); const cfg = { type: 'line', data: { labels: t, datasets: [{ label: 'Online', data: v, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: chartOptions('Users') }; if (chartPresence) chartPresence.destroy(); chartPresence = new Chart(c, cfg); }
-function chartOptions(y) { return { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#9090a8' } }, tooltip: { backgroundColor: '#18181f' } }, scales: { x: { ticks: { color: '#78788f' }, grid: { color: 'rgba(37,37,48,0.6)' } }, y: { title: { display: true, text: y, color: '#78788f' }, ticks: { color: '#78788f', precision: 0 }, grid: { color: 'rgba(37,37,48,0.6)' }, beginAtZero: true } } }; }
+function renderLibraryChart(s) { 
+  if (!window.Chart) return; const c = $('chart-library'); if (!c) return; 
+  const cfg = { type: 'line', data: { labels: s.map(x=>x.date), datasets: [{ label: 'Total Files', data: s.map(x=>x.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }] }, options: chartOptions('Files') }; 
+  if (chartLibrary) chartLibrary.destroy(); chartLibrary = new Chart(c, cfg); 
+}
+function renderUserChart(u) { 
+  if (!window.Chart) return; const c = $('chart-users'); if (!c) return; 
+  const cfg = { type: 'line', data: { labels: u.map(x=>x.date), datasets: [{ label: 'Unique Users', data: u.map(x=>x.users), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Users') }; 
+  if (chartUsers) chartUsers.destroy(); chartUsers = new Chart(c, cfg); 
+}
+function showPresencePlaceholder() { 
+  const c = $('chart-presence'); if (!c) return; const w = c.closest('.chart-wrap'); if (!w) return; c.style.display = 'none'; 
+  if (!w.querySelector('.presence-placeholder')) { const m = document.createElement('div'); m.className = 'presence-placeholder'; m.innerHTML = `<span class="presence-placeholder-icon">◎</span><p>No history yet.</p>`; w.appendChild(m); } 
+}
+function renderPresenceChart(p) { 
+  if (!window.Chart) return; 
+  const c = $('chart-presence'); if (!c) return; 
+  c.style.display = ''; 
+  const w = c.closest('.chart-wrap'); if (w) { const ph = w.querySelector('.presence-placeholder'); if (ph) ph.remove(); } 
+  const t = p.map(x=>x.ts.slice(11,16)), v = p.map(x=>x.online); 
+  
+  // Update chart smoothly without destroying it every 5 seconds
+  if (chartPresence) {
+    chartPresence.data.labels = t;
+    chartPresence.data.datasets[0].data = v;
+    chartPresence.update('none'); 
+  } else {
+    const cfg = { type: 'line', data: { labels: t, datasets: [{ label: 'Online', data: v, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: chartOptions('Users') }; 
+    chartPresence = new Chart(c, cfg); 
+  }
+}
+function chartOptions(y) { 
+  return { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#9090a8' } }, tooltip: { backgroundColor: '#18181f' } }, scales: { x: { ticks: { color: '#78788f' }, grid: { color: 'rgba(37,37,48,0.6)' } }, y: { title: { display: true, text: y, color: '#78788f' }, ticks: { color: '#78788f', precision: 0 }, grid: { color: 'rgba(37,37,48,0.6)' }, beginAtZero: true } } }; 
+}
 
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
@@ -685,14 +722,25 @@ function chartOptions(y) { return { responsive: true, maintainAspectRatio: true,
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
   await initWithGate(); await loadData(); loadShowsData();
-  pushPresencePing(); setInterval(pushPresencePing, 10000);
+  
+  // Heartbeat set to 5 seconds
+  pushPresencePing(); setInterval(pushPresencePing, 5000);
+  
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab; activeTab = tab;
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active'); $( 'tab-' + tab).classList.add('active'); updateCounts();
-      if (tab === 'stats') initStatsTab(); if (tab === 'shows') filterAndRenderShows();
+      
+      // Clear the 5-second interval if leaving the stats tab
+      if (tab !== 'stats' && statsInterval) {
+        clearInterval(statsInterval);
+        statsInterval = null;
+      }
+      
+      if (tab === 'stats') initStatsTab(); 
+      if (tab === 'shows') filterAndRenderShows();
     });
   });
 })();
