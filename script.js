@@ -95,7 +95,6 @@ async function initWithGate() {
       } catch(e) { saveKey(keyStr); triggerServerRetry(); resolve(); }
     }
     
-    // Removed { once: true } so the user can click multiple times if needed
     submitBtn.addEventListener('click', attempt);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
     setTimeout(() => input.focus(), 100);
@@ -322,9 +321,9 @@ const videoEl = $('video-el');
 
 function openMovieViewer(m) {
   currentViewerMovie = m;
-  $('viewer-details').hidden = false;
-  $('viewer-player').hidden = true;
-  viewer.hidden = false;
+  $('viewer-details').style.display = 'block';
+  $('viewer-player').style.display = 'none';
+  viewer.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
   $('viewer-poster').src = m.poster || '';
@@ -348,7 +347,7 @@ function openMovieViewer(m) {
 }
 
 function closeMovieViewer() {
-  viewer.hidden = true;
+  viewer.style.display = 'none';
   if (!videoEl.paused) videoEl.pause();
   videoEl.removeAttribute('src'); videoEl.load();
   document.body.style.overflow = '';
@@ -356,8 +355,8 @@ function closeMovieViewer() {
 }
 
 function playVideo() {
-  $('viewer-details').hidden = true;
-  $('viewer-player').hidden = false;
+  $('viewer-details').style.display = 'none';
+  $('viewer-player').style.display = 'flex';
   videoEl.src = currentViewerMovie.driveLink;
   
   const startTime = getVideoProgress(currentViewerMovie.title);
@@ -393,7 +392,7 @@ videoEl.addEventListener('pause', () => $('ctrl-play-pause').innerHTML = '&#9654
  $('viewer-play-btn').addEventListener('click', playVideo);
  $('viewer-close').addEventListener('click', closeMovieViewer);
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !viewer.hidden) closeMovieViewer(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && viewer.style.display === 'flex') closeMovieViewer(); });
 
 // ─── EVENTS ───────────────────────────────────────────────────
 let searchTimer;
