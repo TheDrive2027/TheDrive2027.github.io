@@ -386,10 +386,12 @@ function saveVideoProgress(title, time, duration) {
 
 let currentViewerMovie = null;
 const viewer = $('movie-viewer');
+const viewerContent = $('viewer-content');
 const videoEl = $('video-el');
 
 function openMovieViewer(m) {
   currentViewerMovie = m;
+  viewerContent.classList.remove('player-active'); // Ensure compact info size
   $('viewer-details').style.display = 'block';
   $('viewer-player').style.display = 'none';
   viewer.style.display = 'flex';
@@ -429,6 +431,7 @@ function openMovieViewer(m) {
 
 function closeMovieViewer() {
   viewer.style.display = 'none';
+  viewerContent.classList.remove('player-active'); // Reset size
   if (!videoEl.paused) videoEl.pause();
   videoEl.removeAttribute('src'); videoEl.load();
   document.body.style.overflow = '';
@@ -438,6 +441,7 @@ function closeMovieViewer() {
 function playVideo() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
+  viewerContent.classList.add('player-active'); // Expand to 80% screen
   videoEl.src = currentViewerMovie.driveLink;
   
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
