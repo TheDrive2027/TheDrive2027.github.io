@@ -226,7 +226,7 @@
         </div>
     </footer>
 
-    <!-- ─── MOVIE VIEWER & PLAYER (Centered Pop-up) ─── -->
+  <!-- ─── MOVIE VIEWER & PLAYER (Centered Pop-up) ─── -->
     <div id="movie-viewer" style="display: none;">
         <div id="viewer-backdrop"></div>
         <div id="viewer-content">
@@ -234,30 +234,56 @@
             
             <!-- Details View -->
             <div id="viewer-details">
-                <div class="viewer-hero">
-                    <img id="viewer-poster" src="" alt="">
-                    <div class="viewer-info">
-                        <h1 id="viewer-title"></h1>
-                        <div id="viewer-meta"></div>
-                        <p id="viewer-plot"></p>
-                        <div id="viewer-cast"></div>
-                        
-                        <div id="viewer-progress-container" style="display:none; margin-top: 20px; max-width: 400px;">
-                            <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:5px;">
-                                <span>PROGRESS</span>
-                                <span id="viewer-progress-time">0:00 / 0:00</span>
+                <div class="viewer-main">
+                    <div class="viewer-hero">
+                        <img id="viewer-poster" src="" alt="">
+                        <div class="viewer-info">
+                            <h1 id="viewer-title"></h1>
+                            <div id="viewer-meta"></div>
+                            <p id="viewer-plot"></p>
+                            <div id="viewer-cast"></div>
+                            
+                            <div id="viewer-progress-container" style="display:none; margin-top: 20px; max-width: 400px;">
+                                <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:5px;">
+                                    <span>PROGRESS</span>
+                                    <span id="viewer-progress-time">0:00 / 0:00</span>
+                                </div>
+                                <div style="height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;">
+                                    <div id="viewer-progress-fill" style="height: 100%; background: var(--accent); width: 0%;"></div>
+                                </div>
                             </div>
-                            <div style="height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;">
-                                <div id="viewer-progress-fill" style="height: 100%; background: var(--accent); width: 0%;"></div>
-                            </div>
-                        </div>
 
-                        <div class="viewer-actions" style="margin-top: 24px;">
-                            <button id="viewer-play-btn">
-                                <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
-                            </button>
+                            <div class="viewer-actions" style="margin-top: 24px;">
+                                <button id="viewer-play-btn">
+                                    <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Reviews Side Panel -->
+                <div class="viewer-reviews">
+                    <div class="review-form">
+                        <h3>REVIEWS & REPORTS</h3>
+                        <select id="review-type" class="sidebar-select" style="width: 100%; margin-bottom: 10px; height: 34px;">
+                            <option value="Comment">Comment</option>
+                            <option value="Error">Report Error</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <textarea id="review-text" placeholder="Leave your thoughts..." rows="3" style="width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 8px; font-family: var(--font-body); font-size: 13px; resize: none; margin-bottom: 10px;"></textarea>
+                        <button id="submit-review-btn" class="sidebar-clear-btn" style="width: 100%; background: var(--accent); color: var(--bg); border-color: var(--accent);">SUBMIT</button>
+                    </div>
+                    <div style="padding: 10px 15px 0; display: flex; gap: 10px; align-items: center;">
+                        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);">FILTER:</span>
+                        <select id="review-filter" class="sidebar-select" style="flex: 1; height: 28px; font-size: 11px;">
+                            <option value="All">All</option>
+                            <option value="Comment">Comments</option>
+                            <option value="Error">Errors</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div id="review-list" class="review-list"></div>
                 </div>
             </div>
 
