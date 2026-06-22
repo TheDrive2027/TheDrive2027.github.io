@@ -1,383 +1,312 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>THE DRIVE — Library</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE DRIVE</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- ACCESS GATE MODAL -->
-  <div class="modal-overlay" id="gate-overlay">
-    <div class="modal-box gate-box">
-      <div class="gate-logo">
-        <span class="logo-mark">▶</span>
-        <span class="gate-logo-text">THE DRIVE</span>
-      </div>
-      <div class="gate-byline">Austin Borchardt</div>
-      <h2 class="modal-title gate-title">ACCESS REQUIRED</h2>
-      <div class="modal-field">
-        <label for="gate-key-input">ACCESS KEY</label>
-        <input type="text" id="gate-key-input" placeholder="XXXX-XXXX-XXXX"
-          autocomplete="off" spellcheck="false" autocapitalize="characters" />
-        <small id="gate-error" class="gate-error" hidden></small>
-      </div>
-      <button class="modal-btn gate-submit-btn" id="gate-submit">ENTER THE DRIVE</button>
-    </div>
-  </div>
+    <!-- Noise Texture Overlay -->
+    <div class="noise"></div>
 
-  <!-- NOISE OVERLAY -->
-  <div class="noise"></div>
-
-  <!-- HEADER -->
-  <header class="site-header">
-    <div class="header-inner">
-      <div class="logo-wrap">
-        <div class="logo">
-          <span class="logo-mark">▶</span>
-          <span class="logo-text">THE DRIVE</span>
+    <!-- ─── ACCESS GATE ─── -->
+    <div id="gate-overlay" class="modal-overlay gate-overlay-hidden">
+        <div class="modal-box gate-box">
+            <div class="gate-logo">
+                <span class="logo-mark">▶</span>
+                <span class="gate-logo-text">THE DRIVE</span>
+            </div>
+            <div class="gate-byline">A CINEMATHEQUE</div>
+            
+            <h2 class="modal-title gate-title">ACCESS REQUIRED</h2>
+            <p class="modal-desc gate-desc">Enter your access key to unlock the archive.</p>
+            
+            <div class="modal-field">
+                <label for="gate-key-input">ACCESS KEY</label>
+                <input id="gate-key-input" type="text" autocomplete="off" spellcheck="false" />
+                <span id="gate-error" class="gate-error" hidden></span>
+            </div>
+            
+            <button id="gate-submit" class="modal-btn gate-submit-btn">ENTER THE DRIVE</button>
         </div>
-        <span class="logo-byline">Austin Borchardt</span>
-      </div>
-      <div class="header-center">
-        <div class="search-wrap">
-          <span class="search-icon">⌕</span>
-          <input type="text" id="search-input" placeholder="Search titles…" autocomplete="off" spellcheck="false" />
-          <button class="clear-search" id="clear-search" title="Clear">✕</button>
-        </div>
-      </div>
-      <div class="header-meta">
-        <span class="meta-updated">UPDATED <span id="last-updated">—</span></span>
-        <span class="dot">·</span>
-        <span id="movie-count">— films</span>
-        <span class="dot">·</span>
-        <span id="available-count">— available</span>
-        <span class="dot">·</span>
-        <span class="online-wrap"><span class="online-dot"></span><span id="online-count">—</span> online</span>
-        <button class="refresh-btn" id="refresh-btn" title="Force refresh">↻</button>
-      </div>
     </div>
 
-    <!-- DONATION PROGRESS BAR -->
-    <div id="donation-bar" style="display:none;" class="donation-bar">
-      <span class="donation-bar-header">Support The Drive</span>
-      <div class="donation-bar-track-wrap">
-        <div class="donation-bar-track">
-          <div class="donation-bar-fill"></div>
+    <!-- ─── HEADER ─── -->
+    <header class="site-header">
+        <div class="header-inner">
+            <div class="logo-wrap">
+                <span class="logo-byline">A CINEMATHEQUE</span>
+                <a class="logo" href="#">
+                    <span class="logo-mark">▶</span>
+                    <span class="logo-text">THE DRIVE</span>
+                </a>
+            </div>
+            
+            <div class="header-center">
+                <div class="search-wrap">
+                    <span class="search-icon">⌕</span>
+                    <input id="search-input" type="text" placeholder="Search films..." autocomplete="off" />
+                    <button id="clear-search" class="clear-search" aria-label="Clear search">✕</button>
+                </div>
+            </div>
+
+            <div class="header-meta">
+                <span class="meta-updated">Updated <span id="last-updated">—</span></span>
+                <span class="dot">·</span>
+                <div class="online-wrap">
+                    <span class="online-dot"></span>
+                    <span id="online-count">0</span> ONLINE
+                </div>
+                <button id="refresh-btn" class="refresh-btn" aria-label="Notifications">↻</button>
+            </div>
         </div>
-        <span class="donation-bar-label">$0 / $0</span>
-      </div>
-      <span class="donation-bar-deadline" style="display:none;"></span>
-      <button class="donation-bar-readmore" id="donation-readmore-btn">READ MORE</button>
+    </header>
+
+    <!-- ─── SCAN BAR ─── -->
+    <div id="scan-bar" class="scan-bar hidden">
+        <span class="scan-patience">SCANNING DRIVE</span>
+        <div class="scan-track">
+            <div id="scan-fill" class="scan-fill"></div>
+        </div>
+        <span class="scan-label">PLEASE WAIT</span>
     </div>
 
-    <!-- TAB NAV -->
+    <!-- ─── TAB NAV ─── -->
     <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="movies">MOVIES</button>
-      <button class="tab-btn" data-tab="shows">SHOWS</button>
-      <button class="tab-btn" data-tab="stats">STATS</button>
+        <button class="tab-btn active" data-tab="movies">MOVIES</button>
+        <button class="tab-btn" data-tab="shows">SHOWS</button>
+        <button class="tab-btn" data-tab="stats">STATS</button>
     </nav>
 
-    <div class="scan-bar" id="scan-bar">
-      <span class="scan-label">SCANNING DRIVE</span>
-      <span class="scan-patience">This may take a while, please be patient</span>
-      <div class="scan-track"><div class="scan-fill" id="scan-fill"></div></div>
-    </div>
-  </header>
+    <!-- ─── MOVIES TAB ─── -->
+    <div id="tab-movies" class="tab-panel active">
+        <div class="movies-layout">
+            
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <div class="sidebar-section">
+                        <div class="sidebar-heading">SORT BY</div>
+                        <div class="sidebar-sort-wrap">
+                            <select id="sort-by" class="sidebar-select">
+                                <option value="title">Title</option>
+                                <option value="year">Year</option>
+                                <option value="imdb">IMDb Rating</option>
+                                <option value="rating">User Rating</option>
+                                <option value="maturity">Maturity</option>
+                                <option value="res">Resolution</option>
+                                <option value="runtime">Runtime</option>
+                            </select>
+                            <button id="sort-dir-btn" class="sort-dir-btn">↓</button>
+                        </div>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <div class="sidebar-heading">MATURITY</div>
+                        <div id="filter-maturity-checks" class="sidebar-checks"></div>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <div class="sidebar-heading">RESOLUTION</div>
+                        <div id="filter-resolution-checks" class="sidebar-checks"></div>
+                    </div>
+                    
+                    <button id="sidebar-clear-btn" class="sidebar-clear-btn" hidden>CLEAR FILTERS</button>
+                </div>
+            </aside>
 
-  <!-- MOVIES TAB -->
-  <div id="tab-movies" class="tab-panel active">
-    <div class="movies-layout">
+            <!-- Main Content -->
+            <main class="main-content" id="main-content">
+                <!-- Row View (Default) -->
+                <div id="row-view" class="view-panel active">
+                    <section class="movie-row-section">
+                        <div class="row-header">
+                            <h2 class="row-title">AVAILABLE FILMS</h2>
+                            <span class="row-subtitle">SORTED BY RATING</span>
+                        </div>
+                        <div class="movie-row-scroll">
+                            <div class="row-scroll-wrapper">
+                                <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="row-available-cards">‹</button>
+                                <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="row-available-cards">›</button>
+                                <div id="row-available-cards" class="movie-row"></div>
+                            </div>
+                        </div>
+                    </section>
 
-      <!-- SIDEBAR -->
-      <aside class="sidebar" id="sidebar">
-        <div class="sidebar-inner">
+                    <section class="movie-row-section" id="row-requested" style="display:none;">
+                        <div class="row-header">
+                            <h2 class="row-title">RECENTLY REQUESTED</h2>
+                        </div>
+                        <div class="movie-row-scroll">
+                            <div class="row-scroll-wrapper">
+                                <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="row-requested-cards">‹</button>
+                                <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="row-requested-cards">›</button>
+                                <div id="row-requested-cards" class="movie-row"></div>
+                            </div>
+                        </div>
+                    </section>
 
-          <!-- SORT -->
-          <div class="sidebar-section">
-            <div class="sidebar-heading">SORT BY</div>
-            <div class="sidebar-sort-wrap">
-              <select id="sort-by" class="sidebar-select">
-                <option value="title">Title</option>
-                <option value="year">Release Year</option>
-                <option value="runtime">Runtime</option>
-                <option value="rating">Top Rated</option>
-                <option value="requests">Top Requested</option>
-                <option value="imdb">IMDb Rating</option>
-              </select>
-              <button class="sort-dir-btn" id="sort-dir-btn" title="Toggle sort direction" aria-label="Sort direction">↓</button>
-            </div>
-          </div>
+                    <section class="movie-row-section">
+                        <div class="row-header">
+                            <h2 class="row-title">TOP RATED</h2>
+                            <span class="row-subtitle">IMDb</span>
+                        </div>
+                        <div class="movie-row-scroll">
+                            <div class="row-scroll-wrapper">
+                                <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="row-imdb-cards">‹</button>
+                                <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="row-imdb-cards">›</button>
+                                <div id="row-imdb-cards" class="movie-row"></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
 
-          <!-- MATURITY -->
-          <div class="sidebar-section">
-            <div class="sidebar-heading">MATURITY</div>
-            <div class="sidebar-checks" id="filter-maturity-checks">
-              <!-- populated by JS -->
-            </div>
-          </div>
-
-          <!-- STATUS -->
-          <div class="sidebar-section">
-            <div class="sidebar-heading">STATUS</div>
-            <div class="sidebar-checks">
-              <label class="check-row">
-                <input type="checkbox" value="Available" data-filter="status" />
-                <span class="check-label">Available</span>
-              </label>
-              <label class="check-row">
-                <input type="checkbox" value="Not Uploaded" data-filter="status" />
-                <span class="check-label">Not Uploaded</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- RESOLUTION -->
-          <div class="sidebar-section">
-            <div class="sidebar-heading">RESOLUTION</div>
-            <div class="sidebar-checks" id="filter-resolution-checks">
-              <!-- populated by JS -->
-            </div>
-          </div>
-
-          <!-- CLEAR FILTERS -->
-          <button class="sidebar-clear-btn" id="sidebar-clear-btn" hidden>CLEAR FILTERS</button>
-
+                <!-- Grid View (Search/Filter Results) -->
+                <div id="grid-view" class="view-panel">
+                    <div class="results-summary" id="results-summary"></div>
+                    <div class="movie-grid" id="movie-grid"></div>
+                    <div id="grid-empty" class="empty-state" hidden>
+                        <span class="empty-icon">◻</span>
+                        <p>No films match your filters.</p>
+                    </div>
+                </div>
+            </main>
         </div>
-      </aside>
-
-      <!-- MAIN CONTENT AREA -->
-      <main class="main-content" id="main-content">
-        <div class="results-summary" id="results-summary"></div>
-
-        <!-- ROW VIEW (default, no filters active) -->
-        <div id="row-view" class="view-panel active">
-
-          <section class="movie-row-section" id="row-available">
-            <div class="row-header">
-              <h2 class="row-title">AVAILABLE</h2>
-              <span class="row-subtitle">Sorted by top rated</span>
-            </div>
-            <div class="row-scroll-wrapper">
-              <button class="row-scroll-btn row-scroll-btn--left" aria-label="Scroll left" data-dir="-1" data-target="row-available-cards">&#8249;</button>
-              <div class="movie-row-scroll">
-                <div class="movie-row" id="row-available-cards"></div>
-              </div>
-              <button class="row-scroll-btn row-scroll-btn--right" aria-label="Scroll right" data-dir="1" data-target="row-available-cards">&#8250;</button>
-            </div>
-          </section>
-
-          <section class="movie-row-section" id="row-requested">
-            <div class="row-header">
-              <h2 class="row-title">MOST REQUESTED</h2>
-              <span class="row-subtitle">Highest request count</span>
-            </div>
-            <div class="row-scroll-wrapper">
-              <button class="row-scroll-btn row-scroll-btn--left" aria-label="Scroll left" data-dir="-1" data-target="row-requested-cards">&#8249;</button>
-              <div class="movie-row-scroll">
-                <div class="movie-row" id="row-requested-cards"></div>
-              </div>
-              <button class="row-scroll-btn row-scroll-btn--right" aria-label="Scroll right" data-dir="1" data-target="row-requested-cards">&#8250;</button>
-            </div>
-          </section>
-
-          <section class="movie-row-section" id="row-imdb">
-            <div class="row-header">
-              <h2 class="row-title">TOP IMDb</h2>
-              <span class="row-subtitle">Highest rated on IMDb</span>
-            </div>
-            <div class="row-scroll-wrapper">
-              <button class="row-scroll-btn row-scroll-btn--left" aria-label="Scroll left" data-dir="-1" data-target="row-imdb-cards">&#8249;</button>
-              <div class="movie-row-scroll">
-                <div class="movie-row" id="row-imdb-cards"></div>
-              </div>
-              <button class="row-scroll-btn row-scroll-btn--right" aria-label="Scroll right" data-dir="1" data-target="row-imdb-cards">&#8250;</button>
-            </div>
-          </section>
-
-        </div>
-
-        <!-- GRID VIEW (shown when filters/search are active) -->
-        <div id="grid-view" class="view-panel">
-          <div class="movie-grid" id="movie-grid"></div>
-          <div class="empty-state" id="grid-empty" hidden>
-            <span class="empty-icon">◻</span><p>No films match your filters.</p>
-          </div>
-        </div>
-
-      </main>
     </div>
-  </div><!-- /tab-movies -->
 
-
-  <!-- SHOWS TAB -->
-  <div id="tab-shows" class="tab-panel">
-    <div class="shows-page">
-      <div class="shows-grid" id="shows-grid">
-        <div class="empty-state"><span class="empty-icon">◻</span><p>Loading shows…</p></div>
-      </div>
-    </div>
-  </div><!-- /tab-shows -->
-
-  <!-- SHOW EPISODE OVERLAY -->
-  <div class="show-overlay" id="show-overlay" hidden>
-    <div class="show-overlay-backdrop" id="show-overlay-backdrop"></div>
-    <div class="show-overlay-panel">
-      <button class="show-overlay-close" id="show-overlay-close" title="Close">✕</button>
-      
-      <div class="show-overlay-sidebar">
-        <div class="show-overlay-info">
-          <div class="show-overlay-title" id="show-overlay-title"></div>
-          <div class="show-overlay-meta" id="show-overlay-meta"></div>
+    <!-- ─── SHOWS TAB ─── -->
+    <div id="tab-shows" class="tab-panel">
+        <div class="shows-page">
+            <div id="shows-grid" class="shows-grid">
+                <div class="empty-state">
+                    <span class="empty-icon">◻</span>
+                    <p>No shows found.</p>
+                </div>
+            </div>
         </div>
-        <div class="show-overlay-seasons" id="show-overlay-seasons"></div>
-      </div>
-
-      <div class="show-overlay-main">
-        <div class="show-overlay-episodes" id="show-overlay-episodes"></div>
-      </div>
-      
     </div>
-  </div>
 
-  <!-- STATS TAB -->
-  <div id="tab-stats" class="tab-panel">
-    <div class="stats-page">
+    <!-- ─── STATS TAB ─── -->
+    <div id="tab-stats" class="tab-panel">
+        <div class="stats-page">
+            <section class="stats-section">
+                <h2 class="stats-heading">LIBRARY OVERVIEW</h2>
+                <div class="upload-progress-wrap">
+                    <div class="upload-progress-labels">
+                        <span class="upload-fraction" id="upload-fraction">0 / 0 movies uploaded</span>
+                        <span class="upload-pct" id="upload-pct">0%</span>
+                    </div>
+                    <div class="upload-track">
+                        <div class="upload-fill" id="upload-fill"></div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><span class="stat-label">TOTAL FILMS</span><span class="stat-value" id="stat-total-films">0</span></div>
+                    <div class="stat-card"><span class="stat-label">AVAILABLE</span><span class="stat-value" id="stat-available">0</span></div>
+                    <div class="stat-card"><span class="stat-label">TOTAL SIZE</span><span class="stat-value" id="stat-total-size">—</span></div>
+                    <div class="stat-card"><span class="stat-label">TOTAL RUNTIME</span><span class="stat-value" id="stat-total-runtime">—</span></div>
+                    <div class="stat-card"><span class="stat-label">AVG IMDb</span><span class="stat-value" id="stat-avg-imdb">—</span></div>
+                    <div class="stat-card"><span class="stat-label">UNIQUE USERS</span><span class="stat-value" id="stat-total-users">0</span></div>
+                    <div class="stat-card"><span class="stat-label">RATED G</span><span class="stat-value" id="stat-g">0</span></div>
+                    <div class="stat-card"><span class="stat-label">RATED PG</span><span class="stat-value" id="stat-pg">0</span></div>
+                    <div class="stat-card"><span class="stat-label">RATED PG-13</span><span class="stat-value" id="stat-pg13">0</span></div>
+                    <div class="stat-card"><span class="stat-label">RATED R</span><span class="stat-value" id="stat-r">0</span></div>
+                </div>
+            </section>
 
-      <section class="stats-section">
-        <h2 class="stats-heading">UPLOAD PROGRESS</h2>
-        <div class="upload-progress-wrap">
-          <div class="upload-progress-labels">
-            <span class="upload-fraction" id="upload-fraction">— / — films uploaded</span>
-            <span class="upload-pct" id="upload-pct">—%</span>
-          </div>
-          <div class="upload-track">
-            <div class="upload-fill" id="upload-fill"></div>
-          </div>
+            <section class="stats-section">
+                <h2 class="stats-heading">LIBRARY GROWTH</h2>
+                <div class="chart-wrap"><canvas id="chart-library"></canvas></div>
+            </section>
+
+            <section class="stats-section">
+                <h2 class="stats-heading">USER GROWTH</h2>
+                <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
+            </section>
+
+            <section class="stats-section">
+                <h2 class="stats-heading">ONLINE USERS (LAST 24H)</h2>
+                <div class="chart-wrap"><canvas id="chart-presence"></canvas></div>
+            </section>
         </div>
-      </section>
+    </div>
 
-      <section class="stats-section">
-        <h2 class="stats-heading">ONLINE HISTORY</h2>
-        <p class="stats-subheading">Concurrent users online, sampled every 10 seconds</p>
-        <div class="chart-wrap"><canvas id="chart-presence"></canvas></div>
-      </section>
-
-      <section class="stats-section">
-        <h2 class="stats-heading">USER GROWTH</h2>
-        <p class="stats-subheading">Total unique users, recorded daily</p>
-        <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
-      </section>
-
-      <section class="stats-section">
-        <h2 class="stats-heading">LIBRARY GROWTH</h2>
-        <p class="stats-subheading">Daily snapshot — total vs. available films</p>
-        <div class="chart-wrap"><canvas id="chart-library"></canvas></div>
-      </section>
-
-      <section class="stats-section">
-        <h2 class="stats-heading">LIBRARY STATS</h2>
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-label">TOTAL FILMS</div><div class="stat-value" id="stat-total-films">—</div></div>
-          <div class="stat-card"><div class="stat-label">AVAILABLE</div><div class="stat-value" id="stat-available">—</div></div>
-          <div class="stat-card"><div class="stat-label">TOTAL USERS</div><div class="stat-value" id="stat-total-users">—</div></div>
-          <div class="stat-card"><div class="stat-label">TOTAL SIZE</div><div class="stat-value" id="stat-total-size">—</div></div>
-          <div class="stat-card"><div class="stat-label">TOTAL RUNTIME</div><div class="stat-value" id="stat-total-runtime">—</div></div>
-          <div class="stat-card"><div class="stat-label">AVG IMDb</div><div class="stat-value" id="stat-avg-imdb">—</div></div>
-          <div class="stat-card"><div class="stat-label">RATED G</div><div class="stat-value" id="stat-g">—</div></div>
-          <div class="stat-card"><div class="stat-label">RATED PG</div><div class="stat-value" id="stat-pg">—</div></div>
-          <div class="stat-card"><div class="stat-label">RATED PG-13</div><div class="stat-value" id="stat-pg13">—</div></div>
-          <div class="stat-card"><div class="stat-label">RATED R</div><div class="stat-value" id="stat-r">—</div></div>
-          <div class="stat-card"><div class="stat-label">4K FILMS</div><div class="stat-value" id="stat-4k">—</div></div>
-          <div class="stat-card"><div class="stat-label">1080p FILMS</div><div class="stat-value" id="stat-1080">—</div></div>
+    <!-- ─── FOOTER ─── -->
+    <footer class="site-footer-bar">
+        <div class="site-footer-inner">
+            <div class="footer-brand">
+                <span class="footer-logo-mark">▶</span>
+                <div>
+                    <span class="footer-logo-text">THE DRIVE</span>
+                    <span class="footer-byline">A CINEMATHEQUE</span>
+                </div>
+            </div>
+            <div class="footer-form-wrap">
+                <div class="footer-form-label">LEAVE FEEDBACK OR REQUEST A FILM</div>
+                <form class="footer-form" onsubmit="return false;">
+                    <input id="footer-name" type="text" placeholder="Name (optional)" />
+                    <textarea id="footer-message" placeholder="Message..." rows="2"></textarea>
+                    <button id="footer-submit" class="footer-submit-btn" type="button">SEND</button>
+                    <span id="footer-form-status" class="footer-form-status" hidden></span>
+                </form>
+            </div>
         </div>
-      </section>
+    </footer>
 
-    </div>
-  </div><!-- /tab-stats -->
-
-  <!-- DONATION MODAL -->
-  <div class="modal-overlay donation-modal-overlay" id="donation-modal-overlay" style="display:none;">
-    <div class="modal-box donation-modal-box">
-      <button class="donation-modal-close" id="donation-modal-close">✕</button>
-      <div class="gate-logo">
-        <span class="logo-mark">▶</span>
-        <span class="gate-logo-text">THE DRIVE</span>
-      </div>
-      <h2 class="modal-title" id="donation-modal-header">Support The Drive</h2>
-      <p class="donation-modal-deadline" id="donation-modal-deadline" style="display:none;"></p>
-      <p class="donation-modal-body" id="donation-modal-body"></p>
-    </div>
-  </div>
-
-  <!-- TOAST -->
-  <div class="toast" id="toast"></div>
-
-  <!-- FOOTER -->
-  <footer class="site-footer-bar">
-    <div class="site-footer-inner">
-      <div class="footer-brand">
-        <span class="footer-logo-mark">▶</span>
-        <span class="footer-logo-text">THE DRIVE</span>
-        <span class="footer-byline">Austin Borchardt</span>
-      </div>
-      <div class="footer-form-wrap">
-        <p class="footer-form-label">LEAVE A COMMENT OR QUESTION</p>
-        <div class="footer-form">
-          <input type="text" id="footer-name" placeholder="Your name (optional)" autocomplete="off" spellcheck="false" />
-          <textarea id="footer-message" placeholder="Message, question, request anything…" rows="3" spellcheck="false"></textarea>
-          <button class="footer-submit-btn" id="footer-submit">SEND</button>
-          <small class="footer-form-status" id="footer-form-status" hidden></small>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <div class="req-tooltip" id="req-tooltip" hidden></div>
-
-  <script src="script.js"></script>
-  <!-- Movie Viewer & Player Overlay -->
-<div id="movie-viewer" hidden>
-    <div id="viewer-backdrop"></div>
-    <div id="viewer-content">
-        <button id="viewer-close" aria-label="Close">&times;</button>
-        
-        <!-- Details View -->
-        <div id="viewer-details">
-            <div class="viewer-hero">
-                <img id="viewer-poster" src="" alt="">
-                <div class="viewer-info">
-                    <h1 id="viewer-title"></h1>
-                    <div id="viewer-meta"></div>
-                    <p id="viewer-plot"></p>
-                    <div id="viewer-cast"></div>
-                    <div class="viewer-actions">
-                        <button id="viewer-play-btn">
-                            <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
-                        </button>
+    <!-- ─── MOVIE VIEWER & PLAYER ─── -->
+    <div id="movie-viewer" style="display: none;">
+        <div id="viewer-backdrop"></div>
+        <div id="viewer-content">
+            <button id="viewer-close" aria-label="Close">&times;</button>
+            
+            <!-- Details View -->
+            <div id="viewer-details">
+                <div class="viewer-hero">
+                    <img id="viewer-poster" src="" alt="">
+                    <div class="viewer-info">
+                        <h1 id="viewer-title"></h1>
+                        <div id="viewer-meta"></div>
+                        <p id="viewer-plot"></p>
+                        <div id="viewer-cast"></div>
+                        <div class="viewer-actions">
+                            <button id="viewer-play-btn">
+                                <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Video Player View -->
-        <div id="viewer-player" hidden>
-            <video id="video-el" preload="metadata" playsinline></video>
-            <div class="custom-controls">
-                <button id="ctrl-play-pause" class="ctrl-btn">&#9654;</button>
-                <div id="ctrl-progress-track">
-                    <div id="ctrl-progress-played"></div>
+            <!-- Video Player View -->
+            <div id="viewer-player" style="display: none;">
+                <video id="video-el" preload="metadata" playsinline></video>
+                <div class="custom-controls">
+                    <button id="ctrl-play-pause" class="ctrl-btn">&#9654;</button>
+                    <div id="ctrl-progress-track">
+                        <div id="ctrl-progress-played"></div>
+                    </div>
+                    <span id="ctrl-time">0:00 / 0:00</span>
+                    <button id="ctrl-fullscreen" class="ctrl-btn">⛶</button>
                 </div>
-                <span id="ctrl-time">0:00 / 0:00</span>
-                <button id="ctrl-fullscreen" class="ctrl-btn">⛶</button>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- ─── TOASTS & TOOLTIPS ─── -->
+    <div id="toast" class="toast"></div>
+    <div id="req-tooltip" class="req-tooltip" hidden></div>
+
+    <!-- ─── SCRIPTS ─── -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
