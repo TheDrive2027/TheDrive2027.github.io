@@ -119,6 +119,11 @@
                         <div class="sidebar-heading">RESOLUTION</div>
                         <div id="filter-resolution-checks" class="sidebar-checks"></div>
                     </div>
+
+                    <div class="sidebar-section">
+                        <div class="sidebar-heading">GENRES</div>
+                        <div id="filter-genre-checks" class="sidebar-checks"></div>
+                    </div>
                     
                     <button id="sidebar-clear-btn" class="sidebar-clear-btn" hidden>CLEAR FILTERS</button>
                 </div>
@@ -127,48 +132,7 @@
             <!-- Main Content -->
             <main class="main-content" id="main-content">
                 <!-- Row View (Default) -->
-                <div id="row-view" class="view-panel active">
-                    <section class="movie-row-section">
-                        <div class="row-header">
-                            <h2 class="row-title">AVAILABLE FILMS</h2>
-                            <span class="row-subtitle">SORTED BY RATING</span>
-                        </div>
-                        <div class="movie-row-scroll">
-                            <div class="row-scroll-wrapper">
-                                <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="row-available-cards">‹</button>
-                                <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="row-available-cards">›</button>
-                                <div id="row-available-cards" class="movie-row"></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="movie-row-section" id="row-requested" style="display:none;">
-                        <div class="row-header">
-                            <h2 class="row-title">RECENTLY REQUESTED</h2>
-                        </div>
-                        <div class="movie-row-scroll">
-                            <div class="row-scroll-wrapper">
-                                <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="row-requested-cards">‹</button>
-                                <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="row-requested-cards">›</button>
-                                <div id="row-requested-cards" class="movie-row"></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="movie-row-section">
-                        <div class="row-header">
-                            <h2 class="row-title">TOP RATED</h2>
-                            <span class="row-subtitle">IMDb</span>
-                        </div>
-                        <div class="movie-row-scroll">
-                            <div class="row-scroll-wrapper">
-                                <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="row-imdb-cards">‹</button>
-                                <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="row-imdb-cards">›</button>
-                                <div id="row-imdb-cards" class="movie-row"></div>
-                            </div>
-                        </div>
-                    </section>
-                </div>
+                <div id="row-view" class="view-panel active"></div>
 
                 <!-- Grid View (Search/Filter Results) -->
                 <div id="grid-view" class="view-panel">
@@ -262,7 +226,7 @@
         </div>
     </footer>
 
-    <!-- ─── MOVIE VIEWER & PLAYER ─── -->
+    <!-- ─── MOVIE VIEWER & PLAYER (Centered Pop-up) ─── -->
     <div id="movie-viewer" style="display: none;">
         <div id="viewer-backdrop"></div>
         <div id="viewer-content">
@@ -277,7 +241,18 @@
                         <div id="viewer-meta"></div>
                         <p id="viewer-plot"></p>
                         <div id="viewer-cast"></div>
-                        <div class="viewer-actions">
+                        
+                        <div id="viewer-progress-container" style="display:none; margin-top: 20px; max-width: 400px;">
+                            <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:5px;">
+                                <span>PROGRESS</span>
+                                <span id="viewer-progress-time">0:00 / 0:00</span>
+                            </div>
+                            <div style="height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;">
+                                <div id="viewer-progress-fill" style="height: 100%; background: var(--accent); width: 0%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="viewer-actions" style="margin-top: 24px;">
                             <button id="viewer-play-btn">
                                 <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
                             </button>
