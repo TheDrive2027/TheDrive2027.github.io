@@ -157,9 +157,38 @@ function formatTime(sec) {
   return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
 }
 
-// ─── SHOWS (Local Stubs) ──────────────────────────────────────
-async function loadShowsData() { allShows = []; renderShows(); }
-function renderShows() { const c = document.getElementById('shows-grid'); if (c) c.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No shows found.</p></div>'; updateCounts(); }
+// ─── SHOWS DATA ───────────────────────────────────────────────
+async function loadShowsData() {
+  try {
+    const r = await fetch(`${API_BASE}/shows?_cb=` + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const videos = await r.json();
+    allShows = videos.map(v => ({
+      title: v.title, runtime: v.runtime || '', resolution: v.resolution || '', maturityRating: v.maturityRating || '',
+      year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
+      driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null
+    }));
+  } catch(e) {
+    allShows = [];
+  }
+  renderShows();
+}
+
+function renderShows() {
+  const container = document.getElementById('shows-grid');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!allShows.length) {
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No shows found.</p></div>';
+    return;
+  }
+  container.className = 'movie-grid';
+  const frag = document.createDocumentFragment();
+  allShows.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
+  container.appendChild(frag);
+  updateCounts();
+}
+
 function filterAndRenderShows() { renderShows(); }
 
 // ─── SIDEBAR FILTERS ──────────────────────────────────────────
@@ -193,8 +222,8 @@ function bindSidebarCheckboxes() {
 function updateClearBtn() { if (sidebarClearBtn) sidebarClearBtn.hidden = !(activeFilters.maturity.size > 0 || activeFilters.status.size > 0 || activeFilters.resolution.size > 0 || activeFilters.genre.size > 0); }
 function clearAllFilters() { activeFilters.maturity.clear(); activeFilters.status.clear(); activeFilters.resolution.clear(); activeFilters.genre.clear(); if (searchInput) { searchInput.value = ''; clearSearch && clearSearch.classList.remove('visible'); } document.querySelectorAll('.sidebar-checks input[type="checkbox"]').forEach(cb => cb.checked = false); updateClearBtn(); render(); saveSettings(); }
 function updateCounts() {
-  const totalMovies = allMovies.length, totalEps = 0;
-  let totalText = activeTab === 'shows' ? totalEps + ' Episodes' : activeTab === 'stats' ? (totalMovies + totalEps) + ' Files' : totalMovies + ' Movies';
+  const totalMovies = allMovies.length, totalEps = allShows.length;
+  let totalText = activeTab === 'shows' ? totalEps + ' Shows' : activeTab === 'stats' ? (totalMovies + totalEps) + ' Files' : totalMovies + ' Movies';
   if (movieCount) movieCount.textContent = totalText;
   if (availCount) availCount.style.display = 'none';
 }
@@ -247,10 +276,10 @@ function createRowHtml(id, title, subtitle) {
         <h2 class="row-title">${title}</h2>
         ${subtitle ? `<span class="row-subtitle">${subtitle}</span>` : ''}
       </div>
-      <div class="movie-row-scroll">
-        <div class="row-scroll-wrapper">
-          <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="${id}">‹</button>
-          <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="${id}">›</button>
+      <div class="row-scroll-wrapper">
+        <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="${id}">‹</button>
+        <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="${id}">›</button>
+        <div class="movie-row-scroll">
           <div id="${id}" class="movie-row"></div>
         </div>
       </div>
@@ -456,7 +485,6 @@ function playVideo() {
   }, { once: true });
 }
 
-// Live smooth progress bar using requestAnimationFrame
 function updateProgressBar() {
   if (videoEl.duration) {
     const pct = (videoEl.currentTime / videoEl.duration) * 100;
@@ -466,19 +494,16 @@ function updateProgressBar() {
   progressRaf = requestAnimationFrame(updateProgressBar);
 }
 
-// Save progress to localStorage quietly in background
 videoEl.addEventListener('timeupdate', () => {
   if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime, videoEl.duration);
 });
 
-// Click video to play/pause
 videoEl.addEventListener('click', (e) => {
   e.stopPropagation();
   if (videoEl.paused) videoEl.play(); 
   else videoEl.pause();
 });
 
-// Custom Control Listeners
  $('ctrl-play-pause').addEventListener('click', (e) => {
   e.stopPropagation();
   if (videoEl.paused) videoEl.play(); 
@@ -491,7 +516,7 @@ videoEl.addEventListener('play', () => {
 videoEl.addEventListener('pause', () => {
   $('ctrl-play-pause').innerHTML = '&#9654;';
   if (progressRaf) { cancelAnimationFrame(progressRaf); progressRaf = null; }
-  updateProgressBar(); // Update one last time on pause
+  updateProgressBar();
 });
  $('ctrl-progress-track').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -508,18 +533,14 @@ videoEl.addEventListener('pause', () => {
  $('viewer-close').addEventListener('click', closeMovieViewer);
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
 
-// Keyboard Shortcuts for Video Player
 let seekInterval = null;
 let seekTimeout = null;
 
 document.addEventListener('keydown', (e) => {
-  // Close viewer on Escape
   if (e.key === 'Escape' && viewer.style.display === 'flex') {
     closeMovieViewer();
     return;
   }
-
-  // Ignore other shortcuts if player isn't open or user is typing
   if (viewer.style.display !== 'flex' || $('viewer-player').style.display === 'none') return;
   const tag = e.target.tagName.toLowerCase();
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -530,7 +551,6 @@ document.addEventListener('keydown', (e) => {
   } else if (e.code === 'ArrowRight' && !e.repeat) {
     e.preventDefault();
     videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 5);
-    // Start fast forward if held
     seekTimeout = setTimeout(() => {
       seekInterval = setInterval(() => {
         videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 2);
@@ -539,7 +559,6 @@ document.addEventListener('keydown', (e) => {
   } else if (e.code === 'ArrowLeft' && !e.repeat) {
     e.preventDefault();
     videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
-    // Start rewind if held
     seekTimeout = setTimeout(() => {
       seekInterval = setInterval(() => {
         videoEl.currentTime = Math.max(0, videoEl.currentTime - 2);
@@ -558,7 +577,6 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
-// Comments Logic
 async function fetchComments(title) {
   try {
     const res = await fetch(`${API_BASE}/api/comments?title=${encodeURIComponent(title)}`);
@@ -724,16 +742,16 @@ function initStatsTab() {
 }
 
 function renderLocalStats() {
-  if (!allMovies.length) return;
-  const t = allMovies.length;
-  if ($('upload-fraction')) $('upload-fraction').textContent = t + ' movies uploaded';
+  if (!allMovies.length && !allShows.length) return;
+  const t = allMovies.length + allShows.length;
+  if ($('upload-fraction')) $('upload-fraction').textContent = t + ' files uploaded';
   if ($('upload-pct')) $('upload-pct').textContent = '100%';
   if ($('upload-fill')) $('upload-fill').style.width = '100%';
   setText('stat-total-films', t);
   if ($('stat-available')?.parentElement) $('stat-available').parentElement.style.display = 'none';
-  let m = 0; allMovies.forEach(v => { m += parseRuntimeMinutes(v.runtime); });
+  let m = 0; allMovies.forEach(v => { m += parseRuntimeMinutes(v.runtime); }); allShows.forEach(v => { m += parseRuntimeMinutes(v.runtime); });
   if (m > 0) setText('stat-total-runtime', Math.floor(m / 60) + 'h ' + (m % 60) + 'm');
-  const r = allMovies.filter(v => parseFloat(v.imdbRating) > 0);
+  const r = [...allMovies, ...allShows].filter(v => parseFloat(v.imdbRating) > 0);
   if (r.length) setText('stat-avg-imdb', '★ ' + (r.reduce((s, v) => s + parseFloat(v.imdbRating), 0) / r.length).toFixed(1));
 }
 function setText(id, v) { const e = $(id); if (e) e.textContent = String(v); }
