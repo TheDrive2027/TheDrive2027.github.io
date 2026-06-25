@@ -3,79 +3,346 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Drive - Local Archive</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>THE DRIVE</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- Noise Texture Overlay -->
     <div class="noise"></div>
-    
+
+    <!-- ─── ACCESS GATE ─── -->
+    <div id="gate-overlay" class="modal-overlay gate-overlay-hidden">
+        <div class="modal-box gate-box">
+            <div class="gate-logo">
+                <span class="logo-mark">▶</span>
+                <span class="gate-logo-text">THE DRIVE</span>
+            </div>
+            <div class="gate-byline">AUSTIN BORCHARDT</div>
+            
+            <h2 class="modal-title gate-title">ACCESS REQUIRED</h2>
+            <p class="modal-desc gate-desc">Enter your access key to unlock the archive.</p>
+            
+            <div class="modal-field">
+                <label for="gate-key-input">ACCESS KEY</label>
+                <input id="gate-key-input" type="text" autocomplete="off" spellcheck="false" />
+                <span id="gate-error" class="gate-error" hidden></span>
+            </div>
+            
+            <button id="gate-submit" class="modal-btn gate-submit-btn">ENTER THE DRIVE</button>
+        </div>
+    </div>
+
     <div class="app-layout">
-        <!-- STREMIO-STYLE SIDEBAR -->
-        <nav class="sidebar">
-            <div class="sidebar-logo">
-                <span class="logo-mark">◉</span>
+        <!-- ─── STREMIO-STYLE MAIN SIDEBAR ─── -->
+        <nav class="main-nav">
+            <div class="nav-logo">
+                <span class="logo-mark">▶</span>
             </div>
             <ul class="nav-items">
                 <li class="nav-btn active" data-view="home">
                     <svg viewBox="0 0 512 512"><path d="M260.4 99a7.983 7.983 0 0 0-5.55-2.25c-2.072 0-4.063 0.81-5.55 2.25l-184.8 176.5a7.944 7.944 0 0 0-2.5 5.8v165.7a32.137 32.137 0 0 0 9.41 22.69 32.133 32.133 0 0 0 22.69 9.41h96.5a16.1 16.1 0 0 0 11.384-4.72 16.071 16.071 0 0 0 4.716-11.38v-136.5a8.024 8.024 0 0 1 8-8H295a8.024 8.024 0 0 1 8 8v136.5c-0.002 2.12 0.412 4.21 1.22 6.16a16.004 16.004 0 0 0 3.49 5.23 16.091 16.091 0 0 0 11.39 4.71h96.4c8.51-0.01 16.67-3.39 22.69-9.41s9.4-14.18 9.41-22.69v-165.7c0-1.09-0.22-2.16-0.65-3.16-0.43-1-1.06-1.9-1.85-2.64l-184.7-176.5Z" style="fill:currentcolor"></path></svg>
                     <span class="label">Home</span>
                 </li>
-                <li class="nav-btn" data-view="discover">
-                    <svg viewBox="0 0 512 512"><path d="M256 48c-114.7 0-208 93.3-208 208s93.3 208 208 208 208-93.3 208-208-93.3-208-208-208Zm105.1 113.4l-46.9 117.2a63.001 63.001 0 0 1-14.2 21.5 66.036 66.036 0 0 1-21.5 14.2l-117.2 46.9c-1.46 0.59-3.06 0.73-4.6 0.4a8.737 8.737 0 0 1-4.1-2.2 7.82 7.82 0 0 1-2.2-4.1c-0.32-1.54-0.18-3.14 0.4-4.6l46.9-117.2c3.2-8.07 8.04-15.39 14.2-21.5a66.036 66.036 0 0 1 21.5-14.2l117.2-46.9c1.46-0.58 3.06-0.72 4.6-0.4 1.54 0.35 2.96 1.11 4.1 2.2a7.82 7.82 0 0 1 2.2 4.1c0.32 1.54 0.18 3.14-0.4 4.6Z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Discover</span>
+                <li class="nav-btn" data-view="movies">
+                    <svg viewBox="0 0 512 512"><path d="M435.79999999999995 80.19999999999982h-360a44.028 44.028 0 0 0-31.1 12.9 44.028 44.028 0 0 0-12.9 31.1v264a44.028 44.028 0 0 0 12.9 31.1 44.028 44.028 0 0 0 31.1 12.9h360a44.028 44.028 0 0 0 31.1-12.9 44.028 44.028 0 0 0 12.9-31.1v-264a44.028 44.028 0 0 0-12.9-31.1 44.028 44.028 0 0 0-31.1-12.9Zm-324 308a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Zm0-80a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Zm0-80a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Zm0-80a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Z" style="fill:currentcolor"></path></svg>
+                    <span class="label">Movies</span>
                 </li>
-                <li class="nav-btn" data-view="library">
+                <li class="nav-btn" data-view="shows">
                     <svg viewBox="0 0 512 512"><path d="M419.0999999999999 448h-326.3a45.06 45.06 0 0 1-31.7-13.2 45.042 45.042 0 0 1-13.2-31.7v-198.3a45.06 45.06 0 0 1 13.2-31.7 45.102 45.102 0 0 1 31.7-13.2h326.3a44.484 44.484 0 0 1 31.7 13.2 45.309 45.309 0 0 1 13.2 31.7V403.0999999999999a45.042 45.042 0 0 1-13.2 31.7 45.06 45.06 0 0 1-31.7 13.2Z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Library</span>
+                    <span class="label">Shows</span>
                 </li>
                 <li class="nav-btn" data-view="calendar">
                     <svg viewBox="0 0 512 512"><path d="M480 128a64.034 64.034 0 0 0-18.76-45.24c-12-12-28.27-18.75-45.24-18.76h-16v-15.6c0-8.6-6.6-16-15.2-16.4-4.24-0.18-8.37 1.31-11.52 4.16a16.126 16.126 0 0 0-5.28 11.04v16.8h-224v-15.6c0-8.6-6.6-16-15.2-16.4-4.24-0.18-8.37 1.31-11.52 4.16a16.126 16.126 0 0 0-5.28 11.04v16.8h-16a64.034 64.034 0 0 0-45.24 18.76c-12 12-18.75 28.27-18.76 45.24v12a4.014 4.014 0 0 0 4 4h440a4.014 4.014 0 0 0 4-4v-12Z" style="fill:currentcolor"></path><path d="M32 416a64.034 64.034 0 0 0 18.76 45.24c12 12 28.27 18.75 45.24 18.76h320a64.034 64.034 0 0 0 45.24-18.76c12-12 18.75-28.27 18.76-45.24v-237c0.01-0.4-0.06-0.79-0.21-1.16-0.15-0.37-0.37-0.7-0.65-0.98s-0.61-0.5-0.98-0.65c-0.37-0.15-0.76-0.22-1.16-0.21h-442c-0.4-0.01-0.79 0.06-1.16 0.21-0.37 0.15-0.7 0.37-0.98 0.65s-0.5 0.61-0.65 0.98c-0.15 0.37-0.22 0.76-0.21 1.16v237Z" style="fill:currentcolor"></path></svg>
                     <span class="label">Calendar</span>
                 </li>
-                <li class="nav-btn" data-view="settings">
-                    <svg viewBox="0 0 512 512"><path d="M256 112a143.957 143.957 0 0 1 139.4 108.1c0.58 2.36 0.62 4.82 0.1 7.2-0.52 2.36-1.55 4.57-3 6.5-1.48 1.92-3.4 3.47-5.6 4.5a15.578 15.578 0 0 1-7 1.6h-105.2a16.271 16.271 0 0 1-14-8.1l-52.1-91.7a16.753 16.753 0 0 1-2.1-7c-0.1-2.46 0.31-4.91 1.2-7.2 0.92-2.29 2.4-4.32 4.3-5.9a15.8 15.8 0 0 1 6.4-3.4c12.3-3.03 24.93-4.57 37.6-4.6Z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Settings</span>
+                <li class="nav-btn" data-view="stats">
+                    <svg viewBox="0 0 512 512"><path d="M464 250a9.996 9.996 0 0 0-2.9-6.7 10.795 10.795 0 0 0-6.5-3.3l-25.6-4.2a5.867 5.867 0 0 1-3-1.6 5.693 5.693 0 0 1-1.5-3.1c-0.5-3.2-1-6.4-1.7-9.5a5.36 5.36 0 0 1 0.4-3.3 6.633 6.633 0 0 1 2.2-2.5l22.8-12.7c2.26-1.16 4.01-3.12 4.9-5.5 0.93-2.37 0.97-5 0.1-7.4l-3.9-10.9a10.6 10.6 0 0 0-4.8-5.6 10.285 10.285 0 0 0-7.3-0.9l-25.5 5c-1.16 0.18-2.34 0.01-3.4-0.5a5.34 5.34 0 0 1-2.4-2.3c-1.5-2.8-3.1-5.6-4.8-8.4-0.6-0.99-0.88-2.14-0.8-3.3 0.07-1.18 0.53-2.3 1.3-3.2l17-19.6c1.69-1.87 2.68-4.28 2.8-6.8 0.08-2.52-0.78-4.97-2.4-6.9l-7.4-8.9a10.298 10.298 0 0 0-13.6-2l-22.4 13.4c-1 0.58-2.15 0.83-3.3 0.7a5.24 5.24 0 0 1-3.1-1.4c-2.5-2.2-5-4.3-7.4-6.2a5.428 5.428 0 0 1-1.9-2.8c-0.28-1.13-0.21-2.31 0.2-3.4l9.3-24.4c0.99-2.33 1.1-4.95 0.31-7.36s-2.43-4.45-4.61-5.74l-10.1-5.9a10.34 10.34 0 0 0-7.3-1.2 9.96 9.96 0 0 0-6.2 4l-16.4 20.5a5.24 5.24 0 0 1-2.5 1.9c-1.02 0.33-2.13 0.26-3.1-0.2-0.6-0.2-5.8-2.4-9.8-3.7a5.508 5.508 0 0 1-2.7-2 5.31 5.31 0 0 1-1-3.2l0.4-26.1c0.15-2.55-0.63-5.08-2.2-7.1-1.55-2.01-3.8-3.36-6.3-3.8l-11.4-2c-2.49-0.4-5.04 0.09-7.2 1.4a10.49 10.49 0 0 0-4.5 5.8l-8.5 24.8a5.12 5.12 0 0 1-2.1 2.7c-0.98 0.64-2.13 0.96-3.3 0.9h-9.8c-1.15 0.04-2.28-0.31-3.2-1-0.97-0.66-1.7-1.6-2.1-2.7l-8.5-24.7c-0.71-2.43-2.32-4.51-4.5-5.8-2.16-1.3-4.71-1.79-7.2-1.4l-11.5 2c-2.48 0.48-4.72 1.83-6.3 3.8a9.968 9.968 0 0 0-2.2 7l0.4 26.2c0.01 1.19-0.4 2.34-1.1 3.3-0.73 0.91-1.7 1.61-2.8 2-2.3 0.9-7.3 2.8-9.5 3.6-2 0.7-4.2-0.1-5.9-2.1l-16.3-20a9.96 9.96 0 0 0-6.2-4c-2.49-0.5-5.07-0.11-7.3 1.1l-10.1 5.8c-2.23 1.29-3.9 3.35-4.7 5.8-0.82 2.43-0.68 5.08 0.4 7.4l9.2 24.3c0.43 1.09 0.47 2.29 0.1 3.4-0.28 1.1-0.91 2.09-1.8 2.8-2.4 2-4.9 4-7.4 6.2-0.86 0.78-1.94 1.27-3.09 1.4-1.15 0.13-2.31-0.12-3.31-0.7l-22.1-13.7a10.68 10.68 0 0 0-7.2-1.6c-2.51 0.36-4.79 1.64-6.4 3.6l-7.4 8.9a10.224 10.224 0 0 0-2.4 6.9c0.1 2.53 1.09 4.94 2.8 6.8l17.1 19.6c0.77 0.9 1.23 2.02 1.3 3.2a5.47 5.47 0 0 1-0.8 3.3c-1.7 2.7-3.3 5.6-4.8 8.4a5.793 5.793 0 0 1-2.5 2.4c-1.05 0.51-2.24 0.69-3.4 0.5l-25.5-4.9a10.21 10.21 0 0 0-7.31 0.91c-2.24 1.2-3.94 3.19-4.79 5.59l-4 10.9c-0.92 2.39-0.88 5.04 0.1 7.4 0.92 2.36 2.66 4.31 4.9 5.5l22.8 12.7c1.01 0.57 1.81 1.45 2.3 2.5 0.49 1.06 0.6 2.27 0.3 3.4l-0.2 1.3c-0.5 2.8-1 5.4-1.5 8.2a5.716 5.716 0 0 1-1.5 3c-0.81 0.84-1.86 1.4-3 1.6l-25.7 4.2c-2.51 0.3-4.82 1.51-6.5 3.4a10.22 10.22 0 0 0-2.6 6.9v11.6c-0.01 2.54 0.91 4.99 2.59 6.89 1.67 1.9 3.99 3.11 6.51 3.41l25.7 4.1c1.15 0.18 2.21 0.75 3 1.6 0.81 0.85 1.33 1.94 1.5 3.1 0.5 3.2 1 6.4 1.7 9.5 0.21 1.15 0.08 2.33-0.4 3.4a6.633 6.633 0 0 1-2.2 2.5l-22.8 12.7a10.203 10.203 0 0 0-4.9 5.5c-0.88 2.38-0.92 5-0.1 7.4l4 10.9a10.6 10.6 0 0 0 4.8 5.6c2.24 1.19 4.84 1.52 7.3 0.9l25.6-4.9c1.16-0.23 2.36-0.05 3.4 0.5 1.02 0.5 1.86 1.3 2.4 2.3 1.5 2.8 3.1 5.6 4.8 8.4 0.6 0.99 0.88 2.14 0.8 3.3a5.39 5.39 0 0 1-1.3 3.2l-17 19.6a10.312 10.312 0 0 0-0.5 13.8l7.4 8.9a10.298 10.298 0 0 0 13.6 2l22.4-13.4c1-0.58 2.15-0.83 3.3-0.7 1.16 0.11 2.25 0.6 3.1 1.4 2.5 2.2 5 4.3 7.4 6.2 0.92 0.71 1.58 1.69 1.9 2.8 0.32 1.12 0.28 2.3-0.1 3.4l-9.3 24.4c-0.99 2.33-1.1 4.95-0.31 7.36s2.43 4.45 4.61 5.74l10.1 5.8c2.2 1.29 4.8 1.71 7.3 1.2a9.96 9.96 0 0 0 6.2-4l16.6-20.3c1.4-1.7 3.6-2.5 5.2-1.8 3.5 1.4 5.8 2.2 9.9 3.6 1.09 0.37 2.03 1.07 2.7 2a5.31 5.31 0 0 1 1 3.2l-0.4 26.1a11.3 11.3 0 0 0 2.2 7.1c1.55 2.01 3.8 3.36 6.3 3.8l11.4 2c2.49 0.41 5.04-0.09 7.2-1.4 2.18-1.29 3.79-3.37 4.5-5.8l8.5-24.8a5.12 5.12 0 0 1 2.1-2.7c0.95-0.69 2.13-1.01 3.3-0.9h9.8c1.15-0.04 2.28 0.32 3.2 1 0.97 0.66 1.7 1.6 2.1 2.7l8.5 24.7a10.662 10.662 0 0 0 10 7.4c0.6-0.02 1.21-0.08 1.8-0.2l11.5-2c2.49-0.47 4.72-1.82 6.3-3.8a9.968 9.968 0 0 0 2.2-7l-0.4-26.2c-0.04-1.15 0.31-2.28 1-3.2 0.69-0.91 1.63-1.6 2.7-2 3.8-1.3 6.5-2.3 8.9-3.2l0.6-0.2c3.1-1.1 4.6 0.2 5.5 1.3l16.8 20.6a10.278 10.278 0 0 0 13.5 2.8l10.1-5.8a9.948 9.948 0 0 0 4.6-5.7c0.8-2.42 0.7-5.05-0.3-7.4l-9.2-24.3a5.724 5.724 0 0 1-0.2-3.4 4.88 4.88 0 0 1 1.9-2.8c2.4-2 4.9-4 7.4-6.2 0.87-0.76 1.95-1.25 3.1-1.4 1.15-0.12 2.3 0.13 3.3 0.7l22.4 13.4a10.68 10.68 0 0 0 7.2 1.6c2.51-0.36 4.79-1.64 6.4-3.6l7.4-8.9c1.64-1.95 2.5-4.45 2.4-7-0.1-2.53-1.09-4.94-2.8-6.8l-17.1-19.7c-0.76-0.89-1.21-2-1.3-3.17-0.09-1.17 0.19-2.33 0.8-3.33 1.7-2.7 3.3-5.6 4.8-8.4a6.48 6.48 0 0 1 2.5-2.4c1.05-0.51 2.24-0.69 3.4-0.5l25.5 5c2.46 0.62 5.07 0.3 7.31-0.9 2.24-1.2 3.95-3.2 4.79-5.6l3.9-10.9c0.92-2.39 0.88-5.04-0.1-7.4-0.92-2.36-2.66-4.31-4.9-5.5l-22.8-12.7a5.568 5.568 0 0 1-2.3-2.5c-0.5-1.06-0.6-2.27-0.3-3.4l0.2-1.3c0.5-2.8 1-5.4 1.5-8.2 0.19-1.13 0.71-2.17 1.5-3 0.81-0.84 1.86-1.4 3-1.6l25.7-4.1c2.51-0.3 4.82-1.51 6.5-3.4 1.69-1.9 2.62-4.36 2.6-6.9v-11.8h-0.1Zm-282.4 94a15.52 15.52 0 0 1-5.1 5.4c-2.1 1.37-4.5 2.23-7 2.5-2.48 0.27-4.99-0.07-7.3-1-2.34-0.9-4.43-2.34-6.1-4.2a135.028 135.028 0 0 1-34.9-90.88 135.02 135.02 0 0 1 35.3-90.72c1.67-1.86 3.76-3.3 6.1-4.2 2.32-0.89 4.83-1.2 7.3-0.9 2.5 0.27 4.9 1.13 7 2.5a16.56 16.56 0 0 1 5.1 5.4l45.6 80.4c1.38 2.41 2.1 5.13 2.1 7.9 0 2.77-0.72 5.49-2.1 7.9l-46 79.9Zm74.4 47.2c-9.51 0-19-1-28.3-3a15.522 15.522 0 0 1-11-9.1c-0.97-2.27-1.41-4.73-1.3-7.2 0.13-2.47 0.85-4.87 2.1-7l46-80c1.4-2.4 3.4-4.4 5.8-5.8 2.4-1.39 5.13-2.12 7.9-2.1h92.1c2.47 0.01 4.9 0.59 7.1 1.7a15.9 15.9 0 0 1 5.6 4.7c1.47 2.02 2.46 4.34 2.9 6.8 0.39 2.44 0.22 4.94-0.5 7.3-17.5 54.2-68.4 93.7-128.4 93.7Zm7.5-163.9L218 147.0999999999999a17.248 17.248 0 0 1-2.1-7c-0.22-3.72 0.91-7.4 3.16-10.37 2.25-2.97 5.5-5.04 9.14-5.83 9.11-1.91 18.39-2.89 27.7-2.9 60 0 110.9 39.4 128.4 93.8 0.71 2.37 0.88 4.86 0.5 7.3-0.41 2.45-1.4 4.77-2.88 6.77-1.47 1.99-3.4 3.62-5.62 4.73-2.21 1.1-4.63 1.68-7.1 1.7h-92c-2.8 0-5.56-0.72-8-2.1-2.33-1.5-4.28-3.52-5.7-5.9Z" style="fill:currentcolor"></path></svg>
+                    <span class="label">Stats</span>
                 </li>
             </ul>
         </nav>
 
-        <!-- MAIN CONTENT AREA -->
         <div class="main-area">
-            <!-- TOP BAR -->
+            <!-- ─── HEADER ─── -->
             <header class="site-header">
                 <div class="header-inner">
-                    <div class="logo-text">The Drive</div>
+                    <div class="logo-wrap">
+                        <span class="logo-byline">AUSTIN BORCHARDT</span>
+                        <a class="logo" href="#">
+                            <span class="logo-mark">▶</span>
+                            <span class="logo-text">THE DRIVE</span>
+                        </a>
+                    </div>
+                    
                     <div class="header-center">
                         <div class="search-wrap">
                             <span class="search-icon">⌕</span>
-                            <input type="text" id="search-input" placeholder="Search local library...">
-                            <button class="clear-search" id="clear-search">×</button>
+                            <input id="search-input" type="text" placeholder="Search films..." autocomplete="off" />
+                            <button id="clear-search" class="clear-search" aria-label="Clear search">✕</button>
                         </div>
                     </div>
+
                     <div class="header-meta">
+                        <span class="meta-updated">Updated <span id="last-updated">—</span></span>
+                        <span class="dot">·</span>
                         <div class="online-wrap">
                             <span class="online-dot"></span>
-                            <span id="server-status">Connecting...</span>
+                            <span id="online-count">0</span> ONLINE
                         </div>
+                        <button id="refresh-btn" class="refresh-btn" aria-label="Notifications">↻</button>
                     </div>
                 </div>
             </header>
 
-            <!-- DYNAMIC VIEW CONTAINER -->
-            <main class="main-content" id="content-area">
-                <!-- Views injected by JS -->
+            <!-- ─── SCAN BAR ─── -->
+            <div id="scan-bar" class="scan-bar hidden">
+                <span class="scan-patience">SCANNING DRIVE</span>
+                <div class="scan-track">
+                    <div id="scan-fill" class="scan-fill"></div>
+                </div>
+                <span class="scan-label">PLEASE WAIT</span>
+            </div>
+
+            <!-- ─── CONTENT AREA ─── -->
+            <main class="content-area">
+                
+                <!-- HOME TAB (Row View) -->
+                <div id="tab-home" class="tab-panel active">
+                    <div id="row-view" class="view-panel active"></div>
+                </div>
+
+                <!-- MOVIES TAB (Grid View + Filters) -->
+                <div id="tab-movies" class="tab-panel">
+                    <div class="movies-layout">
+                        <!-- Filter Sidebar -->
+                        <aside class="sidebar">
+                            <div class="sidebar-inner">
+                                <div class="sidebar-section">
+                                    <div class="sidebar-heading">SORT BY</div>
+                                    <div class="sidebar-sort-wrap">
+                                        <select id="sort-by" class="sidebar-select">
+                                            <option value="title">Title</option>
+                                            <option value="year">Year</option>
+                                            <option value="imdb">IMDb Rating</option>
+                                            <option value="rating">User Rating</option>
+                                            <option value="maturity">Maturity</option>
+                                            <option value="res">Resolution</option>
+                                            <option value="runtime">Runtime</option>
+                                        </select>
+                                        <button id="sort-dir-btn" class="sort-dir-btn">↓</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="sidebar-section">
+                                    <div class="sidebar-heading">MATURITY</div>
+                                    <div id="filter-maturity-checks" class="sidebar-checks"></div>
+                                </div>
+                                
+                                <div class="sidebar-section">
+                                    <div class="sidebar-heading">RESOLUTION</div>
+                                    <div id="filter-resolution-checks" class="sidebar-checks"></div>
+                                </div>
+
+                                <div class="sidebar-section">
+                                    <div class="sidebar-heading">GENRES</div>
+                                    <div id="filter-genre-checks" class="sidebar-checks"></div>
+                                </div>
+                                
+                                <button id="sidebar-clear-btn" class="sidebar-clear-btn" hidden>CLEAR FILTERS</button>
+                            </div>
+                        </aside>
+
+                        <!-- Main Content -->
+                        <div class="main-content" id="main-content">
+                            <div class="results-summary" id="results-summary"></div>
+                            <div class="movie-grid" id="movie-grid"></div>
+                            <div id="grid-empty" class="empty-state" hidden>
+                                <span class="empty-icon">◻</span>
+                                <p>No films match your filters.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SHOWS TAB -->
+                <div id="tab-shows" class="tab-panel">
+                    <div class="shows-page">
+                        <div id="shows-grid" class="shows-grid">
+                            <div class="empty-state">
+                                <span class="empty-icon">◻</span>
+                                <p>No shows found.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CALENDAR TAB -->
+                <div id="tab-calendar" class="tab-panel">
+                    <div class="calendar-page" id="calendar-content">
+                        <!-- Grouped by date injected by JS -->
+                    </div>
+                </div>
+
+                <!-- STATS TAB -->
+                <div id="tab-stats" class="tab-panel">
+                    <div class="stats-page">
+                        <section class="stats-section">
+                            <h2 class="stats-heading">LIBRARY OVERVIEW</h2>
+                            <div class="upload-progress-wrap">
+                                <div class="upload-progress-labels">
+                                    <span class="upload-fraction" id="upload-fraction">0 / 0 movies uploaded</span>
+                                    <span class="upload-pct" id="upload-pct">0%</span>
+                                </div>
+                                <div class="upload-track">
+                                    <div class="upload-fill" id="upload-fill"></div>
+                                </div>
+                            </div>
+                            <div class="stats-grid">
+                                <div class="stat-card"><span class="stat-label">TOTAL FILMS</span><span class="stat-value" id="stat-total-films">0</span></div>
+                                <div class="stat-card"><span class="stat-label">AVAILABLE</span><span class="stat-value" id="stat-available">0</span></div>
+                                <div class="stat-card"><span class="stat-label">TOTAL SIZE</span><span class="stat-value" id="stat-total-size">—</span></div>
+                                <div class="stat-card"><span class="stat-label">TOTAL RUNTIME</span><span class="stat-value" id="stat-total-runtime">—</span></div>
+                                <div class="stat-card"><span class="stat-label">AVG IMDb</span><span class="stat-value" id="stat-avg-imdb">—</span></div>
+                                <div class="stat-card"><span class="stat-label">UNIQUE USERS</span><span class="stat-value" id="stat-total-users">0</span></div>
+                                <div class="stat-card"><span class="stat-label">RATED G</span><span class="stat-value" id="stat-g">0</span></div>
+                                <div class="stat-card"><span class="stat-label">RATED PG</span><span class="stat-value" id="stat-pg">0</span></div>
+                                <div class="stat-card"><span class="stat-label">RATED PG-13</span><span class="stat-value" id="stat-pg13">0</span></div>
+                                <div class="stat-card"><span class="stat-label">RATED R</span><span class="stat-value" id="stat-r">0</span></div>
+                            </div>
+                        </section>
+
+                        <section class="stats-section">
+                            <h2 class="stats-heading">LIBRARY GROWTH</h2>
+                            <div class="chart-wrap"><canvas id="chart-library"></canvas></div>
+                        </section>
+
+                        <section class="stats-section">
+                            <h2 class="stats-heading">USER GROWTH</h2>
+                            <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
+                        </section>
+
+                        <section class="stats-section">
+                            <h2 class="stats-heading">ONLINE USERS (LAST 24H)</h2>
+                            <div class="chart-wrap"><canvas id="chart-presence"></canvas></div>
+                        </section>
+                    </div>
+                </div>
             </main>
+
+            <!-- ─── FOOTER ─── -->
+            <footer class="site-footer-bar">
+                <div class="site-footer-inner">
+                    <div class="footer-brand">
+                        <span class="footer-logo-mark">▶</span>
+                        <div>
+                            <span class="footer-logo-text">THE DRIVE</span>
+                            <span class="footer-byline">AUSTIN BORCHARDT</span>
+                        </div>
+                    </div>
+                    <div class="footer-form-wrap">
+                        <div class="footer-form-label">LEAVE FEEDBACK OR REQUEST A FILM</div>
+                        <form class="footer-form" onsubmit="return false;">
+                            <input id="footer-name" type="text" placeholder="Name (optional)" />
+                            <textarea id="footer-message" placeholder="Message..." rows="2"></textarea>
+                            <button id="footer-submit" class="footer-submit-btn" type="button">SEND</button>
+                            <span id="footer-form-status" class="footer-form-status" hidden></span>
+                        </form>
+                    </div>
+                </div>
+            </footer>
         </div>
     </div>
 
-    <!-- VIDEO PLAYER MODAL -->
-    <div class="modal-overlay hidden" id="video-modal" style="background: rgba(0,0,0,0.95);">
-        <div class="modal-box" style="max-width: 960px; padding: 0; background: #000; border: none; box-shadow: none;">
-            <button id="close-modal" style="position: absolute; top: 16px; right: 16px; z-index: 10; background: rgba(255,255,255,0.1); color: white; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px;">✕</button>
-            <video id="modal-video-player" controls style="width: 100%; max-height: 80vh; display: block;"></video>
+    <!-- ─── MOVIE VIEWER & PLAYER (Centered Pop-up) ─── -->
+    <div id="movie-viewer" style="display: none;">
+        <div id="viewer-backdrop"></div>
+        <div id="viewer-content">
+            <button id="viewer-close" aria-label="Close">&times;</button>
+            
+            <!-- Details View -->
+            <div id="viewer-details">
+                <div class="viewer-main">
+                    <div class="viewer-hero">
+                        <img id="viewer-poster" src="" alt="">
+                        <div class="viewer-info">
+                            <h1 id="viewer-title"></h1>
+                            <div id="viewer-meta"></div>
+                            <p id="viewer-plot"></p>
+                            <div id="viewer-cast"></div>
+                            
+                            <div id="viewer-progress-container" style="display:none; margin-top: 20px; max-width: 400px;">
+                                <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:5px;">
+                                    <span>PROGRESS</span>
+                                    <span id="viewer-progress-time">0:00 / 0:00</span>
+                                </div>
+                                <div style="height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;">
+                                    <div id="viewer-progress-fill" style="height: 100%; background: var(--accent); width: 0%;"></div>
+                                </div>
+                            </div>
+
+                            <div class="viewer-actions" style="margin-top: 24px;">
+                                <button id="viewer-play-btn">
+                                    <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reviews Side Panel -->
+                <div class="viewer-reviews">
+                    <div class="review-form">
+                        <h3>REVIEWS & REPORTS</h3>
+                        <select id="review-type" class="sidebar-select" style="width: 100%; margin-bottom: 10px; height: 34px;">
+                            <option value="Comment">Comment</option>
+                            <option value="Error">Report Error</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <textarea id="review-text" placeholder="Leave your thoughts..." rows="3" style="width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 8px; font-family: var(--font-body); font-size: 13px; resize: none; margin-bottom: 10px;"></textarea>
+                        <button id="submit-review-btn" class="sidebar-clear-btn" style="width: 100%; background: var(--accent); color: var(--bg); border-color: var(--accent);">SUBMIT</button>
+                    </div>
+                    <div style="padding: 10px 15px 0; display: flex; gap: 10px; align-items: center;">
+                        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);">FILTER:</span>
+                        <select id="review-filter" class="sidebar-select" style="flex: 1; height: 28px; font-size: 11px;">
+                            <option value="All">All</option>
+                            <option value="Comment">Comments</option>
+                            <option value="Error">Errors</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div id="review-list" class="review-list"></div>
+                </div>
+            </div>
+
+            <!-- Video Player View -->
+            <div id="viewer-player" style="display: none;">
+                <video id="video-el" preload="metadata" playsinline></video>
+                <div class="custom-controls">
+                    <button id="ctrl-play-pause" class="ctrl-btn">&#9654;</button>
+                    <div id="ctrl-progress-track">
+                        <div id="ctrl-progress-played"></div>
+                    </div>
+                    <span id="ctrl-time">0:00 / 0:00</span>
+                    <button id="ctrl-fullscreen" class="ctrl-btn">⛶</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- ─── TOASTS & TOOLTIPS ─── -->
+    <div id="toast" class="toast"></div>
+    <div id="req-tooltip" class="req-tooltip" hidden></div>
+
+    <!-- ─── SCRIPTS ─── -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
