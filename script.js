@@ -103,7 +103,7 @@ async function initWithGate() {
 
 // ─── STATE ────────────────────────────────────────────────────
 let allMovies   = [], allShows = [], filtered = [];
-let currentSort = 'title', currentDir = 'asc', activeTab = 'movies'; 
+let currentSort = 'title', currentDir = 'asc', activeTab = 'home'; 
 let activeFilters = { maturity: new Set(), status: new Set(), resolution: new Set(), genre: new Set() };
 
 function hasActiveFilters() {
@@ -122,7 +122,7 @@ function getUserRating(title) { return userRatings[normalize(title)] || null; }
 function getRatingCount(title, type) { return (ratingCounts[normalize(title)] || {})[type] || 0; }
 function getRatingScore(title) { const r = ratingCounts[normalize(title)]; return r ? (r.up || 0) - (r.down || 0) : 0; }
 function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
-  document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
+  document.querySelectorAll(`[data-rating_title="${CSS.escape(title)}"]`).forEach(b => {
     const bType = b.dataset.ratingType, isActive = nextVote === bType;
     b.classList.toggle('active', isActive);
     if (b === clickedBtn && isActive) { b.classList.remove('just-voted'); void b.offsetWidth; b.classList.add('just-voted'); }
@@ -135,7 +135,7 @@ const $ = id => document.getElementById(id);
 const searchInput = $('search-input'), clearSearch = $('clear-search'), sortBy = $('sort-by'), sortDirBtn = $('sort-dir-btn');
 const movieCount = $('movie-count'), availCount = $('available-count'), resultsSummary = $('results-summary');
 const scanBar = $('scan-bar'), lastUpdatedEl = $('last-updated'), refreshBtn = $('refresh-btn'), scanFill = $('scan-fill');
-const toast = $('toast'), rowView = $('row-view'), gridView = $('grid-view'), movieGrid = $('movie-grid');
+const toast = $('toast'), rowView = $('row-view'), movieGrid = $('movie-grid');
 const gridEmpty = $('grid-empty'), sidebarClearBtn = $('sidebar-clear-btn');
 
 // ─── UTILITIES ────────────────────────────────────────────────
@@ -188,8 +188,6 @@ function renderShows() {
   container.appendChild(frag);
   updateCounts();
 }
-
-function filterAndRenderShows() { renderShows(); }
 
 // ─── SIDEBAR FILTERS ──────────────────────────────────────────
 function populateFilterCheckboxes() {
@@ -258,14 +256,26 @@ function applySort() {
 }
 
 // ─── RENDER ───────────────────────────────────────────────────
-function render() { applyFilters(); }
-function renderCurrentView() {
+function render() {
   if (hasActiveFilters()) {
-    rowView.classList.remove('active'); gridView.classList.add('active'); renderGrid();
-    if (resultsSummary) resultsSummary.textContent = `Showing ${filtered.length} of ${allMovies.length} movies`;
+    if (activeTab !== 'movies') {
+      const moviesTab = document.querySelector('.nav-btn[data-view="movies"]');
+      if (moviesTab) moviesTab.click();
+      return;
+    }
+    applyFilters();
   } else {
-    gridView.classList.remove('active'); rowView.classList.add('active'); renderRows();
-    if (resultsSummary) resultsSummary.textContent = `${allMovies.length} movies in the library`;
+    if (activeTab === 'home') renderRows();
+    else if (activeTab === 'movies') { filtered = [...allMovies]; applySort(); }
+    else if (activeTab === 'shows') renderShows();
+    else if (activeTab === 'calendar') renderCalendar();
+  }
+}
+
+function renderCurrentView() {
+  if (activeTab === 'movies') {
+    renderGrid();
+    if (resultsSummary) resultsSummary.textContent = hasActiveFilters() ? `Showing ${filtered.length} of ${allMovies.length} movies` : `${allMovies.length} movies in the library`;
   }
 }
 
@@ -288,6 +298,7 @@ function createRowHtml(id, title, subtitle) {
 }
 
 function renderRows() {
+  if (!rowView) return;
   let html = '';
   
   const continueMovies = allMovies.filter(m => {
@@ -356,6 +367,47 @@ function renderGrid() {
   movieGrid.appendChild(frag);
 }
 
+function renderCalendar() {
+  let container = $('calendar-content');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'calendar-content';
+    container.className = 'calendar-page';
+    const tab = $('tab-calendar');
+    if (tab) tab.appendChild(container); else return;
+  }
+  container.innerHTML = '';
+  
+  if (!allMovies.length) {
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No films found.</p></div>';
+    return;
+  }
+  
+  const grouped = {};
+  allMovies.forEach(v => {
+    const date = v.added_date || 'Unknown Date';
+    if (!grouped[date]) grouped[date] = [];
+    grouped[date].push(v);
+  });
+  
+  const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
+  const frag = document.createDocumentFragment();
+  
+  sortedDates.forEach(date => {
+    const group = document.createElement('div');
+    group.className = 'calendar-group';
+    const formattedDate = date === 'Unknown Date' ? 'Unknown Date' : new Date(date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    group.innerHTML = `<div class="calendar-date" style="font-family: var(--font-head); font-size: 20px; color: var(--accent); margin: 20px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">${formattedDate}</div>`;
+    
+    const grid = document.createElement('div');
+    grid.className = 'movie-grid';
+    grouped[date].forEach((m, i) => grid.appendChild(buildCard(m, i, false)));
+    group.appendChild(grid);
+    frag.appendChild(group);
+  });
+  container.appendChild(frag);
+}
+
 function buildCard(m, i, isRowCard) {
   const card = document.createElement('div');
   card.className = isRowCard ? 'movie-card row-card' : 'movie-card';
@@ -397,8 +449,8 @@ function buildCard(m, i, isRowCard) {
 function ratingHTML(title) {
   const userVote = getUserRating(title), ups = getRatingCount(title, 'up'), downs = getRatingCount(title, 'down');
   return `<div class="rating-wrap">
-    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it"><span class="rating-icon">👍</span><span class="rating-count">${ups || 0}</span></button>
-    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="down" title="Didn't like it"><span class="rating-icon">👎</span><span class="rating-count">${downs || 0}</span></button>
+    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating_title="${escHtml(title)}" data-rating_type="up" title="Liked it"><span class="rating-icon">👍</span><span class="rating-count">${ups || 0}</span></button>
+    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating_title="${escHtml(title)}" data-rating_type="down" title="Didn't like it"><span class="rating-icon">👎</span><span class="rating-count">${downs || 0}</span></button>
   </div>`;
 }
 function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -710,7 +762,8 @@ async function loadData() {
     allMovies = videos.map(v => ({
       title: v.title, runtime: v.runtime || '', resolution: v.resolution || '', maturityRating: v.maturityRating || '',
       year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
-      driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null
+      driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null,
+      added_date: v.added_date || '2024-01-01'
     }));
     try { const rR = await fetch(`${API_BASE}/api/ratings`); if (rR.ok) ratingCounts = await rR.json(); } catch(e) {}
     setProgress(100); render(); populateFilterCheckboxes(); updateCounts(); updateLastUpdated();
@@ -819,20 +872,28 @@ function chartOptions(y) {
   
   pushPresencePing(); setInterval(pushPresencePing, 5000);
   
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  // Initial render for Home tab
+  renderRows();
+  
+  document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab; activeTab = tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const view = btn.dataset.view;
+      activeTab = view;
+      
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active'); $( 'tab-' + tab).classList.add('active'); updateCounts();
+      const panel = $('tab-' + view);
+      if (panel) panel.classList.add('active');
       
-      if (tab !== 'stats' && presenceInterval) {
-        clearInterval(presenceInterval);
-        presenceInterval = null;
-      }
+      updateCounts();
       
-      if (tab === 'stats') initStatsTab(); 
-      if (tab === 'shows') filterAndRenderShows();
+      if (view === 'stats') initStatsTab(); 
+      else if (view === 'home') renderRows();
+      else if (view === 'movies') { if(hasActiveFilters()) applyFilters(); else { filtered = [...allMovies]; applySort(); } }
+      else if (view === 'shows') renderShows();
+      else if (view === 'calendar') renderCalendar();
     });
   });
 })();
