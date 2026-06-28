@@ -2336,10 +2336,14 @@ tbody tr:hover td { background: var(--surface2); }
   overflow: hidden;
 }
 
-/* ── SIDEBAR ── */
-.sidebar {
+/* ── MAIN NAV (icon rail — stays pinned, doesn't scroll) ── */
+.main-nav {
   width: 80px;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: flex-start;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
@@ -2349,7 +2353,7 @@ tbody tr:hover td { background: var(--surface2); }
   z-index: 50;
 }
 
-.sidebar-logo {
+.nav-logo {
   margin-bottom: 40px;
   font-size: 24px;
   color: var(--accent);
