@@ -2333,7 +2333,7 @@ tbody tr:hover td { background: var(--surface2); }
   display: flex;
   min-height: 100vh;
   width: 100%;
-  overflow: hidden;
+  overflow: visible; /* must be visible (not hidden) so the sticky nav can pin to the viewport */
 }
 
 /* ── MAIN NAV (icon rail — stays pinned, doesn't scroll) ── */
