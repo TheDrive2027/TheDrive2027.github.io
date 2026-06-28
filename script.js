@@ -12,11 +12,24 @@ const AUTO_RELOAD_MS = 30 * 60 * 1000;
 setTimeout(() => location.reload(), AUTO_RELOAD_MS);
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
-const LOCAL_KEY_STORE = 'thedrive_access_key_v1';
 const LOCAL_DEVICE_ID = 'thedrive_device_id_v1';
+let cachedDeviceData = null;
 
-function getSavedKey() { try { return localStorage.getItem(LOCAL_KEY_STORE) || null; } catch(e) { return null; } }
-function saveKey(key) { try { localStorage.setItem(LOCAL_KEY_STORE, key); } catch(e) {} }
+// Access key now lives server-side (in the device's data file).
+// Kept in memory for the session; no longer written to localStorage.
+async function getSavedKey() {
+  try {
+    if (!cachedDeviceData) {
+      const did = getDeviceId();
+      const res = await fetch(`${API_BASE}/api/device/data?did=${encodeURIComponent(did)}`);
+      if (res.ok) cachedDeviceData = await res.json();
+    }
+    return cachedDeviceData?.access_key || null;
+  } catch(e) { return null; }
+}
+// Key is persisted server-side by /api/keys/use — nothing to do client-side.
+function saveKey(key) {}
+
 function getDeviceId() {
   try {
     let did = localStorage.getItem(LOCAL_DEVICE_ID);
