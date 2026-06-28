@@ -2430,7 +2430,39 @@ tbody tr:hover td { background: var(--surface2); }
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   font-family: var(--font-mono);
   font-size: 12px;
 }
 .settings-item:last-child { border-bottom: none; }
+.settings-item > span:first-child { color: var(--text-dim); letter-spacing: 1px; flex-shrink: 0; }
+.settings-value { color: var(--text); text-align: right; word-break: break-all; }
+.settings-value.mono { letter-spacing: 0.5px; }
+
+.settings-rename-wrap { display: flex; align-items: center; gap: 10px; }
+.rename-btn {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+  flex-shrink: 0;
+}
+.rename-btn:hover { border-color: var(--accent); color: var(--accent); }
+.rename-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 5px 10px;
+  outline: none;
+  max-width: 220px;
+}
