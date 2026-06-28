@@ -871,7 +871,7 @@ function startRename() {
       
       updateCounts();
       
-      if (view === 'stats') initStatsTab(); 
+      if (view === 'settings') initSettingsTab(); 
       else if (view === 'home') renderRows();
       else if (view === 'movies') { if(hasActiveFilters()) applyFilters(); else { filtered = [...allMovies]; applySort(); } }
       else if (view === 'shows') renderShows();
