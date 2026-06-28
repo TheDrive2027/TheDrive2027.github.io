@@ -191,48 +191,31 @@
                     </div>
                 </div>
 
-                <!-- STATS TAB -->
-                <div id="tab-stats" class="tab-panel">
-                    <div class="stats-page">
-                        <section class="stats-section">
-                            <h2 class="stats-heading">LIBRARY OVERVIEW</h2>
-                            <div class="upload-progress-wrap">
-                                <div class="upload-progress-labels">
-                                    <span class="upload-fraction" id="upload-fraction">0 / 0 movies uploaded</span>
-                                    <span class="upload-pct" id="upload-pct">0%</span>
-                                </div>
-                                <div class="upload-track">
-                                    <div class="upload-fill" id="upload-fill"></div>
+                <!-- SETTINGS TAB -->
+                <div id="tab-settings" class="tab-panel">
+                    <div class="settings-page">
+                        <div class="settings-area">
+                            <h2>DEVICE</h2>
+                            <div class="settings-item">
+                                <span>DEVICE ID</span>
+                                <span id="settings-device-id" class="settings-value mono">—</span>
+                            </div>
+                            <div class="settings-item">
+                                <span>DEVICE NAME</span>
+                                <div class="settings-rename-wrap">
+                                    <span id="settings-device-name" class="settings-value">—</span>
+                                    <button id="rename-btn" class="rename-btn">RENAME</button>
                                 </div>
                             </div>
-                            <div class="stats-grid">
-                                <div class="stat-card"><span class="stat-label">TOTAL FILMS</span><span class="stat-value" id="stat-total-films">0</span></div>
-                                <div class="stat-card"><span class="stat-label">AVAILABLE</span><span class="stat-value" id="stat-available">0</span></div>
-                                <div class="stat-card"><span class="stat-label">TOTAL SIZE</span><span class="stat-value" id="stat-total-size">—</span></div>
-                                <div class="stat-card"><span class="stat-label">TOTAL RUNTIME</span><span class="stat-value" id="stat-total-runtime">—</span></div>
-                                <div class="stat-card"><span class="stat-label">AVG IMDb</span><span class="stat-value" id="stat-avg-imdb">—</span></div>
-                                <div class="stat-card"><span class="stat-label">UNIQUE USERS</span><span class="stat-value" id="stat-total-users">0</span></div>
-                                <div class="stat-card"><span class="stat-label">RATED G</span><span class="stat-value" id="stat-g">0</span></div>
-                                <div class="stat-card"><span class="stat-label">RATED PG</span><span class="stat-value" id="stat-pg">0</span></div>
-                                <div class="stat-card"><span class="stat-label">RATED PG-13</span><span class="stat-value" id="stat-pg13">0</span></div>
-                                <div class="stat-card"><span class="stat-label">RATED R</span><span class="stat-value" id="stat-r">0</span></div>
+                            <div class="settings-item">
+                                <span>ACCESS KEY</span>
+                                <span id="settings-access-key" class="settings-value mono">—</span>
                             </div>
-                        </section>
-
-                        <section class="stats-section">
-                            <h2 class="stats-heading">LIBRARY GROWTH</h2>
-                            <div class="chart-wrap"><canvas id="chart-library"></canvas></div>
-                        </section>
-
-                        <section class="stats-section">
-                            <h2 class="stats-heading">USER GROWTH</h2>
-                            <div class="chart-wrap"><canvas id="chart-users"></canvas></div>
-                        </section>
-
-                        <section class="stats-section">
-                            <h2 class="stats-heading">ONLINE USERS (LAST 24H)</h2>
-                            <div class="chart-wrap"><canvas id="chart-presence"></canvas></div>
-                        </section>
+                            <div class="settings-item">
+                                <span>REGISTERED</span>
+                                <span id="settings-first-seen" class="settings-value">—</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
