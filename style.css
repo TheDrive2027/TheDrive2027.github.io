@@ -1794,8 +1794,7 @@ tbody tr:hover td { background: var(--surface2); }
   #grid-view .movie-grid { padding: 8px 16px 40px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
   .results-summary { padding: 10px 16px 2px; }
   .tab-nav { padding: 0 16px; }
-  .stats-page { padding: 24px 16px 60px; gap: 40px; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .settings-page { padding: 24px 16px 60px; gap: 32px; }
   .site-footer-inner { gap: 36px; }
   .movie-grid { padding: 0 16px 40px; }
 
