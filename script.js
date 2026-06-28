@@ -469,11 +469,39 @@ function ratingHTML(title) {
 function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ─── MOVIE VIEWER, PLAYER & COMMENTS LOGIC ────────────────────
-function getVideoProgress(title) { 
-  try { return JSON.parse(localStorage.getItem('thedrive_progress_' + normalize(title)) || '{}'); } catch(e) { return {}; }
+// Progress now lives server-side (per-device file). We keep an in-memory
+// cache so the home "Continue Watching" rows render instantly, hydrating it
+// once from the server on init and pushing updates as the user watches.
+let progressCache = {};
+
+async function hydrateProgress() {
+  try {
+    const res = await fetch(`${API_BASE}/api/device/data?did=${encodeURIComponent(getDeviceId())}`);
+    if (res.ok) {
+      const d = await res.json();
+      progressCache = d.progress || {};
+    }
+  } catch(e) {}
 }
-function saveVideoProgress(title, time, duration) { 
-  localStorage.setItem('thedrive_progress_' + normalize(title), JSON.stringify({time, duration})); 
+
+function getVideoProgress(title) {
+  return progressCache[normalize(title)] || {};
+}
+
+// Debounced + throttled progress reporter so we don't spam the server.
+let progressTimers = {};
+function saveVideoProgress(title, time, duration) {
+  const key = normalize(title);
+  progressCache[key] = { time, duration };
+  clearTimeout(progressTimers[key]);
+  progressTimers[key] = setTimeout(async () => {
+    try {
+      await fetch(`${API_BASE}/api/device/progress`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: getDeviceId(), title, time, duration })
+      });
+    } catch(e) {}
+  }, 4000);
 }
 
 let currentViewerMovie = null;
