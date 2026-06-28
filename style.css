@@ -2403,9 +2403,10 @@ tbody tr:hover td { background: var(--surface2); }
 /* ── MAIN AREA ── */
 .main-area {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible; /* sticky nav needs visible ancestors */
 }
 
 .main-content {
