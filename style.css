@@ -1859,6 +1859,7 @@ tbody tr:hover td { background: var(--surface2); }
   .header-inner { padding: 14px 16px; flex-wrap: wrap; gap: 8px; }
   .movies-layout { flex-direction: column; }
   .sidebar { width: 100%; position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .main-nav { width: 64px; }
   .sidebar-inner { flex-direction: row; flex-wrap: wrap; gap: 16px; padding: 14px 16px; }
   .sidebar-section { min-width: 140px; }
   .header-center { display: none; }
