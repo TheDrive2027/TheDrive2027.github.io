@@ -890,7 +890,9 @@ function startRename() {
   currentSort = 'title'; currentDir = 'asc';
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
-  await initWithGate(); await loadData(); loadShowsData();
+  await initWithGate();
+  await Promise.all([loadData(), hydrateProgress()]);
+  loadShowsData();
   
   pushPresencePing(); setInterval(pushPresencePing, 5000);
   
