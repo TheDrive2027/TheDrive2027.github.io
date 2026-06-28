@@ -783,83 +783,65 @@ async function pushPresencePing() {
   } catch(e) {}
 }
 
-// ─── STATS ────────────────────────────────────────────────────
-let statsLoaded = false, chartLibrary = null, chartUsers = null, chartPresence = null;
-let presenceInterval = null;
-
-function initStatsTab() { 
-  renderLocalStats(); 
-  fetchStatsData(); 
-  if (presenceInterval) clearInterval(presenceInterval);
-  presenceInterval = setInterval(fetchPresenceData, 5000); 
-}
-
-function renderLocalStats() {
-  if (!allMovies.length && !allShows.length) return;
-  const t = allMovies.length + allShows.length;
-  if ($('upload-fraction')) $('upload-fraction').textContent = t + ' files uploaded';
-  if ($('upload-pct')) $('upload-pct').textContent = '100%';
-  if ($('upload-fill')) $('upload-fill').style.width = '100%';
-  setText('stat-total-films', t);
-  if ($('stat-available')?.parentElement) $('stat-available').parentElement.style.display = 'none';
-  let m = 0; allMovies.forEach(v => { m += parseRuntimeMinutes(v.runtime); }); allShows.forEach(v => { m += parseRuntimeMinutes(v.runtime); });
-  if (m > 0) setText('stat-total-runtime', Math.floor(m / 60) + 'h ' + (m % 60) + 'm');
-  const r = [...allMovies, ...allShows].filter(v => parseFloat(v.imdbRating) > 0);
-  if (r.length) setText('stat-avg-imdb', '★ ' + (r.reduce((s, v) => s + parseFloat(v.imdbRating), 0) / r.length).toFixed(1));
-}
-function setText(id, v) { const e = $(id); if (e) e.textContent = String(v); }
-
-async function fetchStatsData() {
+// ─── SETTINGS ────────────────────────────────────────────────
+async function initSettingsTab() {
+  const did = getDeviceId();
+  const elId   = $('settings-device-id');
+  const elName = $('settings-device-name');
+  const elKey  = $('settings-access-key');
+  const elSeen = $('settings-first-seen');
+  if (elId) elId.textContent = did;
   try {
-    const res = await fetch(`${API_BASE}/api/stats`); if (!res.ok) return; const d = await res.json(); if (!d) return;
-    if (typeof d.uniqueDevices === 'number') setText('stat-total-users', d.uniqueDevices);
-    if (d.snapshots?.length) renderLibraryChart(d.snapshots);
-    if (d.userHistory?.length) renderUserChart(d.userHistory);
-    if (d.presence?.length) renderPresenceChart(d.presence); else showPresencePlaceholder();
-    const el = $('online-count'); if (el && typeof d.online === 'number') el.textContent = d.online;
-  } catch(e) {}
-}
-
-async function fetchPresenceData() {
-  try {
-    const res = await fetch(`${API_BASE}/api/presence`); if (!res.ok) return; const d = await res.json(); if (!d) return;
-    if (d.presence?.length) renderPresenceChart(d.presence); else showPresencePlaceholder();
-    const el = $('online-count'); if (el && typeof d.online === 'number') el.textContent = d.online;
-  } catch(e) {}
-}
-
-function renderLibraryChart(s) { 
-  if (!window.Chart) return; const c = $('chart-library'); if (!c) return; 
-  const cfg = { type: 'line', data: { labels: s.map(x=>x.date), datasets: [{ label: 'Total Files', data: s.map(x=>x.total), borderColor: '#9090a8', backgroundColor: 'rgba(144,144,168,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#9090a8', tension: 0.3, fill: true }] }, options: chartOptions('Files') }; 
-  if (chartLibrary) chartLibrary.destroy(); chartLibrary = new Chart(c, cfg); 
-}
-function renderUserChart(u) { 
-  if (!window.Chart) return; const c = $('chart-users'); if (!c) return; 
-  const cfg = { type: 'line', data: { labels: u.map(x=>x.date), datasets: [{ label: 'Unique Users', data: u.map(x=>x.users), borderColor: '#e8c547', backgroundColor: 'rgba(232,197,71,0.10)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#e8c547', tension: 0.3, fill: true }] }, options: chartOptions('Users') }; 
-  if (chartUsers) chartUsers.destroy(); chartUsers = new Chart(c, cfg); 
-}
-function showPresencePlaceholder() { 
-  const c = $('chart-presence'); if (!c) return; const w = c.closest('.chart-wrap'); if (!w) return; c.style.display = 'none'; 
-  if (!w.querySelector('.presence-placeholder')) { const m = document.createElement('div'); m.className = 'presence-placeholder'; m.innerHTML = `<span class="presence-placeholder-icon">◎</span><p>No history yet.</p>`; w.appendChild(m); } 
-}
-function renderPresenceChart(p) { 
-  if (!window.Chart) return; 
-  const c = $('chart-presence'); if (!c) return; 
-  c.style.display = ''; 
-  const w = c.closest('.chart-wrap'); if (w) { const ph = w.querySelector('.presence-placeholder'); if (ph) ph.remove(); } 
-  const t = p.map(x=>x.ts.slice(11,16)), v = p.map(x=>x.online); 
-  
-  if (chartPresence) {
-    chartPresence.data.labels = t;
-    chartPresence.data.datasets[0].data = v;
-    chartPresence.update('none'); 
-  } else {
-    const cfg = { type: 'line', data: { labels: t, datasets: [{ label: 'Online', data: v, borderColor: '#3ecf74', backgroundColor: 'rgba(62,207,116,0.10)', borderWidth: 2, pointRadius: 0, tension: 0, fill: true }] }, options: chartOptions('Users') }; 
-    chartPresence = new Chart(c, cfg); 
+    const res = await fetch(`${API_BASE}/api/device/data?did=${encodeURIComponent(did)}`);
+    if (res.ok) {
+      const d = await res.json();
+      if (elName) elName.textContent = d.device_name || 'Unnamed Device';
+      if (elKey)  elKey.textContent  = d.access_key || '—';
+      if (elSeen) elSeen.textContent = d.first_seen || '—';
+    }
+  } catch(e) {
+    if (elKey) elKey.textContent = '—';
+  }
+  // Wire up the rename button once
+  const btn = $('rename-btn');
+  if (btn && !btn.dataset.bound) {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', startRename);
   }
 }
-function chartOptions(y) { 
-  return { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#9090a8' } }, tooltip: { backgroundColor: '#18181f' } }, scales: { x: { ticks: { color: '#78788f' }, grid: { color: 'rgba(37,37,48,0.6)' } }, y: { title: { display: true, text: y, color: '#78788f' }, ticks: { color: '#78788f', precision: 0 }, grid: { color: 'rgba(37,37,48,0.6)' }, beginAtZero: true } } }; 
+
+function startRename() {
+  const nameEl = $('settings-device-name');
+  const btn    = $('rename-btn');
+  if (!nameEl || !btn) return;
+  const wrap = nameEl.parentElement;
+  const current = nameEl.textContent === '—' ? '' : nameEl.textContent.replace(/^Unnamed Device$/, '');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'rename-input';
+  input.value = current;
+  input.maxLength = 64;
+  input.placeholder = 'Device name';
+  nameEl.replaceWith(input);
+  btn.textContent = 'SAVE';
+  input.focus();
+  input.select();
+  const submit = async () => {
+    const name = input.value.trim();
+    if (!name) { input.replaceWith(nameEl); btn.textContent = 'RENAME'; return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/device/rename`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: getDeviceId(), name })
+      });
+      const d = await res.json();
+      nameEl.textContent = d.name || name;
+    } catch(e) { nameEl.textContent = name; }
+    input.replaceWith(nameEl);
+    btn.textContent = 'RENAME';
+  };
+  btn.onclick = submit;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { input.replaceWith(nameEl); btn.textContent = 'RENAME'; btn.onclick = null; } });
 }
 
 // ─── MAIN INIT ────────────────────────────────────────────────
