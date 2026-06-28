@@ -221,7 +221,7 @@ function updateClearBtn() { if (sidebarClearBtn) sidebarClearBtn.hidden = !(acti
 function clearAllFilters() { activeFilters.maturity.clear(); activeFilters.status.clear(); activeFilters.resolution.clear(); activeFilters.genre.clear(); if (searchInput) { searchInput.value = ''; clearSearch && clearSearch.classList.remove('visible'); } document.querySelectorAll('.sidebar-checks input[type="checkbox"]').forEach(cb => cb.checked = false); updateClearBtn(); render(); saveSettings(); }
 function updateCounts() {
   const totalMovies = allMovies.length, totalEps = allShows.length;
-  let totalText = activeTab === 'shows' ? totalEps + ' Shows' : activeTab === 'stats' ? (totalMovies + totalEps) + ' Files' : totalMovies + ' Movies';
+  let totalText = activeTab === 'shows' ? totalEps + ' Shows' : totalMovies + ' Movies';
   if (movieCount) movieCount.textContent = totalText;
   if (availCount) availCount.style.display = 'none';
 }
