@@ -47,7 +47,7 @@ async function initWithGate() {
   const submitBtn = document.getElementById('gate-submit');
   const errorEl = document.getElementById('gate-error');
   const did = getDeviceId();
-  const savedKey = getSavedKey();
+  const savedKey = await getSavedKey();
 
   function triggerServerRetry() {
     if (overlay) overlay.classList.remove('gate-overlay-hidden');
