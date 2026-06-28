@@ -846,7 +846,6 @@ function startRename() {
 
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
-  try { localStorage.removeItem('thedrive_settings_v2'); } catch(e) {}
   currentSort = 'title'; currentDir = 'asc';
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
