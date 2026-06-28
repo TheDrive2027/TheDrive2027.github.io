@@ -1274,89 +1274,15 @@ tbody tr:hover td { background: var(--surface2); }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-/* ── STATS PAGE ── */
-.stats-page {
-  max-width: 960px;
+/* ── SETTINGS PAGE ── */
+.settings-page {
+  max-width: 600px;
   margin: 0 auto;
   padding: 40px 28px 80px;
   display: flex;
   flex-direction: column;
-  gap: 56px;
+  gap: 40px;
 }
-
-.stats-section { display: flex; flex-direction: column; gap: 16px; }
-
-.stats-heading {
-  font-family: var(--font-head);
-  font-size: 22px;
-  letter-spacing: 3px;
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 10px;
-}
-
-.stats-subheading {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: var(--text-dim);
-  margin-top: -8px;
-}
-
-/* ── UPLOAD PROGRESS ── */
-.upload-progress-wrap { display: flex; flex-direction: column; gap: 10px; }
-.upload-progress-labels { display: flex; justify-content: space-between; align-items: baseline; }
-.upload-fraction { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
-.upload-pct { font-family: var(--font-head); font-size: 28px; letter-spacing: 2px; color: var(--accent); }
-
-.upload-track {
-  height: 10px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.upload-fill {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--accent2), var(--accent));
-  border-radius: 99px;
-  transition: width 1s cubic-bezier(.4,0,.2,1);
-  box-shadow: 0 0 12px rgba(232,197,71,.4);
-}
-
-/* ── CHARTS ── */
-.chart-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  position: relative;
-  min-height: 240px;
-}
-
-/* ── STATS GRID ── */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-}
-
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 20px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  transition: border-color var(--transition);
-}
-
-.stat-card:hover { border-color: var(--border2); }
-.stat-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); }
-.stat-value { font-family: var(--font-head); font-size: 30px; letter-spacing: 1px; color: var(--text); line-height: 1; }
 
 /* ============================================================
    NEW LAYOUT — Sidebar + Row Browse View
