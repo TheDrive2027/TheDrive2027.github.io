@@ -75,7 +75,7 @@ async function initWithGate() {
       if (valData.valid) {
         if (overlay) { overlay.classList.add('gate-overlay-hidden'); overlay.style.display = 'none'; }
         return;
-      } else { localStorage.removeItem(LOCAL_KEY_STORE); }
+      }
     } catch(e) { triggerServerRetry(); return; }
   }
 
