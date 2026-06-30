@@ -135,7 +135,7 @@ function getUserRating(title) { return userRatings[normalize(title)] || null; }
 function getRatingCount(title, type) { return (ratingCounts[normalize(title)] || {})[type] || 0; }
 function getRatingScore(title) { const r = ratingCounts[normalize(title)]; return r ? (r.up || 0) - (r.down || 0) : 0; }
 function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
-  document.querySelectorAll(`[data-rating_title="${CSS.escape(title)}"]`).forEach(b => {
+  document.querySelectorAll(`[data-rating-title="${CSS.escape(title)}"]`).forEach(b => {
     const bType = b.dataset.ratingType, isActive = nextVote === bType;
     b.classList.toggle('active', isActive);
     if (b === clickedBtn && isActive) { b.classList.remove('just-voted'); void b.offsetWidth; b.classList.add('just-voted'); }
@@ -462,8 +462,8 @@ function buildCard(m, i, isRowCard) {
 function ratingHTML(title) {
   const userVote = getUserRating(title), ups = getRatingCount(title, 'up'), downs = getRatingCount(title, 'down');
   return `<div class="rating-wrap">
-    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating_title="${escHtml(title)}" data-rating_type="up" title="Liked it"><span class="rating-icon">👍</span><span class="rating-count">${ups || 0}</span></button>
-    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating_title="${escHtml(title)}" data-rating_type="down" title="Didn't like it"><span class="rating-icon">👎</span><span class="rating-count">${downs || 0}</span></button>
+    <button class="rating-btn rating-btn--up ${userVote === 'up' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="up" title="Liked it"><span class="rating-icon">👍</span><span class="rating-count">${ups || 0}</span></button>
+    <button class="rating-btn rating-btn--down ${userVote === 'down' ? 'active' : ''}" data-rating-title="${escHtml(title)}" data-rating-type="down" title="Didn't like it"><span class="rating-icon">👎</span><span class="rating-count">${downs || 0}</span></button>
   </div>`;
 }
 function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
