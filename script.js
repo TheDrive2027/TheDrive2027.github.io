@@ -434,11 +434,15 @@ function buildCard(m, i, isRowCard) {
   const duration = progObj.duration || 0;
   const progressHtml = (progress > 10 && duration > 0) ? `<div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.min(100, (progress / duration) * 100)}%"></div></div>` : '';
 
+  const inLib = isInLibrary(m.title);
+  const libIcon = inLib ? '−' : '+';
+
   card.innerHTML = `
     <div class="card-poster card-poster--playable">
       ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
       <div class="card-play-overlay"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></div>
       ${progressHtml}
+      <button class="card-library-btn" data-title="${escHtml(m.title)}" title="${inLib ? 'Remove from library' : 'Add to library'}">${libIcon}</button>
     </div>
     <div class="card-title">${escHtml(m.title)}</div>
     <div class="card-meta">
@@ -452,9 +456,14 @@ function buildCard(m, i, isRowCard) {
     </div>
     <div class="card-footer">${ratingHTML(m.title)}</div>
   `;
-  
+
   card.addEventListener('click', (e) => {
     if (e.target.closest('.rating-btn')) return;
+    if (e.target.closest('.card-library-btn')) {
+      e.stopPropagation();
+      toggleLibrary(m.title);
+      return;
+    }
     openMovieViewer(m);
   });
   return card;
