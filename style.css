@@ -1022,7 +1022,6 @@ select:focus { border-color: var(--accent); }
 .movies-layout {
   display: flex;
   align-items: flex-start;
-  min-height: calc(100vh - 130px);
 }
 
 /* ── SIDEBAR ── */
@@ -1030,12 +1029,13 @@ select:focus { border-color: var(--accent); }
   width: 220px;
   flex-shrink: 0;
   position: sticky;
-  top: 20px; /* Sits properly at the top of the content area */
-  height: calc(100vh - 40px);
+  top: 0; /* Sits perfectly at the top of the content area scroll container */
+  height: 100vh; /* Full height of the viewport */
   overflow-y: auto;
   background: var(--surface);
   border-right: 1px solid var(--border);
   padding-bottom: 40px;
+  z-index: 5;
 }
 
 .sidebar-inner { padding: 20px 18px; display: flex; flex-direction: column; gap: 24px; }
