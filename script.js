@@ -587,6 +587,23 @@ function saveVideoProgress(title, time, duration) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ did: getDeviceId(), title, time, duration })
       });
+
+      // Auto-add to library if watched more than 50%
+      if (duration > 0 && time / duration > 0.5) {
+        const section = getLibrarySection(title);
+        if (section !== 'watched') {
+          // Remove from unwatched if present, add to watched
+          libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== key);
+          if (!libraryData.watched.some(t => normalize(t) === key)) {
+            libraryData.watched.push(title);
+            await fetch(`${API_BASE}/api/library/add`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ did: getDeviceId(), title, watched: true })
+            });
+          }
+        }
+      }
     } catch(e) {}
   }, 4000);
 }
