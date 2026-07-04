@@ -15,8 +15,6 @@ setTimeout(() => location.reload(), AUTO_RELOAD_MS);
 const LOCAL_DEVICE_ID = 'thedrive_device_id_v1';
 let cachedDeviceData = null;
 
-// Access key now lives server-side (in the device's data file).
-// Kept in memory for the session; no longer written to localStorage.
 async function getSavedKey() {
   try {
     if (!cachedDeviceData) {
@@ -27,7 +25,6 @@ async function getSavedKey() {
     return cachedDeviceData?.access_key || null;
   } catch(e) { return null; }
 }
-// Key is persisted server-side by /api/keys/use — nothing to do client-side.
 function saveKey(key) {}
 
 function getDeviceId() {
@@ -148,7 +145,7 @@ function applyRatingDOM(title, nextVote, upCount, downCount, clickedBtn) {
 const $ = id => document.getElementById(id);
 const searchInput = $('search-input'), clearSearch = $('clear-search'), sortBy = $('sort-by'), sortDirBtn = $('sort-dir-btn');
 const movieCount = $('movie-count'), availCount = $('available-count'), resultsSummary = $('results-summary');
-const scanBar = $('scan-bar'), lastUpdatedEl = $('last-updated'), refreshBtn = $('refresh-btn'), scanFill = $('scan-fill');
+const scanBar = $('scan-bar'), lastUpdatedEl = $('last-updated'), scanFill = $('scan-fill');
 const toast = $('toast'), rowView = $('row-view'), movieGrid = $('movie-grid');
 const gridEmpty = $('grid-empty'), sidebarClearBtn = $('sidebar-clear-btn');
 
@@ -201,6 +198,31 @@ function renderShows() {
   allShows.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
   container.appendChild(frag);
   updateCounts();
+}
+
+// ─── UPDATES DATA ─────────────────────────────────────────────
+async function loadUpdates() {
+  const container = $('updates-container');
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>Loading updates...</p></div>';
+  try {
+    const res = await fetch(`${API_BASE}/api/updates`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const updates = await res.json();
+    if (!updates || updates.length === 0) {
+      container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No updates yet.</p></div>';
+      return;
+    }
+    container.innerHTML = updates.map(u => `
+      <div class="update-panel">
+        <div class="update-header">${escHtml(u.header)}</div>
+        <span class="update-timestamp">${u.timestamp}</span>
+        <div class="update-body">${escHtml(u.body)}</div>
+      </div>
+    `).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>Failed to load updates.</p></div>';
+  }
 }
 
 // ─── SIDEBAR FILTERS ──────────────────────────────────────────
@@ -389,7 +411,6 @@ function renderLibrary() {
 
   if (!watchedGrid || !unwatchedGrid) return;
 
-  // Render watched
   watchedGrid.innerHTML = '';
   const watchedMovies = allMovies.filter(m => libraryData.watched.some(t => normalize(t) === normalize(m.title)));
   if (watchedMovies.length === 0) {
@@ -401,7 +422,6 @@ function renderLibrary() {
     watchedGrid.appendChild(frag);
   }
 
-  // Render unwatched
   unwatchedGrid.innerHTML = '';
   const unwatchedMovies = allMovies.filter(m => libraryData.unwatched.some(t => normalize(t) === normalize(m.title)));
   if (unwatchedMovies.length === 0) {
@@ -482,9 +502,6 @@ function ratingHTML(title) {
 function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ─── MOVIE VIEWER, PLAYER & COMMENTS LOGIC ────────────────────
-// Progress now lives server-side (per-device file). We keep an in-memory
-// cache so the home "Continue Watching" rows render instantly, hydrating it
-// once from the server on init and pushing updates as the user watches.
 let progressCache = {};
 
 async function hydrateProgress() {
@@ -528,7 +545,6 @@ async function loadLibrary() {
 async function toggleLibrary(title, watched = false) {
   const section = getLibrarySection(title);
   if (section) {
-    // Remove from library
     try {
       await fetch(`${API_BASE}/api/library/remove`, {
         method: 'POST',
@@ -540,7 +556,6 @@ async function toggleLibrary(title, watched = false) {
       showToast('Removed from library');
     } catch(e) {}
   } else {
-    // Add to library
     try {
       await fetch(`${API_BASE}/api/library/add`, {
         method: 'POST',
@@ -577,7 +592,6 @@ function updateViewerLibraryButton() {
   }
 }
 
-// Debounced + throttled progress reporter so we don't spam the server.
 let progressTimers = {};
 function saveVideoProgress(title, time, duration) {
   const key = normalize(title);
@@ -590,11 +604,9 @@ function saveVideoProgress(title, time, duration) {
         body: JSON.stringify({ did: getDeviceId(), title, time, duration })
       });
 
-      // Auto-add to library if watched more than 50%
       if (duration > 0 && time / duration > 0.5) {
         const section = getLibrarySection(title);
         if (section !== 'watched') {
-          // Remove from unwatched if present, add to watched
           libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== key);
           if (!libraryData.watched.some(t => normalize(t) === key)) {
             libraryData.watched.push(title);
@@ -875,22 +887,7 @@ document.body.addEventListener('click', e => {
     fetch(`${API_BASE}/api/rate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, type: nextVote, prev: prevVote, did: getDeviceId() }) })
     .then(res => res.json()).then(data => { if (data.ratings) { ratingCounts[key] = data.ratings; applyRatingDOM(title, getUserRating(title), data.ratings.up, data.ratings.down, null); } })
     .catch(e => console.error('Rating failed:', e)).finally(() => ratingInflight.delete(key));
-  });
-}
-
-// ─── NOTIFICATIONS (Local Stubs) ─────────────────────────────
-function toggleNotificationPanel() { const p = $('notif-panel'); if (p) p.style.display = p.style.display === 'block' ? 'none' : 'block'; }
-(function initNotificationBell() {
-  if (!refreshBtn) return;
-  refreshBtn.id = 'notif-btn'; refreshBtn.classList.remove('spinning');
-  refreshBtn.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg><span class="notif-dot" style="display:none; position:absolute; top:4px; right:4px; width:8px; height:8px; background:var(--red); border-radius:50%; border:1px solid var(--bg);"></span>`;
-  const panel = document.createElement('div'); panel.id = 'notif-panel';
-  panel.style.cssText = 'display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;max-height:400px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:1000;padding:12px;font-size:13px;color:var(--text)';
-  panel.innerHTML = '<div class="notif-list"><div class="notif-empty">No notifications</div></div>';
-  refreshBtn.parentNode.style.position = 'relative'; refreshBtn.parentNode.appendChild(panel);
-  refreshBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleNotificationPanel(); });
-  document.addEventListener('click', (e) => { if (!refreshBtn.contains(e.target) && !panel.contains(e.target)) panel.style.display = 'none'; });
-})();
+});
 
 // ─── FOOTER FORM ──────────────────────────────────────────────
 (function() {
@@ -1041,6 +1038,7 @@ function startRename() {
       else if (view === 'movies') { if(hasActiveFilters()) applyFilters(); else { filtered = [...allMovies]; applySort(); } }
       else if (view === 'shows') renderShows();
       else if (view === 'library') loadLibrary().then(() => renderLibrary()); // Fix: Actively fetch library data before rendering
+      else if (view === 'updates') loadUpdates(); // Load updates tab data
     });
   });
 })();
