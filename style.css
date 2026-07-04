@@ -383,7 +383,8 @@ select:focus { border-color: var(--accent); }
   height: 100%;
   object-fit: cover;
   display: block;
-  position: relative;
+  position: absolute; /* Prevents image from stretching card height before loading */
+  inset: 0;
   z-index: 1;
   opacity: 0;
   transition: opacity .3s ease, transform .4s ease;
@@ -872,6 +873,87 @@ select:focus { border-color: var(--accent); }
   gap: 40px;
 }
 
+.settings-area {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.settings-area h2 {
+  font-family: var(--font-head);
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-item:last-child { border-bottom: none; }
+
+.settings-item > span:first-child {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+.settings-value {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.settings-value.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  word-break: break-all;
+  text-align: right;
+}
+
+.settings-rename-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rename-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.rename-btn:hover { background: var(--border); border-color: var(--accent); }
+
+.rename-input {
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  width: 180px;
+  text-align: right;
+}
+
 /* ============================================================
    NEW LAYOUT — Sidebar + Row Browse View
    ============================================================ */
@@ -948,8 +1030,8 @@ select:focus { border-color: var(--accent); }
   width: 220px;
   flex-shrink: 0;
   position: sticky;
-  top: 130px;
-  height: calc(100vh - 130px);
+  top: 20px; /* Sits properly at the top of the content area */
+  height: calc(100vh - 40px);
   overflow-y: auto;
   background: var(--surface);
   border-right: 1px solid var(--border);
