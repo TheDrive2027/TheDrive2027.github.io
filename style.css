@@ -718,10 +718,10 @@ tbody tr:hover td { background: var(--surface2); }
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.7);
   border: 2px solid var(--accent);
   color: var(--accent);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -733,6 +733,7 @@ tbody tr:hover td { background: var(--surface2); }
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   z-index: 10;
+  pointer-events: auto;
 }
 
 .movie-card:hover .card-library-btn { opacity: 1; transform: scale(1); }
@@ -2113,14 +2114,14 @@ tbody tr:hover td { background: var(--surface2); }
 #viewer-play-btn .play-icon { font-size: 14px; }
 
 #viewer-library-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(232,197,71,0.15); color: var(--accent);
-    border: 1px solid var(--accent); padding: 12px 24px; border-radius: 4px;
-    font-family: var(--font-body); font-size: 14px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--text); color: var(--bg);
+    border: none; padding: 12px 32px; border-radius: 4px;
+    font-family: var(--font-body); font-size: 16px; font-weight: 600;
     cursor: pointer; transition: background 0.2s, transform 0.1s;
 }
-#viewer-library-btn:hover { background: var(--accent); color: var(--bg); transform: translateY(-2px); }
-#viewer-library-btn .library-icon { font-size: 16px; font-weight: bold; }
+#viewer-library-btn:hover { background: var(--accent); transform: translateY(-2px); }
+#viewer-library-btn .library-icon { font-size: 14px; }
 
 /* Video Player Layout */
 #viewer-player {
