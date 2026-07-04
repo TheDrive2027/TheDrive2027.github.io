@@ -591,7 +591,7 @@ function saveVideoProgress(title, time, duration) {
       });
 
       // Auto-add to library if watched more than 50%
-      if (duration > 0 && time / duration > 0.5) {
+      if (duration > 0 && time / duration > 0) {
         const section = getLibrarySection(title);
         if (section !== 'watched') {
           // Remove from unwatched if present, add to watched
@@ -999,7 +999,13 @@ function startRename() {
 (async function init() {
   currentSort = 'title'; currentDir = 'asc';
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
-  try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
+  
+  // Bypass GitHub Pages delay by fetching directly from the raw repository file
+  try { 
+    const cR = await fetch('https://raw.githubusercontent.com/TheDrive2027/TheDrive2027.github.io/main/config.json?t=' + Date.now()); 
+    if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } 
+  } catch(e) { API_BASE = ''; }
+  
   await initWithGate();
   await Promise.all([loadData(), hydrateProgress(), loadLibrary()]);
   loadShowsData();
