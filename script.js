@@ -415,7 +415,7 @@ function renderLibrary() {
 }
 
 function updateLibraryButtons() {
-  document.querySelectorAll('.card-library-btn').forEach(btn => {
+  document.querySelectorAll('.library-btn').forEach(btn => {
     const title = btn.dataset.title;
     const inLib = isInLibrary(title);
     btn.textContent = inLib ? '−' : '+';
