@@ -2105,6 +2105,8 @@ tbody tr:hover td { background: var(--surface2); }
     border: none; padding: 12px 32px; border-radius: 4px;
     font-family: var(--font-body); font-size: 16px; font-weight: 600;
     cursor: pointer; transition: background 0.2s, transform 0.1s;
+    width: 140px;
+    justify-content: center;
 }
 #viewer-play-btn:hover { background: var(--accent); transform: translateY(-2px); }
 #viewer-play-btn .play-icon { font-size: 14px; }
@@ -2115,7 +2117,7 @@ tbody tr:hover td { background: var(--surface2); }
     border: none; padding: 12px 32px; border-radius: 4px;
     font-family: var(--font-body); font-size: 16px; font-weight: 600;
     cursor: pointer; transition: background 0.2s, transform 0.1s;
-    min-width: 180px;
+    width: 200px;
     justify-content: center;
 }
 #viewer-library-btn:hover { background: var(--accent); transform: translateY(-2px); }
