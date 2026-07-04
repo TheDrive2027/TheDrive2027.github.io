@@ -852,9 +852,8 @@ if (sortBy) sortBy.addEventListener('change', () => { currentSort = sortBy.value
 if (sortDirBtn) sortDirBtn.addEventListener('click', () => { currentDir = currentDir === 'desc' ? 'asc' : 'desc'; sortDirBtn.textContent = currentDir === 'desc' ? '↓' : '↑'; if (hasActiveFilters()) applySort(); saveSettings(); });
 if (sidebarClearBtn) sidebarClearBtn.addEventListener('click', clearAllFilters);
 
-const mainContent = document.getElementById('main-content');
-if (mainContent) {
-  mainContent.addEventListener('click', e => {
+// Fix: Attached to document body so Like/Dislike works on ALL tabs (Home, Movies, Library)
+document.body.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn'); if (!btn) return;
     e.stopPropagation();
     
@@ -955,9 +954,8 @@ async function initSettingsTab() {
   }
   // Wire up the rename button once
   const btn = $('rename-btn');
-  if (btn && !btn.dataset.bound) {
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', startRename);
+  if (btn) {
+    btn.onclick = startRename; // Use onclick so we can easily swap it to submitRename
   }
 }
 
@@ -977,9 +975,15 @@ function startRename() {
   btn.textContent = 'SAVE';
   input.focus();
   input.select();
+  
   const submit = async () => {
     const name = input.value.trim();
-    if (!name) { input.replaceWith(nameEl); btn.textContent = 'RENAME'; return; }
+    if (!name) { 
+      input.replaceWith(nameEl); 
+      btn.textContent = 'RENAME'; 
+      btn.onclick = startRename; 
+      return; 
+    }
     try {
       const res = await fetch(`${API_BASE}/api/device/rename`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -990,9 +994,18 @@ function startRename() {
     } catch(e) { nameEl.textContent = name; }
     input.replaceWith(nameEl);
     btn.textContent = 'RENAME';
+    btn.onclick = startRename; // Reset back to startRename so it can be clicked again!
   };
+  
   btn.onclick = submit;
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') { input.replaceWith(nameEl); btn.textContent = 'RENAME'; btn.onclick = null; } });
+  input.addEventListener('keydown', e => { 
+    if (e.key === 'Enter') submit(); 
+    if (e.key === 'Escape') { 
+      input.replaceWith(nameEl); 
+      btn.textContent = 'RENAME'; 
+      btn.onclick = startRename; 
+    } 
+  });
 }
 
 // ─── MAIN INIT ────────────────────────────────────────────────
@@ -1027,7 +1040,7 @@ function startRename() {
       else if (view === 'home') renderRows();
       else if (view === 'movies') { if(hasActiveFilters()) applyFilters(); else { filtered = [...allMovies]; applySort(); } }
       else if (view === 'shows') renderShows();
-      else if (view === 'calendar') renderCalendar();
+      else if (view === 'library') loadLibrary().then(() => renderLibrary()); // Fix: Actively fetch library data before rendering
     });
   });
 })();
