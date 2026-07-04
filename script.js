@@ -999,11 +999,11 @@ function startRename() {
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
   await initWithGate();
-  await Promise.all([loadData(), hydrateProgress()]);
+  await Promise.all([loadData(), hydrateProgress(), loadLibrary()]);
   loadShowsData();
-  
+
   pushPresencePing(); setInterval(pushPresencePing, 5000);
-  
+
   // Initial render for Home tab
   renderRows();
   
