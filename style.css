@@ -2108,6 +2108,8 @@ tbody tr:hover td { background: var(--surface2); }
     border: none; padding: 12px 32px; border-radius: 4px;
     font-family: var(--font-body); font-size: 16px; font-weight: 600;
     cursor: pointer; transition: background 0.2s, transform 0.1s;
+    min-width: 180px;
+    justify-content: center;
 }
 #viewer-library-btn:hover { background: var(--accent); transform: translateY(-2px); }
 #viewer-library-btn .library-icon { font-size: 14px; }
