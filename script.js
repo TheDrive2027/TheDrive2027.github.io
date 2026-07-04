@@ -382,23 +382,23 @@ function renderGrid() {
 }
 
 function renderLibrary() {
-  const watchedGrid = $('library-watched-grid');
+  const watchingGrid = $('library-watching-grid');
   const unwatchedGrid = $('library-unwatched-grid');
-  const watchedEmpty = $('library-watched-empty');
+  const watchingEmpty = $('library-watching-empty');
   const unwatchedEmpty = $('library-unwatched-empty');
 
-  if (!watchedGrid || !unwatchedGrid) return;
+  if (!watchingGrid || !unwatchedGrid) return;
 
-  // Render watched
-  watchedGrid.innerHTML = '';
-  const watchedMovies = allMovies.filter(m => libraryData.watched.some(t => normalize(t) === normalize(m.title)));
-  if (watchedMovies.length === 0) {
-    watchedEmpty.hidden = false;
+  // Render watching
+  watchingGrid.innerHTML = '';
+  const watchingMovies = allMovies.filter(m => libraryData.watching.some(t => normalize(t) === normalize(m.title)));
+  if (watchingMovies.length === 0) {
+    watchingEmpty.hidden = false;
   } else {
-    watchedEmpty.hidden = true;
+    watchingEmpty.hidden = true;
     const frag = document.createDocumentFragment();
-    watchedMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
-    watchedGrid.appendChild(frag);
+    watchingMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
+    watchingGrid.appendChild(frag);
   }
 
   // Render unwatched
@@ -504,13 +504,13 @@ function getVideoProgress(title) {
 // ─── LIBRARY ───────────────────────────────────────────────────
 function isInLibrary(title) {
   const norm = normalize(title);
-  return libraryData.watched.some(t => normalize(t) === norm) ||
+  return libraryData.watching.some(t => normalize(t) === norm) ||
          libraryData.unwatched.some(t => normalize(t) === norm);
 }
 
 function getLibrarySection(title) {
   const norm = normalize(title);
-  if (libraryData.watched.some(t => normalize(t) === norm)) return 'watched';
+  if (libraryData.watching.some(t => normalize(t) === norm)) return 'watching';
   if (libraryData.unwatched.some(t => normalize(t) === norm)) return 'unwatched';
   return null;
 }
@@ -520,12 +520,12 @@ async function loadLibrary() {
     const res = await fetch(`${API_BASE}/api/library?did=${encodeURIComponent(getDeviceId())}`);
     if (res.ok) {
       const data = await res.json();
-      libraryData = data.library || { watched: [], unwatched: [] };
+      libraryData = data.library || { watching: [], unwatched: [] };
     }
   } catch(e) {}
 }
 
-async function toggleLibrary(title, watched = false) {
+async function toggleLibrary(title, watching = false) {
   const section = getLibrarySection(title);
   if (section) {
     // Remove from library
@@ -535,7 +535,7 @@ async function toggleLibrary(title, watched = false) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ did: getDeviceId(), title })
       });
-      libraryData.watched = libraryData.watched.filter(t => normalize(t) !== normalize(title));
+      libraryData.watching = libraryData.watching.filter(t => normalize(t) !== normalize(title));
       libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(title));
       showToast('Removed from library');
     } catch(e) {}
@@ -545,10 +545,10 @@ async function toggleLibrary(title, watched = false) {
       await fetch(`${API_BASE}/api/library/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: getDeviceId(), title, watched })
+        body: JSON.stringify({ did: getDeviceId(), title, watching })
       });
-      if (watched) {
-        libraryData.watched.push(title);
+      if (watching) {
+        libraryData.watching.push(title);
       } else {
         libraryData.unwatched.push(title);
       }
