@@ -158,11 +158,22 @@ const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'R': 4, 'NC-17': 5, 'NR': 
 
 function normalizeMaturity(str) {
   if (!str) return 'NR';
-  // Remove "Rated " prefix, then remove spaces and hyphens for easy checking
-  let s = String(str).toUpperCase().replace(/RATED\s*/, '').replace(/[\s-]/g, '').trim();
+  // 1. Uppercase and trim
+  let s = String(str).toUpperCase().trim();
+  
+  // 2. Remove country prefixes like "US:" or "US-"
+  s = s.replace(/^[A-Z]{2}[:\-]\s*/, '');
+  
+  // 3. Remove the word "RATED" (e.g., "Rated R" -> "R")
+  s = s.replace(/^RATED\s*/, '').trim();
+  
+  // 4. Standardize spaces and hyphens for exact matching
+  s = s.replace(/\s+/g, '').replace(/-/g, ''); // Remove all spaces and hyphens
+  
   if (s === 'NC17') return 'NC-17';
   if (s === 'PG13') return 'PG-13';
   if (s === 'R' || s === 'PG' || s === 'G') return s;
+  
   return 'NR'; // Fallback for Unrated, Not Rated, etc.
 }
 
