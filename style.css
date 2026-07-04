@@ -328,6 +328,7 @@ select:focus { border-color: var(--accent); }
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
   padding: 0 28px 40px;
+  align-items: start; /* PREVENTS CARDS FROM STRETCHING TO FULL HEIGHT */
 }
 
 .movie-card {
@@ -393,6 +394,24 @@ select:focus { border-color: var(--accent); }
 .card-poster img.loaded { opacity: 1; }
 
 .movie-card:hover .card-poster img { transform: scale(1.04); }
+
+/* ── CARD PROGRESS BAR ── */
+.card-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(0,0,0,0.5);
+  z-index: 2;
+}
+
+.card-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  transition: width .3s ease;
+}
 
 /* ── CARD PLAY OVERLAY ── */
 .card-play-overlay {
@@ -1205,6 +1224,7 @@ select:focus { border-color: var(--accent); }
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
   padding: 8px 28px 40px;
+  align-items: start; /* PREVENTS CARDS FROM STRETCHING TO FULL HEIGHT */
 }
 
 /* ============================================================
@@ -1217,6 +1237,7 @@ select:focus { border-color: var(--accent); }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 20px;
+  align-items: start; /* PREVENTS CARDS FROM STRETCHING TO FULL HEIGHT */
 }
 
 /* ── UPDATES TAB ── */
