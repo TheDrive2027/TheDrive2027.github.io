@@ -282,7 +282,7 @@ function render() {
     if (activeTab === 'home') renderRows();
     else if (activeTab === 'movies') { filtered = [...allMovies]; applySort(); }
     else if (activeTab === 'shows') renderShows();
-    else if (activeTab === 'calendar') renderCalendar();
+    else if (activeTab === 'library') renderLibrary();
   }
 }
 
@@ -381,45 +381,46 @@ function renderGrid() {
   movieGrid.appendChild(frag);
 }
 
-function renderCalendar() {
-  let container = $('calendar-content');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'calendar-content';
-    container.className = 'calendar-page';
-    const tab = $('tab-calendar');
-    if (tab) tab.appendChild(container); else return;
+function renderLibrary() {
+  const watchedGrid = $('library-watched-grid');
+  const unwatchedGrid = $('library-unwatched-grid');
+  const watchedEmpty = $('library-watched-empty');
+  const unwatchedEmpty = $('library-unwatched-empty');
+
+  if (!watchedGrid || !unwatchedGrid) return;
+
+  // Render watched
+  watchedGrid.innerHTML = '';
+  const watchedMovies = allMovies.filter(m => libraryData.watched.some(t => normalize(t) === normalize(m.title)));
+  if (watchedMovies.length === 0) {
+    watchedEmpty.hidden = false;
+  } else {
+    watchedEmpty.hidden = true;
+    const frag = document.createDocumentFragment();
+    watchedMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
+    watchedGrid.appendChild(frag);
   }
-  container.innerHTML = '';
-  
-  if (!allMovies.length) {
-    container.innerHTML = '<div class="empty-state"><span class="empty-icon">◻</span><p>No films found.</p></div>';
-    return;
+
+  // Render unwatched
+  unwatchedGrid.innerHTML = '';
+  const unwatchedMovies = allMovies.filter(m => libraryData.unwatched.some(t => normalize(t) === normalize(m.title)));
+  if (unwatchedMovies.length === 0) {
+    unwatchedEmpty.hidden = false;
+  } else {
+    unwatchedEmpty.hidden = true;
+    const frag = document.createDocumentFragment();
+    unwatchedMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
+    unwatchedGrid.appendChild(frag);
   }
-  
-  const grouped = {};
-  allMovies.forEach(v => {
-    const date = v.added_date || 'Unknown Date';
-    if (!grouped[date]) grouped[date] = [];
-    grouped[date].push(v);
+}
+
+function updateLibraryButtons() {
+  document.querySelectorAll('.card-library-btn').forEach(btn => {
+    const title = btn.dataset.title;
+    const inLib = isInLibrary(title);
+    btn.textContent = inLib ? '−' : '+';
+    btn.title = inLib ? 'Remove from library' : 'Add to library';
   });
-  
-  const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
-  const frag = document.createDocumentFragment();
-  
-  sortedDates.forEach(date => {
-    const group = document.createElement('div');
-    group.className = 'calendar-group';
-    const formattedDate = date === 'Unknown Date' ? 'Unknown Date' : new Date(date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    group.innerHTML = `<div class="calendar-date" style="font-family: var(--font-head); font-size: 20px; color: var(--accent); margin: 20px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 4px;">${formattedDate}</div>`;
-    
-    const grid = document.createElement('div');
-    grid.className = 'movie-grid';
-    grouped[date].forEach((m, i) => grid.appendChild(buildCard(m, i, false)));
-    group.appendChild(grid);
-    frag.appendChild(group);
-  });
-  container.appendChild(frag);
 }
 
 function buildCard(m, i, isRowCard) {
