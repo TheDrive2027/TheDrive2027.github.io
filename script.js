@@ -554,6 +554,24 @@ async function toggleLibrary(title, watched = false) {
   }
   renderLibrary();
   updateLibraryButtons();
+  if (currentViewerMovie) updateViewerLibraryButton();
+}
+
+function updateViewerLibraryButton() {
+  if (!currentViewerMovie) return;
+  const btn = $('viewer-library-btn');
+  const icon = btn?.querySelector('.library-icon');
+  const text = $('library-btn-text');
+  if (!btn || !icon || !text) return;
+
+  const inLib = isInLibrary(currentViewerMovie.title);
+  if (inLib) {
+    icon.textContent = '−';
+    text.textContent = 'Remove from Library';
+  } else {
+    icon.textContent = '+';
+    text.textContent = 'Add to Library';
+  }
 }
 
 // Debounced + throttled progress reporter so we don't spam the server.
@@ -620,6 +638,7 @@ async function openMovieViewer(m) {
 
   currentViewerComments = await fetchComments(m.title);
   renderComments();
+  updateViewerLibraryButton();
 }
 
 function closeMovieViewer() {
