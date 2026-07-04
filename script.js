@@ -411,19 +411,33 @@ function renderLibrary() {
 
   if (!watchedGrid || !unwatchedGrid) return;
 
+  // WATCHING section (Top)
   watchedGrid.innerHTML = '';
-  const watchedMovies = allMovies.filter(m => libraryData.watched.some(t => normalize(t) === normalize(m.title)));
-  if (watchedMovies.length === 0) {
+  // Only movies that have progress > 10 seconds
+  const watchingMovies = allMovies.filter(m => {
+    const p = getVideoProgress(m.title);
+    return p.time > 10 && p.duration > 0;
+  }).sort((a,b) => getVideoProgress(b.title).time - getVideoProgress(a.title).time); // Sort by most recently watched
+
+  if (watchingMovies.length === 0) {
     watchedEmpty.hidden = false;
   } else {
     watchedEmpty.hidden = true;
     const frag = document.createDocumentFragment();
-    watchedMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
+    watchingMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
     watchedGrid.appendChild(frag);
   }
 
+  // UNWATCHED section (Bottom)
   unwatchedGrid.innerHTML = '';
-  const unwatchedMovies = allMovies.filter(m => libraryData.unwatched.some(t => normalize(t) === normalize(m.title)));
+  // Only movies explicitly added to the watchlist, AND that do NOT have progress
+  const unwatchedMovies = allMovies.filter(m => {
+    const p = getVideoProgress(m.title);
+    const hasProgress = p.time > 10 && p.duration > 0;
+    const isInUnwatched = libraryData.unwatched.some(t => normalize(t) === normalize(m.title));
+    return isInUnwatched && !hasProgress;
+  });
+
   if (unwatchedMovies.length === 0) {
     unwatchedEmpty.hidden = false;
   } else {
@@ -521,8 +535,12 @@ function getVideoProgress(title) {
 // ─── LIBRARY ───────────────────────────────────────────────────
 function isInLibrary(title) {
   const norm = normalize(title);
+  const p = getVideoProgress(title);
+  const hasProgress = p.time > 10 && p.duration > 0;
+  // It's in the library if it's in the unwatched list, the watched list, OR if it has progress
   return libraryData.watched.some(t => normalize(t) === norm) ||
-         libraryData.unwatched.some(t => normalize(t) === norm);
+         libraryData.unwatched.some(t => normalize(t) === norm) ||
+         hasProgress;
 }
 
 function getLibrarySection(title) {
@@ -544,29 +562,44 @@ async function loadLibrary() {
 
 async function toggleLibrary(title, watched = false) {
   const section = getLibrarySection(title);
-  if (section) {
+  const p = getVideoProgress(title);
+  const hasProgress = p.time > 10 && p.duration > 0;
+
+  if (section || hasProgress) {
+    // Remove
     try {
-      await fetch(`${API_BASE}/api/library/remove`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: getDeviceId(), title })
-      });
+      // If it's in the explicit lists, remove from server
+      if (section) {
+        await fetch(`${API_BASE}/api/library/remove`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ did: getDeviceId(), title })
+        });
+      }
       libraryData.watched = libraryData.watched.filter(t => normalize(t) !== normalize(title));
       libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(title));
+      
+      // If it had progress, clear progress so it leaves the "Watching" list
+      if (hasProgress) {
+        await fetch(`${API_BASE}/api/device/progress/remove`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ did: getDeviceId(), title })
+        });
+        delete progressCache[normalize(title)];
+      }
+      
       showToast('Removed from library');
     } catch(e) {}
   } else {
+    // Add to unwatched
     try {
       await fetch(`${API_BASE}/api/library/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: getDeviceId(), title, watched })
+        body: JSON.stringify({ did: getDeviceId(), title, watched: false })
       });
-      if (watched) {
-        libraryData.watched.push(title);
-      } else {
-        libraryData.unwatched.push(title);
-      }
+      libraryData.unwatched.push(title);
       showToast('Added to library');
     } catch(e) {}
   }
