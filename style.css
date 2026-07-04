@@ -712,21 +712,28 @@ tbody tr:hover td { background: var(--surface2); }
 
 /* ── LIBRARY BUTTON IN FOOTER ── */
 .library-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  padding: 4px 8px;
-  transition: color 200ms ease;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 24px;
+  gap: 3px;
+  padding: 6px 10px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 80ms ease;
+  margin-left: auto;
 }
 
-.library-btn:hover { color: var(--accent); }
+.library-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.library-btn:active { transform: scale(0.93); }
 
 /* ── LIBRARY PAGE ── */
 .library-page {
