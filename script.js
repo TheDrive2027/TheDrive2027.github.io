@@ -118,7 +118,7 @@ async function initWithGate() {
 let allMovies   = [], allShows = [], filtered = [];
 let currentSort = 'title', currentDir = 'asc', activeTab = 'home';
 let activeFilters = { maturity: new Set(), status: new Set(), resolution: new Set(), genre: new Set() };
-let libraryData = { watched: [], unwatched: [] };
+let libraryData = { watching: [], unwatched: [] };
 
 function hasActiveFilters() {
   const search = searchInput ? searchInput.value.trim() : '';
