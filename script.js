@@ -153,11 +153,23 @@ const gridEmpty = $('grid-empty'), sidebarClearBtn = $('sidebar-clear-btn');
 function normalize(str) { return String(str || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 function extractYear(dateStr) { if (!dateStr) return '—'; const m = String(dateStr).match(/\d{4}/); return m ? m[0] : '—'; }
 function parseRuntimeMinutes(str) { if (!str) return 0; const hm = str.match(/(\d+)\s*h(?:r|ours?)?\s*(\d+)?\s*m?/i); if (hm) return parseInt(hm[1]) * 60 + (parseInt(hm[2]) || 0); const m = str.match(/(\d+)/); return m ? parseInt(m[1]) : 0; }
-const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'PG13': 3, 'R': 4, 'NC-17': 5, 'NR': 6 };
+
+const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'R': 4, 'NC-17': 5, 'NR': 6 };
+
+function normalizeMaturity(str) {
+  if (!str) return 'NR';
+  // Remove "Rated " prefix, then remove spaces and hyphens for easy checking
+  let s = String(str).toUpperCase().replace(/RATED\s*/, '').replace(/[\s-]/g, '').trim();
+  if (s === 'NC17') return 'NC-17';
+  if (s === 'PG13') return 'PG-13';
+  if (s === 'R' || s === 'PG' || s === 'G') return s;
+  return 'NR'; // Fallback for Unrated, Not Rated, etc.
+}
+
 function parseResolutionScore(res) { if (!res) return 0; const s = String(res).toUpperCase().trim(); if (s === '4K' || s === 'UHD' || s.includes('2160')) return 2160; const m = s.match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
 function imdbClass(rating) { const r = parseFloat(rating); if (r >= 8) return 'imdb-high'; if (r >= 6.5) return 'imdb-mid'; return 'imdb-low'; }
 function resClass(res) { const r = String(res).toUpperCase(); if (r.includes('4K') || r.includes('2160')) return 'res-4k'; if (r.includes('1080')) return 'res-1080'; if (r.includes('720') || r.includes('576')) return 'res-720'; return 'res-other'; }
-function ratingClass(rating) { const r = String(rating || '').toUpperCase().replace(/[\s-]/g, ''); if (r === 'G') return 'rating-g'; if (r === 'PG') return 'rating-pg'; if (r === 'PG13') return 'rating-pg13'; if (r === 'R') return 'rating-r'; return ''; }
+function ratingClass(rating) { const r = normalizeMaturity(rating); if (r === 'G') return 'rating-g'; if (r === 'PG') return 'rating-pg'; if (r === 'PG-13') return 'rating-pg13'; if (r === 'R') return 'rating-r'; if (r === 'NC-17') return 'rating-nc17'; return 'rating-nr'; }
 let toastTimer;
 function showToast(msg, duration = 3000) { toast.textContent = msg; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), duration); }
 function updateLastUpdated(date) { const d = (date instanceof Date && !isNaN(date)) ? date : new Date(); let h = d.getHours(), m = d.getMinutes(); const ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; const mm = String(m).padStart(2, '0'); if (lastUpdatedEl) lastUpdatedEl.textContent = h + ':' + mm + ' ' + ampm; }
@@ -229,7 +241,8 @@ async function loadUpdates() {
 function populateFilterCheckboxes() {
   const maturityEl = $('filter-maturity-checks');
   if (maturityEl) {
-    const ratings = [...new Set(allMovies.map(m => m.maturityRating).filter(Boolean))].sort((a, b) => (MATURITY_ORDER[a.toUpperCase().replace(/[\s-]/g,'')] || 99) - (MATURITY_ORDER[b.toUpperCase().replace(/[\s-]/g,'')] || 99));
+    // Normalize all ratings before putting them in the sidebar so they group properly
+    const ratings = [...new Set(allMovies.map(m => normalizeMaturity(m.maturityRating)).filter(Boolean))].sort((a, b) => (MATURITY_ORDER[a] || 99) - (MATURITY_ORDER[b] || 99));
     maturityEl.innerHTML = ratings.map(r => `<label class="check-row"><input type="checkbox" value="${escHtml(r)}" data-filter="maturity" ${activeFilters.maturity.has(r) ? 'checked' : ''} /><span class="check-label ${ratingClass(r)}">${escHtml(r)}</span></label>`).join('');
   }
   const resEl = $('filter-resolution-checks');
@@ -267,7 +280,8 @@ function applyFilters() {
   const q = normalize(searchInput ? searchInput.value : '');
   filtered = allMovies.filter(m => {
     if (q && !normalize(m.title).includes(q)) return false;
-    if (activeFilters.maturity.size > 0 && !activeFilters.maturity.has(m.maturityRating)) return false;
+    // Apply normalizeMaturity to the check so it matches the sidebar values
+    if (activeFilters.maturity.size > 0 && !activeFilters.maturity.has(normalizeMaturity(m.maturityRating))) return false;
     if (activeFilters.resolution.size > 0 && !activeFilters.resolution.has(m.resolution)) return false;
     if (activeFilters.genre.size > 0) {
       if (!m.genres || !m.genres.some(g => activeFilters.genre.has(g))) return false;
@@ -284,7 +298,7 @@ function applySort() {
     else if (key === 'imdb') { va = parseFloat(a.imdbRating) || 0; vb = parseFloat(b.imdbRating) || 0; }
     else if (key === 'year') { va = parseInt(a.year) || 0; vb = parseInt(b.year) || 0; }
     else if (key === 'rating') { va = getRatingScore(a.title); vb = getRatingScore(b.title); }
-    else if (key === 'maturity') { va = MATURITY_ORDER[a.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; vb = MATURITY_ORDER[b.maturityRating?.toUpperCase().replace(/[\s-]/g,'')] || 99; }
+    else if (key === 'maturity') { va = MATURITY_ORDER[normalizeMaturity(a.maturityRating)] || 99; vb = MATURITY_ORDER[normalizeMaturity(b.maturityRating)] || 99; }
     else if (key === 'res') { va = parseResolutionScore(a.resolution); vb = parseResolutionScore(b.resolution); }
     if (va < vb) return dir === 'asc' ? -1 : 1; if (va > vb) return dir === 'asc' ? 1 : -1; return 0;
   });
@@ -413,11 +427,10 @@ function renderLibrary() {
 
   // WATCHING section (Top)
   watchedGrid.innerHTML = '';
-  // Only movies that have progress > 10 seconds
   const watchingMovies = allMovies.filter(m => {
     const p = getVideoProgress(m.title);
     return p.time > 10 && p.duration > 0;
-  }).sort((a,b) => getVideoProgress(b.title).time - getVideoProgress(a.title).time); // Sort by most recently watched
+  }).sort((a,b) => getVideoProgress(b.title).time - getVideoProgress(a.title).time);
 
   if (watchingMovies.length === 0) {
     watchedEmpty.hidden = false;
@@ -430,7 +443,6 @@ function renderLibrary() {
 
   // UNWATCHED section (Bottom)
   unwatchedGrid.innerHTML = '';
-  // Only movies explicitly added to the watchlist, AND that do NOT have progress
   const unwatchedMovies = allMovies.filter(m => {
     const p = getVideoProgress(m.title);
     const hasProgress = p.time > 10 && p.duration > 0;
@@ -469,6 +481,8 @@ function buildCard(m, i, isRowCard) {
   const duration = progObj.duration || 0;
   const progressHtml = (progress > 10 && duration > 0) ? `<div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.min(100, (progress / duration) * 100)}%"></div></div>` : '';
 
+  const maturity = normalizeMaturity(m.maturityRating);
+
   card.innerHTML = `
     <div class="card-poster card-poster--playable">
       ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
@@ -478,8 +492,7 @@ function buildCard(m, i, isRowCard) {
     <div class="card-title">${escHtml(m.title)}</div>
     <div class="card-meta">
       <span class="card-year">${escHtml(m.year)}</span><span class="card-sep">·</span>
-      <span class="card-rating ${ratingClass(m.maturityRating)}">${escHtml(m.maturityRating) || '—'}</span>
-      ${m.runtime ? `<span class="card-sep">·</span><span class="card-runtime">${escHtml(m.runtime)}</span>` : ''}
+      <span class="card-rating ${ratingClass(maturity)}">${escHtml(maturity)}</span>
     </div>
     <div class="card-row">
       <span class="card-imdb ${imdbClass(m.imdbRating)}">${m.imdbRating ? '★ ' + m.imdbRating : '—'}</span>
@@ -537,7 +550,6 @@ function isInLibrary(title) {
   const norm = normalize(title);
   const p = getVideoProgress(title);
   const hasProgress = p.time > 10 && p.duration > 0;
-  // It's in the library if it's in the unwatched list, the watched list, OR if it has progress
   return libraryData.watched.some(t => normalize(t) === norm) ||
          libraryData.unwatched.some(t => normalize(t) === norm) ||
          hasProgress;
@@ -566,9 +578,7 @@ async function toggleLibrary(title, watched = false) {
   const hasProgress = p.time > 10 && p.duration > 0;
 
   if (section || hasProgress) {
-    // Remove
     try {
-      // If it's in the explicit lists, remove from server
       if (section) {
         await fetch(`${API_BASE}/api/library/remove`, {
           method: 'POST',
@@ -579,7 +589,6 @@ async function toggleLibrary(title, watched = false) {
       libraryData.watched = libraryData.watched.filter(t => normalize(t) !== normalize(title));
       libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(title));
       
-      // If it had progress, clear progress so it leaves the "Watching" list
       if (hasProgress) {
         await fetch(`${API_BASE}/api/device/progress/remove`, {
           method: 'POST',
@@ -592,7 +601,6 @@ async function toggleLibrary(title, watched = false) {
       showToast('Removed from library');
     } catch(e) {}
   } else {
-    // Add to unwatched
     try {
       await fetch(`${API_BASE}/api/library/add`, {
         method: 'POST',
@@ -672,10 +680,12 @@ async function openMovieViewer(m) {
 
   $('viewer-poster').src = m.poster || '';
   $('viewer-title').textContent = m.title;
+  
+  const maturity = normalizeMaturity(m.maturityRating);
   $('viewer-meta').innerHTML = `
     <span>${m.year || '—'}</span>
     <span class="card-sep">·</span>
-    <span class="card-rating ${ratingClass(m.maturityRating)}">${m.maturityRating || 'NR'}</span>
+    <span class="card-rating ${ratingClass(maturity)}">${maturity}</span>
     <span class="card-sep">·</span>
     <span>${m.runtime || '—'}</span>
     <span class="card-sep">·</span>
@@ -897,7 +907,6 @@ if (sortBy) sortBy.addEventListener('change', () => { currentSort = sortBy.value
 if (sortDirBtn) sortDirBtn.addEventListener('click', () => { currentDir = currentDir === 'desc' ? 'asc' : 'desc'; sortDirBtn.textContent = currentDir === 'desc' ? '↓' : '↑'; if (hasActiveFilters()) applySort(); saveSettings(); });
 if (sidebarClearBtn) sidebarClearBtn.addEventListener('click', clearAllFilters);
 
-// Fix: Attached to document body so Like/Dislike works on ALL tabs (Home, Movies, Library)
 document.body.addEventListener('click', e => {
     const btn = e.target.closest('.rating-btn'); if (!btn) return;
     e.stopPropagation();
@@ -982,10 +991,9 @@ async function initSettingsTab() {
   } catch(e) {
     if (elKey) elKey.textContent = '—';
   }
-  // Wire up the rename button once
   const btn = $('rename-btn');
   if (btn) {
-    btn.onclick = startRename; // Use onclick so we can easily swap it to submitRename
+    btn.onclick = startRename;
   }
 }
 
@@ -1024,7 +1032,7 @@ function startRename() {
     } catch(e) { nameEl.textContent = name; }
     input.replaceWith(nameEl);
     btn.textContent = 'RENAME';
-    btn.onclick = startRename; // Reset back to startRename so it can be clicked again!
+    btn.onclick = startRename; 
   };
   
   btn.onclick = submit;
@@ -1049,7 +1057,6 @@ function startRename() {
 
   pushPresencePing(); setInterval(pushPresencePing, 5000);
 
-  // Initial render for Home tab
   renderRows();
   
   document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1070,8 +1077,8 @@ function startRename() {
       else if (view === 'home') renderRows();
       else if (view === 'movies') { if(hasActiveFilters()) applyFilters(); else { filtered = [...allMovies]; applySort(); } }
       else if (view === 'shows') renderShows();
-      else if (view === 'library') loadLibrary().then(() => renderLibrary()); // Fix: Actively fetch library data before rendering
-      else if (view === 'updates') loadUpdates(); // Load updates tab data
+      else if (view === 'library') loadLibrary().then(() => renderLibrary());
+      else if (view === 'updates') loadUpdates(); 
     });
   });
 })();
