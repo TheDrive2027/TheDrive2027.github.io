@@ -591,7 +591,7 @@ function saveVideoProgress(title, time, duration) {
       });
 
       // Auto-add to library if watched more than 50%
-      if (duration > 0 && time / duration > 0) {
+      if (duration > 0 && time / duration > 0.5) {
         const section = getLibrarySection(title);
         if (section !== 'watched') {
           // Remove from unwatched if present, add to watched
