@@ -710,6 +710,9 @@ videoEl.addEventListener('pause', () => {
   else document.exitFullscreen();
 });
  $('viewer-play-btn').addEventListener('click', playVideo);
+ $('viewer-library-btn').addEventListener('click', () => {
+   if (currentViewerMovie) toggleLibrary(currentViewerMovie.title);
+ });
  $('viewer-close').addEventListener('click', closeMovieViewer);
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
 
