@@ -118,7 +118,7 @@ async function initWithGate() {
 let allMovies   = [], allShows = [], filtered = [];
 let currentSort = 'title', currentDir = 'asc', activeTab = 'home';
 let activeFilters = { maturity: new Set(), status: new Set(), resolution: new Set(), genre: new Set() };
-let libraryData = { watching: [], unwatched: [] };
+let libraryData = { watched: [], unwatched: [] };
 
 function hasActiveFilters() {
   const search = searchInput ? searchInput.value.trim() : '';
@@ -382,23 +382,23 @@ function renderGrid() {
 }
 
 function renderLibrary() {
-  const watchingGrid = $('library-watching-grid');
+  const watchedGrid = $('library-watched-grid');
   const unwatchedGrid = $('library-unwatched-grid');
-  const watchingEmpty = $('library-watching-empty');
+  const watchedEmpty = $('library-watched-empty');
   const unwatchedEmpty = $('library-unwatched-empty');
 
-  if (!watchingGrid || !unwatchedGrid) return;
+  if (!watchedGrid || !unwatchedGrid) return;
 
-  // Render watching
-  watchingGrid.innerHTML = '';
-  const watchingMovies = allMovies.filter(m => libraryData.watching.some(t => normalize(t) === normalize(m.title)));
-  if (watchingMovies.length === 0) {
-    watchingEmpty.hidden = false;
+  // Render watched
+  watchedGrid.innerHTML = '';
+  const watchedMovies = allMovies.filter(m => libraryData.watched.some(t => normalize(t) === normalize(m.title)));
+  if (watchedMovies.length === 0) {
+    watchedEmpty.hidden = false;
   } else {
-    watchingEmpty.hidden = true;
+    watchedEmpty.hidden = true;
     const frag = document.createDocumentFragment();
-    watchingMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
-    watchingGrid.appendChild(frag);
+    watchedMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
+    watchedGrid.appendChild(frag);
   }
 
   // Render unwatched
@@ -504,13 +504,13 @@ function getVideoProgress(title) {
 // ─── LIBRARY ───────────────────────────────────────────────────
 function isInLibrary(title) {
   const norm = normalize(title);
-  return libraryData.watching.some(t => normalize(t) === norm) ||
+  return libraryData.watched.some(t => normalize(t) === norm) ||
          libraryData.unwatched.some(t => normalize(t) === norm);
 }
 
 function getLibrarySection(title) {
   const norm = normalize(title);
-  if (libraryData.watching.some(t => normalize(t) === norm)) return 'watching';
+  if (libraryData.watched.some(t => normalize(t) === norm)) return 'watched';
   if (libraryData.unwatched.some(t => normalize(t) === norm)) return 'unwatched';
   return null;
 }
@@ -520,12 +520,12 @@ async function loadLibrary() {
     const res = await fetch(`${API_BASE}/api/library?did=${encodeURIComponent(getDeviceId())}`);
     if (res.ok) {
       const data = await res.json();
-      libraryData = data.library || { watching: [], unwatched: [] };
+      libraryData = data.library || { watched: [], unwatched: [] };
     }
   } catch(e) {}
 }
 
-async function toggleLibrary(title, watching = false) {
+async function toggleLibrary(title, watched = false) {
   const section = getLibrarySection(title);
   if (section) {
     // Remove from library
@@ -535,7 +535,7 @@ async function toggleLibrary(title, watching = false) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ did: getDeviceId(), title })
       });
-      libraryData.watching = libraryData.watching.filter(t => normalize(t) !== normalize(title));
+      libraryData.watched = libraryData.watched.filter(t => normalize(t) !== normalize(title));
       libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(title));
       showToast('Removed from library');
     } catch(e) {}
@@ -545,10 +545,10 @@ async function toggleLibrary(title, watching = false) {
       await fetch(`${API_BASE}/api/library/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: getDeviceId(), title, watching })
+        body: JSON.stringify({ did: getDeviceId(), title, watched })
       });
-      if (watching) {
-        libraryData.watching.push(title);
+      if (watched) {
+        libraryData.watched.push(title);
       } else {
         libraryData.unwatched.push(title);
       }
@@ -589,6 +589,23 @@ function saveVideoProgress(title, time, duration) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ did: getDeviceId(), title, time, duration })
       });
+
+      // Auto-add to library if watched more than 50%
+      if (duration > 0 && time / duration > 0.5) {
+        const section = getLibrarySection(title);
+        if (section !== 'watched') {
+          // Remove from unwatched if present, add to watched
+          libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== key);
+          if (!libraryData.watched.some(t => normalize(t) === key)) {
+            libraryData.watched.push(title);
+            await fetch(`${API_BASE}/api/library/add`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ did: getDeviceId(), title, watched: true })
+            });
+          }
+        }
+      }
     } catch(e) {}
   }, 4000);
 }
@@ -658,22 +675,7 @@ function playVideo() {
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
   videoEl.src = currentViewerMovie.driveLink;
-
-  // Auto-add to library when starting to watch
-  const section = getLibrarySection(currentViewerMovie.title);
-  if (section !== 'watching') {
-    // Remove from unwatched if present, add to watching
-    libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(currentViewerMovie.title));
-    if (!libraryData.watching.some(t => normalize(t) === normalize(currentViewerMovie.title))) {
-      libraryData.watching.push(currentViewerMovie.title);
-      fetch(`${API_BASE}/api/library/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: getDeviceId(), title: currentViewerMovie.title, watching: true })
-      }).catch(e => {});
-    }
-  }
-
+  
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
   videoEl.addEventListener('loadedmetadata', () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
@@ -999,8 +1001,7 @@ function startRename() {
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
   await initWithGate();
-  await Promise.all([loadData(), hydrateProgress()]);
-  loadLibrary().catch(() => {});
+  await Promise.all([loadData(), hydrateProgress(), loadLibrary()]);
   loadShowsData();
 
   pushPresencePing(); setInterval(pushPresencePing, 5000);
