@@ -710,6 +710,51 @@ tbody tr:hover td { background: var(--surface2); }
 .card-poster--requestable:has(.card-request-btn--done) .card-play-overlay { background: rgba(0,0,0,0.35); }
 .card-poster--requestable:has(.card-request-btn--done) img { filter: blur(2px); }
 
+/* ── CARD LIBRARY BUTTON ── */
+.card-library-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 200ms ease;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10;
+}
+
+.movie-card:hover .card-library-btn { opacity: 1; transform: scale(1); }
+.card-library-btn:hover { background: var(--accent); color: var(--bg); }
+
+/* ── LIBRARY PAGE ── */
+.library-page {
+  padding: 24px;
+}
+
+.library-section {
+  margin-bottom: 40px;
+}
+
+.library-section-title {
+  font-family: var(--font-head);
+  font-size: 24px;
+  color: var(--accent);
+  margin: 0 0 20px 0;
+  letter-spacing: 2px;
+}
+
 .card-title {
   font-family: var(--font-head);
   font-size: 18px;
