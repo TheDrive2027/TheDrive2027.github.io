@@ -116,8 +116,9 @@ async function initWithGate() {
 
 // ─── STATE ────────────────────────────────────────────────────
 let allMovies   = [], allShows = [], filtered = [];
-let currentSort = 'title', currentDir = 'asc', activeTab = 'home'; 
+let currentSort = 'title', currentDir = 'asc', activeTab = 'home';
 let activeFilters = { maturity: new Set(), status: new Set(), resolution: new Set(), genre: new Set() };
+let libraryData = { watched: [], unwatched: [] };
 
 function hasActiveFilters() {
   const search = searchInput ? searchInput.value.trim() : '';
@@ -486,6 +487,64 @@ async function hydrateProgress() {
 
 function getVideoProgress(title) {
   return progressCache[normalize(title)] || {};
+}
+
+// ─── LIBRARY ───────────────────────────────────────────────────
+function isInLibrary(title) {
+  const norm = normalize(title);
+  return libraryData.watched.some(t => normalize(t) === norm) ||
+         libraryData.unwatched.some(t => normalize(t) === norm);
+}
+
+function getLibrarySection(title) {
+  const norm = normalize(title);
+  if (libraryData.watched.some(t => normalize(t) === norm)) return 'watched';
+  if (libraryData.unwatched.some(t => normalize(t) === norm)) return 'unwatched';
+  return null;
+}
+
+async function loadLibrary() {
+  try {
+    const res = await fetch(`${API_BASE}/api/library?did=${encodeURIComponent(getDeviceId())}`);
+    if (res.ok) {
+      const data = await res.json();
+      libraryData = data.library || { watched: [], unwatched: [] };
+    }
+  } catch(e) {}
+}
+
+async function toggleLibrary(title, watched = false) {
+  const section = getLibrarySection(title);
+  if (section) {
+    // Remove from library
+    try {
+      await fetch(`${API_BASE}/api/library/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: getDeviceId(), title })
+      });
+      libraryData.watched = libraryData.watched.filter(t => normalize(t) !== normalize(title));
+      libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(title));
+      showToast('Removed from library');
+    } catch(e) {}
+  } else {
+    // Add to library
+    try {
+      await fetch(`${API_BASE}/api/library/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: getDeviceId(), title, watched })
+      });
+      if (watched) {
+        libraryData.watched.push(title);
+      } else {
+        libraryData.unwatched.push(title);
+      }
+      showToast('Added to library');
+    } catch(e) {}
+  }
+  renderLibrary();
+  updateLibraryButtons();
 }
 
 // Debounced + throttled progress reporter so we don't spam the server.
