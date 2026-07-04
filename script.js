@@ -675,7 +675,22 @@ function playVideo() {
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
   videoEl.src = currentViewerMovie.driveLink;
-  
+
+  // Auto-add to library when starting to watch
+  const section = getLibrarySection(currentViewerMovie.title);
+  if (section !== 'watching') {
+    // Remove from unwatched if present, add to watching
+    libraryData.unwatched = libraryData.unwatched.filter(t => normalize(t) !== normalize(currentViewerMovie.title));
+    if (!libraryData.watching.some(t => normalize(t) === normalize(currentViewerMovie.title))) {
+      libraryData.watching.push(currentViewerMovie.title);
+      fetch(`${API_BASE}/api/library/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: getDeviceId(), title: currentViewerMovie.title, watching: true })
+      }).catch(e => {});
+    }
+  }
+
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
   videoEl.addEventListener('loadedmetadata', () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
