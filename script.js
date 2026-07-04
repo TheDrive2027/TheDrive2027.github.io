@@ -1000,9 +1000,10 @@ function startRename() {
   currentSort = 'title'; currentDir = 'asc';
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   
-  // Bypass GitHub Pages delay by fetching directly from the raw repository file
+    // Bypass GitHub Pages delay by fetching directly from the raw repository file
   try { 
-    const cR = await fetch('https://raw.githubusercontent.com/TheDrive2027/TheDrive2027.github.io/main/config.json?t=' + Date.now()); 
+    let cR = await fetch('https://raw.githubusercontent.com/TheDrive2027/TheDrive2027.github.io/main/config.json?t=' + Date.now()); 
+    if (!cR.ok) cR = await fetch('https://raw.githubusercontent.com/TheDrive2027/TheDrive2027.github.io/master/config.json?t=' + Date.now());
     if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } 
   } catch(e) { API_BASE = ''; }
   
