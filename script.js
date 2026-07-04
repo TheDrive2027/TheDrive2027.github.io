@@ -997,7 +997,17 @@ function startRename() {
 (async function init() {
   currentSort = 'title'; currentDir = 'asc';
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
-  try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
+  try {
+    const cR = await fetch('config.json?t=' + Date.now());
+    if (cR.ok) {
+      const c = await cR.json();
+      API_BASE = c.API_BASE || '';
+    } else {
+      API_BASE = 'http://localhost:8000';
+    }
+  } catch(e) {
+    API_BASE = 'http://localhost:8000';
+  }
   await initWithGate();
   await Promise.all([loadData(), hydrateProgress(), loadLibrary()]);
   loadShowsData();
