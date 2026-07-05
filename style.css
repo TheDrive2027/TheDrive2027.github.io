@@ -1395,9 +1395,22 @@ select:focus { border-color: var(--accent); }
     color: var(--text); font-size: 24px; cursor: pointer;
     width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s, transform 0.2s;
+    transition: background 0.2s, transform 0.2s, opacity 0.3s; /* Added opacity transition */
 }
 #viewer-close:hover { background: var(--red); border-color: var(--red); transform: rotate(90deg); }
+
+/* Fade out exit button when video is playing */
+#viewer-content.player-active #viewer-close {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Fade in exit button on hover when video is playing */
+#viewer-content.player-active:hover #viewer-close,
+#viewer-content.player-active #viewer-close:hover {
+    opacity: 1;
+    pointer-events: auto;
+}
 
 #viewer-details {
     position: relative;
