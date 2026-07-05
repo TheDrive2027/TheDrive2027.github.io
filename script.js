@@ -158,23 +158,17 @@ const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'R': 4, 'NC-17': 5, 'NR': 
 
 function normalizeMaturity(str) {
   if (!str) return 'NR';
-  // 1. Uppercase and trim
   let s = String(str).toUpperCase().trim();
   
-  // 2. Remove country prefixes like "US:" or "US-"
-  s = s.replace(/^[A-Z]{2}[:\-]\s*/, '');
+  // Use regex word boundaries to scan the string for valid ratings
+  // This handles messy NFO formats like "US:R / US:Rated R"
+  if (/\bNC[-\s]?17\b/.test(s)) return 'NC-17';
+  if (/\bPG[-\s]?13\b/.test(s)) return 'PG-13';
+  if (/\bPG\b/.test(s)) return 'PG';
+  if (/\bR\b/.test(s)) return 'R'; // \b prevents matching the 'R' inside 'Rated'
+  if (/\bG\b/.test(s)) return 'G';
   
-  // 3. Remove the word "RATED" (e.g., "Rated R" -> "R")
-  s = s.replace(/^RATED\s*/, '').trim();
-  
-  // 4. Standardize spaces and hyphens for exact matching
-  s = s.replace(/\s+/g, '').replace(/-/g, ''); // Remove all spaces and hyphens
-  
-  if (s === 'NC17') return 'NC-17';
-  if (s === 'PG13') return 'PG-13';
-  if (s === 'R' || s === 'PG' || s === 'G') return s;
-  
-  return 'NR'; // Fallback for Unrated, Not Rated, etc.
+  return 'NR';
 }
 
 function parseResolutionScore(res) { if (!res) return 0; const s = String(res).toUpperCase().trim(); if (s === '4K' || s === 'UHD' || s.includes('2160')) return 2160; const m = s.match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
