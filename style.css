@@ -1315,7 +1315,7 @@ select:focus { border-color: var(--accent); }
   
   /* Responsive Movie Viewer */
   #movie-viewer { padding: 0; }
-  #viewer-content { max-width: 100%; max-height: 100%; border-radius: 0; }
+  #viewer-content { max-width: 100%; height: 100vh; max-height: 100vh; border-radius: 0; }
   .viewer-main { padding: 20px; }
   .viewer-hero { flex-direction: column; gap: 20px; }
   #viewer-poster { width: 180px; height: 270px; margin: 0 auto; }
@@ -1359,11 +1359,11 @@ select:focus { border-color: var(--accent); }
     justify-content: center;
     background: rgba(0,0,0,0.85);
     backdrop-filter: blur(8px);
-    padding: 24px; /* Padding so the viewer doesn't touch the edges */
+    padding: 24px; 
 }
 
 #viewer-backdrop {
-    position: fixed; /* Fixed so it covers the whole screen behind the card */
+    position: fixed; 
     inset: 0;
     z-index: 1;
     background: transparent;
@@ -1374,8 +1374,9 @@ select:focus { border-color: var(--accent); }
     z-index: 2;
     width: 100%;
     max-width: 1400px;
-    max-height: 90vh; /* Capped height so it acts like a card */
-    background: var(--bg); /* Restored background color */
+    height: 90vh; /* Strict height prevents collapse when details are hidden */
+    max-height: 90vh;
+    background: var(--bg); 
     border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: 0 24px 80px rgba(0,0,0,0.7);
@@ -1403,7 +1404,7 @@ select:focus { border-color: var(--accent); }
     z-index: 2;
     display: flex;
     flex: 1;
-    min-height: 0; /* Allows proper scrolling inside flexbox */
+    min-height: 0; 
     overflow: hidden;
 }
 
