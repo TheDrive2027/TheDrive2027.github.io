@@ -1743,6 +1743,13 @@ select:focus { border-color: var(--accent); }
 .app-layout {
   display: flex;
   min-height: 100vh;
+  border: 3px solid transparent;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.app-layout.party-active {
+  box-shadow: 0 0 15px var(--user-color, transparent);
+  border-color: var(--user-color, transparent);
 }
 
 .main-area {
@@ -1755,4 +1762,60 @@ select:focus { border-color: var(--accent); }
 .content-area {
   flex: 1;
   overflow-y: auto;
+}
+
+/* ── WATCH PARTY STYLES ── */
+.party-input-wrap {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+#party-code-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    outline: none;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#party-code-input:focus { border-color: var(--accent); }
+
+/* Remote Cursors */
+.remote-cursor {
+    position: absolute;
+    pointer-events: none;
+    transition: transform 0.05s linear, opacity 0.5s ease;
+    z-index: 2000;
+    opacity: 0;
+}
+
+.remote-cursor.visible {
+    opacity: 1;
+}
+
+.remote-cursor-arrow {
+    width: 20px;
+    height: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.remote-cursor-label {
+    position: absolute;
+    top: 18px;
+    left: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #000;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: bold;
+    white-space: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
