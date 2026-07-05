@@ -1057,16 +1057,62 @@ function startRename() {
 let partyWS = null;
 let userColor = null;
 let cursorTimers = {};
+let partyPingInterval = null;
 
-function joinParty(code) {
+// Prompt for name if needed before joining
+async function ensureDeviceName() {
+  if (!cachedDeviceData) {
+    try {
+      const res = await fetch(`${API_BASE}/api/device/data?did=${encodeURIComponent(getDeviceId())}`);
+      if (res.ok) cachedDeviceData = await res.json();
+    } catch(e) {}
+  }
+  
+  let name = cachedDeviceData?.device_name;
+  if (!name || name === 'Unnamed Device' || name === '') {
+    name = prompt('Please enter your name for the Watch Party:', '');
+    if (name && name.trim()) {
+      name = name.trim().substring(0, 64);
+      try {
+        const res = await fetch(`${API_BASE}/api/device/rename`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ did: getDeviceId(), name })
+        });
+        if (res.ok) {
+          const d = await res.json();
+          cachedDeviceData.device_name = d.name;
+          if ($('settings-device-name')) $('settings-device-name').textContent = d.name;
+          showToast(`Name set to ${d.name}`);
+          return d.name;
+        }
+      } catch(e) {}
+      return null;
+    } else {
+      return null; // User cancelled or entered empty string
+    }
+  }
+  return name;
+}
+
+async function joinParty(code) {
   if (!API_BASE) return;
-  // Ensure code is exactly 6 characters
+  
+  // 1. Ensure the user has a name before connecting
+  const name = await ensureDeviceName();
+  if (!name) {
+    showToast('You must enter a name to join a party.');
+    return;
+  }
+
+  // 2. Validate the code
   code = code.toUpperCase().substring(0, 6);
   if (code.length < 6) {
     showToast('Code must be 6 characters.');
     return;
   }
 
+  // 3. Connect to WebSocket
   const wsUrl = `${API_BASE.replace('http', 'ws')}/ws/party/${code}?did=${getDeviceId()}`;
   partyWS = new WebSocket(wsUrl);
   
@@ -1077,6 +1123,13 @@ function joinParty(code) {
     $('party-leave-btn').style.display = 'block';
     document.querySelectorAll('.party-code-digit').forEach(inp => inp.disabled = true);
     showToast('Joined Watch Party!');
+    
+    // Send heartbeat every 30s to keep WS alive through Cloudflare
+    partyPingInterval = setInterval(() => {
+      if (partyWS && partyWS.readyState === WebSocket.OPEN) {
+        partyWS.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000);
   };
   
   partyWS.onmessage = (event) => {
@@ -1096,13 +1149,8 @@ function joinParty(code) {
       }
     } else if (msg.type === 'play' || msg.type === 'pause' || msg.type === 'seek') {
       _applying_party_action = true;
-      if (viewer.style.display !== 'flex') {
-        openMovieViewer(currentViewerMovie || msg.movie, true);
-        setTimeout(() => applyVideoAction(msg), 500);
-      } else {
-        applyVideoAction(msg);
-      }
-      setTimeout(() => { _applying_party_action = false; }, 500);
+      applyVideoAction(msg);
+      setTimeout(() => { _applying_party_action = false; }, 1000); // Give it a second to load
     }
   };
   
@@ -1118,15 +1166,29 @@ function joinParty(code) {
 
 function applyVideoAction(msg) {
   if (msg.type === 'play') {
-    if (videoEl.paused) videoEl.play();
+    // If the video player isn't active yet, we need to trigger playVideo() which sets the src
+    if (viewer.style.display !== 'flex' || $('viewer-player').style.display === 'none') {
+      playVideo();
+      // If they are seeking to a specific time, apply it once metadata loads
+      if (msg.time) {
+        videoEl.addEventListener('loadedmetadata', () => { 
+          videoEl.currentTime = msg.time; 
+        }, { once: true });
+      }
+    } else {
+      // Already playing, just ensure it's playing and seek if needed
+      if (videoEl.paused) videoEl.play();
+      if (msg.time) videoEl.currentTime = msg.time;
+    }
   } else if (msg.type === 'pause') {
     if (!videoEl.paused) videoEl.pause();
   } else if (msg.type === 'seek') {
-    videoEl.currentTime = msg.time;
+    if (videoEl.duration) videoEl.currentTime = msg.time;
   }
 }
 
 function leaveParty(silent = false) {
+  if (partyPingInterval) clearInterval(partyPingInterval);
   if (partyWS) {
     partyWS.close();
     partyWS = null;
