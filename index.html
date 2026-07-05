@@ -246,6 +246,26 @@
                                 <span id="settings-first-seen" class="settings-value">—</span>
                             </div>
                         </div>
+                        
+                        <!-- WATCH PARTY SECTION -->
+                        <div class="settings-area">
+                            <h2>WATCH PARTY</h2>
+                            <div id="party-controls">
+                                <div class="settings-item" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+                                    <span>JOIN OR CREATE A PARTY</span>
+                                    <div class="party-input-wrap">
+                                        <input type="text" id="party-code-input" maxlength="6" placeholder="6-Digit Code" />
+                                        <button id="party-join-btn" class="rename-btn">JOIN/CREATE</button>
+                                        <button id="party-leave-btn" class="rename-btn" style="display: none; border-color: var(--red); color: var(--red);">LEAVE</button>
+                                    </div>
+                                </div>
+                                <div class="settings-item" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+                                    <span>STATUS</span>
+                                    <span id="party-status" class="settings-value">Not connected.</span>
+                                    <span id="party-users" class="settings-value" style="font-size: 12px; color: var(--text-muted);"></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -356,6 +376,9 @@
     <!-- ─── TOASTS & TOOLTIPS ─── -->
     <div id="toast" class="toast"></div>
     <div id="req-tooltip" class="req-tooltip" hidden></div>
+    
+    <!-- Remote Cursors Container for Watch Party -->
+    <div id="remote-cursors-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1999; overflow: hidden;"></div>
 
     <!-- ─── SCRIPTS ─── -->
     <script src="script.js"></script>
