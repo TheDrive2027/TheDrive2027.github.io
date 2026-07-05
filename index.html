@@ -247,20 +247,27 @@
                             </div>
                         </div>
                         
-                        <!-- WATCH PARTY SECTION -->
+                                                <!-- WATCH PARTY SECTION -->
                         <div class="settings-area">
                             <h2>WATCH PARTY</h2>
                             <div id="party-controls">
-                                <div class="settings-item" style="flex-direction: column; align-items: flex-start; gap: 10px;">
-                                    <span>JOIN OR CREATE A PARTY</span>
-                                    <div class="party-input-wrap">
-                                        <input type="text" id="party-code-input" maxlength="6" placeholder="6-Digit Code" />
-                                        <button id="party-join-btn" class="rename-btn">JOIN/CREATE</button>
-                                        <button id="party-leave-btn" class="rename-btn" style="display: none; border-color: var(--red); color: var(--red);">LEAVE</button>
+                                <div class="settings-item" style="flex-direction: column; align-items: center; gap: 15px;">
+                                    <span>PARTY CODE</span>
+                                    <div class="party-code-boxes" id="party-code-boxes">
+                                        <input type="text" inputmode="text" maxlength="1" class="party-code-digit" data-index="0">
+                                        <input type="text" inputmode="text" maxlength="1" class="party-code-digit" data-index="1">
+                                        <input type="text" inputmode="text" maxlength="1" class="party-code-digit" data-index="2">
+                                        <input type="text" inputmode="text" maxlength="1" class="party-code-digit" data-index="3">
+                                        <input type="text" inputmode="text" maxlength="1" class="party-code-digit" data-index="4">
+                                        <input type="text" inputmode="text" maxlength="1" class="party-code-digit" data-index="5">
+                                    </div>
+                                    <div class="party-btn-group">
+                                        <button id="party-create-btn" class="rename-btn">CREATE PARTY</button>
+                                        <button id="party-join-btn" class="rename-btn">JOIN PARTY</button>
+                                        <button id="party-leave-btn" class="rename-btn" style="display: none; border-color: var(--red); color: var(--red);">LEAVE PARTY</button>
                                     </div>
                                 </div>
-                                <div class="settings-item" style="flex-direction: column; align-items: flex-start; gap: 10px;">
-                                    <span>STATUS</span>
+                                <div class="settings-item" style="flex-direction: column; align-items: center; gap: 5px;">
                                     <span id="party-status" class="settings-value">Not connected.</span>
                                     <span id="party-users" class="settings-value" style="font-size: 12px; color: var(--text-muted);"></span>
                                 </div>
