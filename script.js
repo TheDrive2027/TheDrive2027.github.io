@@ -991,9 +991,20 @@ async function initSettingsTab() {
     const res = await fetch(`${API_BASE}/api/device/data?did=${encodeURIComponent(did)}`);
     if (res.ok) {
       const d = await res.json();
-      if (elName) elName.textContent = d.device_name || 'Unnamed Device';
+      cachedDeviceData = d; // share with watch-party logic
+      const unnamed = isUnnamedDeviceName(d.device_name);
+      if (elName) elName.textContent = unnamed ? 'Unnamed Device' : d.device_name;
       if (elKey)  elKey.textContent  = d.access_key || '—';
       if (elSeen) elSeen.textContent = d.first_seen || '—';
+
+      // Automatically prompt for a name (once per session) if the device is
+      // still "Unnamed Device" — the name shows beside the cursor in Watch
+      // Parties, so we want every device named before joining.
+      if (unnamed && !_proactiveNamePromptShown) {
+        _proactiveNamePromptShown = true;
+        const newName = await ensureDeviceName();
+        if (newName && elName) elName.textContent = newName;
+      }
     }
   } catch(e) {
     if (elKey) elKey.textContent = '—';
@@ -1009,7 +1020,7 @@ function startRename() {
   const btn    = $('rename-btn');
   if (!nameEl || !btn) return;
   const wrap = nameEl.parentElement;
-  const current = nameEl.textContent === '—' ? '' : nameEl.textContent.replace(/^Unnamed Device$/, '');
+  const current = (nameEl.textContent === '—' || isUnnamedDeviceName(nameEl.textContent)) ? '' : nameEl.textContent;
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'rename-input';
@@ -1020,36 +1031,31 @@ function startRename() {
   btn.textContent = 'SAVE';
   input.focus();
   input.select();
-  
+
   const submit = async () => {
     const name = input.value.trim();
-    if (!name) { 
-      input.replaceWith(nameEl); 
-      btn.textContent = 'RENAME'; 
-      btn.onclick = startRename; 
-      return; 
+    if (!name) {
+      input.replaceWith(nameEl);
+      btn.textContent = 'RENAME';
+      btn.onclick = startRename;
+      return;
     }
-    try {
-      const res = await fetch(`${API_BASE}/api/device/rename`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ did: getDeviceId(), name })
-      });
-      const d = await res.json();
-      nameEl.textContent = d.name || name;
-    } catch(e) { nameEl.textContent = name; }
+    // saveDeviceName updates the DOM, cachedDeviceData, and notifies the party
+    const saved = await saveDeviceName(name);
+    if (!saved) nameEl.textContent = name; // fallback on failure
     input.replaceWith(nameEl);
     btn.textContent = 'RENAME';
-    btn.onclick = startRename; 
+    btn.onclick = startRename;
   };
-  
+
   btn.onclick = submit;
-  input.addEventListener('keydown', e => { 
-    if (e.key === 'Enter') submit(); 
-    if (e.key === 'Escape') { 
-      input.replaceWith(nameEl); 
-      btn.textContent = 'RENAME'; 
-      btn.onclick = startRename; 
-    } 
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submit();
+    if (e.key === 'Escape') {
+      input.replaceWith(nameEl);
+      btn.textContent = 'RENAME';
+      btn.onclick = startRename;
+    }
   });
 }
 
@@ -1059,7 +1065,45 @@ let userColor = null;
 let cursorTimers = {};
 let partyPingInterval = null;
 
-// Prompt for name if needed before joining
+// Tracks whether we've already proactively prompted for a name this session,
+// so opening the Settings tab repeatedly doesn't keep nagging the user.
+let _proactiveNamePromptShown = false;
+
+// Returns true if the given device name should be treated as "unnamed".
+// Case-insensitive to catch "Unnamed device", "Unnamed Device", "unnamed", etc.
+function isUnnamedDeviceName(name) {
+  if (name === null || name === undefined) return true;
+  const n = String(name).trim().toLowerCase();
+  return n === '' || n === 'unnamed device' || n === 'unnamed' || n === 'unknown' || n === 'null' || n === 'none';
+}
+
+// Persist a freshly chosen name to the server, update local state + UI,
+// and notify any active watch party so remote cursor labels refresh live.
+async function saveDeviceName(name) {
+  name = name.trim().substring(0, 64);
+  if (!name) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/device/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ did: getDeviceId(), name })
+    });
+    if (res.ok) {
+      const d = await res.json();
+      if (!cachedDeviceData) cachedDeviceData = {};
+      cachedDeviceData.device_name = d.name;
+      if ($('settings-device-name')) $('settings-device-name').textContent = d.name;
+      // Let other party members see the new name beside our cursor
+      sendParty({ type: 'rename', name: d.name });
+      showToast(`Name set to ${d.name}`);
+      return d.name;
+    }
+  } catch(e) {}
+  return null;
+}
+
+// Prompt for a name if the device is still unnamed, then rename it.
+// Returns the chosen name, or null if the user cancelled / entered nothing.
 async function ensureDeviceName() {
   if (!cachedDeviceData) {
     try {
@@ -1067,30 +1111,14 @@ async function ensureDeviceName() {
       if (res.ok) cachedDeviceData = await res.json();
     } catch(e) {}
   }
-  
+
   let name = cachedDeviceData?.device_name;
-  if (!name || name === 'Unnamed Device' || name === '') {
-    name = prompt('Please enter your name for the Watch Party:', '');
+  if (isUnnamedDeviceName(name)) {
+    name = prompt('Please enter a name for this device (shown beside your cursor in Watch Parties):', '');
     if (name && name.trim()) {
-      name = name.trim().substring(0, 64);
-      try {
-        const res = await fetch(`${API_BASE}/api/device/rename`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ did: getDeviceId(), name })
-        });
-        if (res.ok) {
-          const d = await res.json();
-          cachedDeviceData.device_name = d.name;
-          if ($('settings-device-name')) $('settings-device-name').textContent = d.name;
-          showToast(`Name set to ${d.name}`);
-          return d.name;
-        }
-      } catch(e) {}
-      return null;
-    } else {
-      return null; // User cancelled or entered empty string
+      return await saveDeviceName(name);
     }
+    return null; // User cancelled or entered empty string
   }
   return name;
 }
@@ -1142,7 +1170,10 @@ async function joinParty(code) {
     } else if (msg.type === 'user_joined' || msg.type === 'user_left') {
       // Could update a user list here
     } else if (msg.type === 'cursor') {
-      moveRemoteCursor(msg.color, msg.x, msg.y);
+      moveRemoteCursor(msg.color, msg.x, msg.y, msg.name);
+    } else if (msg.type === 'rename') {
+      // A party member renamed their device — refresh their cursor label.
+      updateRemoteCursorName(msg.color, msg.name);
     } else if (msg.type === 'load_video') {
       if (!currentViewerMovie || currentViewerMovie.title !== msg.movie.title) {
         openMovieViewer(msg.movie, true);
@@ -1223,9 +1254,10 @@ document.addEventListener('mousemove', (e) => {
   sendParty({ type: 'cursor', x: e.clientX, y: e.clientY });
 });
 
-function moveRemoteCursor(color, x, y) {
+function moveRemoteCursor(color, x, y, name) {
   const container = $('remote-cursors-container');
   let cursor = container.querySelector(`.remote-cursor[data-color="${color}"]`);
+  const displayName = (name && String(name).trim()) ? String(name).trim() : 'Unknown';
   
   if (!cursor) {
     cursor = document.createElement('div');
@@ -1235,10 +1267,14 @@ function moveRemoteCursor(color, x, y) {
       <svg class="remote-cursor-arrow" viewBox="0 0 24 24" fill="${color}" stroke="#000" stroke-width="1">
         <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.85a.5.5 0 00-.85.36z"/>
       </svg>
-      <div class="remote-cursor-label" style="background: ${color}">User</div>
+      <div class="remote-cursor-label" style="background: ${color}"></div>
     `;
     container.appendChild(cursor);
   }
+
+  // Always sync the label with the latest device name (handles live renames)
+  const label = cursor.querySelector('.remote-cursor-label');
+  if (label && label.textContent !== displayName) label.textContent = displayName;
   
   cursor.style.transform = `translate(${x}px, ${y}px)`;
   cursor.classList.add('visible');
@@ -1248,6 +1284,16 @@ function moveRemoteCursor(color, x, y) {
   cursorTimers[color] = setTimeout(() => {
     cursor.classList.remove('visible');
   }, 2000);
+}
+
+// Update just the label of an existing remote cursor (used when a party
+// member renames their device mid-session, without moving the cursor).
+function updateRemoteCursorName(color, name) {
+  const cursor = $('remote-cursors-container').querySelector(`.remote-cursor[data-color="${color}"]`);
+  if (!cursor) return;
+  const displayName = (name && String(name).trim()) ? String(name).trim() : 'Unknown';
+  const label = cursor.querySelector('.remote-cursor-label');
+  if (label && label.textContent !== displayName) label.textContent = displayName;
 }
 
 // Party UI Logic
