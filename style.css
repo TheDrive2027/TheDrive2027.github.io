@@ -328,7 +328,7 @@ select:focus { border-color: var(--accent); }
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
   padding: 0 28px 40px;
-  align-items: start; /* PREVENTS CARDS FROM STRETCHING TO FULL HEIGHT */
+  align-items: start;
 }
 
 .movie-card {
@@ -342,7 +342,6 @@ select:focus { border-color: var(--accent); }
   transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
   animation: card-in .3s ease both;
   cursor: default;
-  align-self: start; /* ENSURES CARD NEVER STRETches IN FLEX OR GRID */
 }
 
 @keyframes card-in {
@@ -385,7 +384,7 @@ select:focus { border-color: var(--accent); }
   height: 100%;
   object-fit: cover;
   display: block;
-  position: absolute; /* Prevents image from stretching card height before loading */
+  position: absolute;
   inset: 0;
   z-index: 1;
   opacity: 0;
@@ -1049,8 +1048,8 @@ select:focus { border-color: var(--accent); }
   width: 220px;
   flex-shrink: 0;
   position: sticky;
-  top: 0; /* Sits perfectly at the top of the content area scroll container */
-  height: 100vh; /* Full height of the viewport */
+  top: 0;
+  height: 100vh;
   overflow-y: auto;
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -1225,7 +1224,7 @@ select:focus { border-color: var(--accent); }
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
   padding: 8px 28px 40px;
-  align-items: start; /* PREVENTS CARDS FROM STRETCHING TO FULL HEIGHT */
+  align-items: start;
 }
 
 /* ============================================================
@@ -1238,7 +1237,7 @@ select:focus { border-color: var(--accent); }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 20px;
-  align-items: start; /* PREVENTS CARDS FROM STRETCHING TO FULL HEIGHT */
+  align-items: start;
 }
 
 /* ── UPDATES TAB ── */
@@ -1315,8 +1314,12 @@ select:focus { border-color: var(--accent); }
   .ep-thumb-wrapper { width: 110px; height: 62px; }
   
   /* Responsive Movie Viewer */
-  #viewer-content { max-width: 100%; max-height: 100%; border-radius: 0; }
   #movie-viewer { padding: 0; }
+  #viewer-content { max-width: 100%; max-height: 100%; border-radius: 0; }
+  .viewer-main { padding: 20px; }
+  .viewer-hero { flex-direction: column; gap: 20px; }
+  #viewer-poster { width: 180px; height: 270px; margin: 0 auto; }
+  .viewer-reviews { width: 100%; border-left: none; border-top: 1px solid var(--border); }
 }
 
 /* ── DONATION BAR ── */
@@ -1348,11 +1351,22 @@ select:focus { border-color: var(--accent); }
 
 /* ─── MOVIE VIEWER & PLAYER ─── */
 #movie-viewer {
-    position: fixed; inset: 0; z-index: 2000;
-    display: flex; align-items: center; justify-content: center;
+    position: fixed; 
+    inset: 0; 
+    z-index: 2000;
+    display: none; 
+    align-items: center; 
+    justify-content: center;
     background: rgba(0,0,0,0.85);
     backdrop-filter: blur(8px);
     padding: 24px; /* Padding so the viewer doesn't touch the edges */
+}
+
+#viewer-backdrop {
+    position: fixed; /* Fixed so it covers the whole screen behind the card */
+    inset: 0;
+    z-index: 1;
+    background: transparent;
 }
 
 #viewer-content {
@@ -1361,10 +1375,9 @@ select:focus { border-color: var(--accent); }
     width: 100%;
     max-width: 1400px;
     max-height: 90vh; /* Capped height so it acts like a card */
-    background: var(--bg);
+    background: var(--bg); /* Restored background color */
     border-radius: var(--radius-lg);
     overflow: hidden;
-    animation: viewerIn 0.3s cubic-bezier(.22,1,.36,1);
     box-shadow: 0 24px 80px rgba(0,0,0,0.7);
     display: flex;
     flex-direction: column;
@@ -1373,13 +1386,6 @@ select:focus { border-color: var(--accent); }
 @keyframes viewerIn {
     from { opacity: 0; transform: scale(0.98); }
     to { opacity: 1; transform: scale(1); }
-}
-
-#viewer-backdrop {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: transparent;
 }
 
 #viewer-close {
@@ -1407,7 +1413,6 @@ select:focus { border-color: var(--accent); }
     padding: 40px;
     display: flex;
     flex-direction: column;
-    justify-content: center;
 }
 
 .viewer-hero {
