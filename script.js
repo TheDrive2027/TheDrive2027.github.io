@@ -1060,14 +1060,22 @@ let cursorTimers = {};
 
 function joinParty(code) {
   if (!API_BASE) return;
+  // Ensure code is exactly 6 characters
+  code = code.toUpperCase().substring(0, 6);
+  if (code.length < 6) {
+    showToast('Code must be 6 characters.');
+    return;
+  }
+
   const wsUrl = `${API_BASE.replace('http', 'ws')}/ws/party/${code}?did=${getDeviceId()}`;
   partyWS = new WebSocket(wsUrl);
   
   partyWS.onopen = () => {
     $('party-status').textContent = `Connected to Party: ${code}`;
+    $('party-create-btn').style.display = 'none';
     $('party-join-btn').style.display = 'none';
     $('party-leave-btn').style.display = 'block';
-    $('party-code-input').disabled = true;
+    document.querySelectorAll('.party-code-digit').forEach(inp => inp.disabled = true);
     showToast('Joined Watch Party!');
   };
   
@@ -1089,7 +1097,6 @@ function joinParty(code) {
     } else if (msg.type === 'play' || msg.type === 'pause' || msg.type === 'seek') {
       _applying_party_action = true;
       if (viewer.style.display !== 'flex') {
-        // Auto-open viewer if it's closed
         openMovieViewer(currentViewerMovie || msg.movie, true);
         setTimeout(() => applyVideoAction(msg), 500);
       } else {
@@ -1127,9 +1134,13 @@ function leaveParty(silent = false) {
   userColor = null;
   document.querySelector('.app-layout').classList.remove('party-active');
   $('party-status').textContent = 'Not connected.';
+  $('party-create-btn').style.display = 'block';
   $('party-join-btn').style.display = 'block';
   $('party-leave-btn').style.display = 'none';
-  $('party-code-input').disabled = false;
+  document.querySelectorAll('.party-code-digit').forEach(inp => {
+    inp.disabled = false;
+    inp.value = '';
+  });
   // Clear cursors
   $('remote-cursors-container').innerHTML = '';
 }
@@ -1177,16 +1188,72 @@ function moveRemoteCursor(color, x, y) {
   }, 2000);
 }
 
- $('party-join-btn').addEventListener('click', () => {
-  const code = $('party-code-input').value.trim().toUpperCase();
-  if (code.length !== 6) {
-    showToast('Code must be 6 characters.');
-    return;
+// Party UI Logic
+function generatePartyCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No confusing chars like 0/O, 1/I
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  return code;
+}
+
+function setPartyCodeInputs(code) {
+  const inputs = document.querySelectorAll('.party-code-digit');
+  inputs.forEach((inp, i) => {
+    inp.value = code[i] || '';
+  });
+}
+
+function getPartyCodeFromInputs() {
+  let code = '';
+  document.querySelectorAll('.party-code-digit').forEach(inp => {
+    code += inp.value.toUpperCase();
+  });
+  return code;
+}
+
+ $('party-create-btn').addEventListener('click', () => {
+  const code = generatePartyCode();
+  setPartyCodeInputs(code);
+  joinParty(code);
+});
+
+ $('party-join-btn').addEventListener('click', () => {
+  const code = getPartyCodeFromInputs();
   joinParty(code);
 });
 
  $('party-leave-btn').addEventListener('click', () => leaveParty());
+
+// Setup 6-box input auto-advance
+const partyInputs = document.querySelectorAll('.party-code-digit');
+partyInputs.forEach((inp, index) => {
+  inp.addEventListener('input', (e) => {
+    // Ensure uppercase and letters/numbers only
+    inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (inp.value && index < 5) {
+      partyInputs[index + 1].focus();
+    }
+  });
+  
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !inp.value && index > 0) {
+      partyInputs[index - 1].focus();
+    }
+  });
+  
+  inp.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const paste = (e.clipboardData || window.clipboardData).getData('text').toUpperCase().substring(0, 6);
+    if (paste) {
+      setPartyCodeInputs(paste);
+      // Focus the last filled input or the 6th one
+      const focusIndex = Math.min(paste.length, 5);
+      if (partyInputs[focusIndex]) partyInputs[focusIndex].focus();
+    }
+  });
+});
 
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
