@@ -159,15 +159,11 @@ const MATURITY_ORDER = { 'G': 1, 'PG': 2, 'PG-13': 3, 'R': 4, 'NC-17': 5, 'NR': 
 function normalizeMaturity(str) {
   if (!str) return 'NR';
   let s = String(str).toUpperCase().trim();
-  
-  // Use regex word boundaries to scan the string for valid ratings
-  // This handles messy NFO formats like "US:R / US:Rated R"
   if (/\bNC[-\s]?17\b/.test(s)) return 'NC-17';
   if (/\bPG[-\s]?13\b/.test(s)) return 'PG-13';
   if (/\bPG\b/.test(s)) return 'PG';
-  if (/\bR\b/.test(s)) return 'R'; // \b prevents matching the 'R' inside 'Rated'
+  if (/\bR\b/.test(s)) return 'R'; 
   if (/\bG\b/.test(s)) return 'G';
-  
   return 'NR';
 }
 
@@ -246,7 +242,6 @@ async function loadUpdates() {
 function populateFilterCheckboxes() {
   const maturityEl = $('filter-maturity-checks');
   if (maturityEl) {
-    // Normalize all ratings before putting them in the sidebar so they group properly
     const ratings = [...new Set(allMovies.map(m => normalizeMaturity(m.maturityRating)).filter(Boolean))].sort((a, b) => (MATURITY_ORDER[a] || 99) - (MATURITY_ORDER[b] || 99));
     maturityEl.innerHTML = ratings.map(r => `<label class="check-row"><input type="checkbox" value="${escHtml(r)}" data-filter="maturity" ${activeFilters.maturity.has(r) ? 'checked' : ''} /><span class="check-label ${ratingClass(r)}">${escHtml(r)}</span></label>`).join('');
   }
@@ -285,7 +280,6 @@ function applyFilters() {
   const q = normalize(searchInput ? searchInput.value : '');
   filtered = allMovies.filter(m => {
     if (q && !normalize(m.title).includes(q)) return false;
-    // Apply normalizeMaturity to the check so it matches the sidebar values
     if (activeFilters.maturity.size > 0 && !activeFilters.maturity.has(normalizeMaturity(m.maturityRating))) return false;
     if (activeFilters.resolution.size > 0 && !activeFilters.resolution.has(m.resolution)) return false;
     if (activeFilters.genre.size > 0) {
@@ -430,7 +424,6 @@ function renderLibrary() {
 
   if (!watchedGrid || !unwatchedGrid) return;
 
-  // WATCHING section (Top)
   watchedGrid.innerHTML = '';
   const watchingMovies = allMovies.filter(m => {
     const p = getVideoProgress(m.title);
@@ -446,7 +439,6 @@ function renderLibrary() {
     watchedGrid.appendChild(frag);
   }
 
-  // UNWATCHED section (Bottom)
   unwatchedGrid.innerHTML = '';
   const unwatchedMovies = allMovies.filter(m => {
     const p = getVideoProgress(m.title);
@@ -674,8 +666,9 @@ const viewer = $('movie-viewer');
 const viewerContent = $('viewer-content');
 const videoEl = $('video-el');
 let progressRaf = null;
+let _applying_party_action = false; // Flag to prevent WS echo loops
 
-async function openMovieViewer(m) {
+async function openMovieViewer(m, fromParty = false) {
   currentViewerMovie = m;
   viewerContent.classList.remove('player-active');
   $('viewer-details').style.display = 'flex';
@@ -719,6 +712,10 @@ async function openMovieViewer(m) {
   currentViewerComments = await fetchComments(m.title);
   renderComments();
   updateViewerLibraryButton();
+
+  if (partyWS && !fromParty) {
+    sendParty({ type: 'load_video', movie: m });
+  }
 }
 
 function closeMovieViewer() {
@@ -772,11 +769,16 @@ videoEl.addEventListener('click', (e) => {
 videoEl.addEventListener('play', () => {
   $('ctrl-play-pause').innerHTML = '&#10074;&#10074;';
   if (!progressRaf) progressRaf = requestAnimationFrame(updateProgressBar);
+  if (partyWS && !_applying_party_action) sendParty({ type: 'play' });
 });
 videoEl.addEventListener('pause', () => {
   $('ctrl-play-pause').innerHTML = '&#9654;';
   if (progressRaf) { cancelAnimationFrame(progressRaf); progressRaf = null; }
   updateProgressBar();
+  if (partyWS && !_applying_party_action) sendParty({ type: 'pause' });
+});
+videoEl.addEventListener('seeked', () => {
+  if (partyWS && !_applying_party_action) sendParty({ type: 'seek', time: videoEl.currentTime });
 });
  $('ctrl-progress-track').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1050,6 +1052,141 @@ function startRename() {
     } 
   });
 }
+
+// ─── WATCH PARTY LOGIC ───────────────────────────────────────
+let partyWS = null;
+let userColor = null;
+let cursorTimers = {};
+
+function joinParty(code) {
+  if (!API_BASE) return;
+  const wsUrl = `${API_BASE.replace('http', 'ws')}/ws/party/${code}?did=${getDeviceId()}`;
+  partyWS = new WebSocket(wsUrl);
+  
+  partyWS.onopen = () => {
+    $('party-status').textContent = `Connected to Party: ${code}`;
+    $('party-join-btn').style.display = 'none';
+    $('party-leave-btn').style.display = 'block';
+    $('party-code-input').disabled = true;
+    showToast('Joined Watch Party!');
+  };
+  
+  partyWS.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    
+    if (msg.type === 'assigned_color') {
+      userColor = msg.color;
+      document.documentElement.style.setProperty('--user-color', userColor);
+      document.querySelector('.app-layout').classList.add('party-active');
+    } else if (msg.type === 'user_joined' || msg.type === 'user_left') {
+      // Could update a user list here
+    } else if (msg.type === 'cursor') {
+      moveRemoteCursor(msg.color, msg.x, msg.y);
+    } else if (msg.type === 'load_video') {
+      if (!currentViewerMovie || currentViewerMovie.title !== msg.movie.title) {
+        openMovieViewer(msg.movie, true);
+      }
+    } else if (msg.type === 'play' || msg.type === 'pause' || msg.type === 'seek') {
+      _applying_party_action = true;
+      if (viewer.style.display !== 'flex') {
+        // Auto-open viewer if it's closed
+        openMovieViewer(currentViewerMovie || msg.movie, true);
+        setTimeout(() => applyVideoAction(msg), 500);
+      } else {
+        applyVideoAction(msg);
+      }
+      setTimeout(() => { _applying_party_action = false; }, 500);
+    }
+  };
+  
+  partyWS.onclose = () => {
+    leaveParty(true);
+    showToast('Left Watch Party.');
+  };
+  
+  partyWS.onerror = () => {
+    showToast('⚠ Party connection failed.');
+  };
+}
+
+function applyVideoAction(msg) {
+  if (msg.type === 'play') {
+    if (videoEl.paused) videoEl.play();
+  } else if (msg.type === 'pause') {
+    if (!videoEl.paused) videoEl.pause();
+  } else if (msg.type === 'seek') {
+    videoEl.currentTime = msg.time;
+  }
+}
+
+function leaveParty(silent = false) {
+  if (partyWS) {
+    partyWS.close();
+    partyWS = null;
+  }
+  userColor = null;
+  document.querySelector('.app-layout').classList.remove('party-active');
+  $('party-status').textContent = 'Not connected.';
+  $('party-join-btn').style.display = 'block';
+  $('party-leave-btn').style.display = 'none';
+  $('party-code-input').disabled = false;
+  // Clear cursors
+  $('remote-cursors-container').innerHTML = '';
+}
+
+function sendParty(data) {
+  if (partyWS && partyWS.readyState === WebSocket.OPEN) {
+    partyWS.send(JSON.stringify(data));
+  }
+}
+
+// Throttle cursor sending
+let lastMouseSend = 0;
+document.addEventListener('mousemove', (e) => {
+  if (!partyWS || partyWS.readyState !== WebSocket.OPEN) return;
+  const now = Date.now();
+  if (now - lastMouseSend < 40) return; // ~25fps
+  lastMouseSend = now;
+  sendParty({ type: 'cursor', x: e.clientX, y: e.clientY });
+});
+
+function moveRemoteCursor(color, x, y) {
+  const container = $('remote-cursors-container');
+  let cursor = container.querySelector(`.remote-cursor[data-color="${color}"]`);
+  
+  if (!cursor) {
+    cursor = document.createElement('div');
+    cursor.className = 'remote-cursor visible';
+    cursor.dataset.color = color;
+    cursor.innerHTML = `
+      <svg class="remote-cursor-arrow" viewBox="0 0 24 24" fill="${color}" stroke="#000" stroke-width="1">
+        <path d="M5.5 3.21V20.79c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.87a.5.5 0 00.35-.85L6.35 2.85a.5.5 0 00-.85.36z"/>
+      </svg>
+      <div class="remote-cursor-label" style="background: ${color}">User</div>
+    `;
+    container.appendChild(cursor);
+  }
+  
+  cursor.style.transform = `translate(${x}px, ${y}px)`;
+  cursor.classList.add('visible');
+  
+  // Fade out after 2 seconds of no movement
+  clearTimeout(cursorTimers[color]);
+  cursorTimers[color] = setTimeout(() => {
+    cursor.classList.remove('visible');
+  }, 2000);
+}
+
+ $('party-join-btn').addEventListener('click', () => {
+  const code = $('party-code-input').value.trim().toUpperCase();
+  if (code.length !== 6) {
+    showToast('Code must be 6 characters.');
+    return;
+  }
+  joinParty(code);
+});
+
+ $('party-leave-btn').addEventListener('click', () => leaveParty());
 
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
