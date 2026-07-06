@@ -338,7 +338,7 @@ function createRowHtml(id, title, subtitle) {
       <div class="row-scroll-wrapper">
         <button class="row-scroll-btn row-scroll-btn--left" data-dir="-1" data-target="${id}">‹</button>
         <button class="row-scroll-btn row-scroll-btn--right" data-dir="1" data-target="${id}">›</button>
-        <div class="movie-row-scroll">
+        <div class="movie-row-scroll snap">
           <div id="${id}" class="movie-row"></div>
         </div>
       </div>
@@ -346,10 +346,113 @@ function createRowHtml(id, title, subtitle) {
   `;
 }
 
+// ─── HERO (Apple TV superhero lockup) ─────────────────────────
+let heroFilms = [];
+let heroIndex = 0;
+let heroTimer = null;
+
+function pickHeroFilms() {
+  // Prefer a blend of recently-added and top-rated films for variety
+  const byImdb = [...allMovies].filter(m => parseFloat(m.imdbRating) > 0)
+    .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
+  const byRecent = [...allMovies].sort((a, b) => new Date(b.added_date || 0) - new Date(a.added_date || 0));
+  const seen = new Set();
+  const picks = [];
+  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && picks.length < 3) { seen.add(k); picks.push(m); } }
+  for (const m of byImdb) { const k = normalize(m.title); if (!seen.has(k) && picks.length < 6) { seen.add(k); picks.push(m); } }
+  return picks.filter(m => m.poster).slice(0, 6);
+}
+
+function renderHero() {
+  const hero = $('hero');
+  if (!hero) return;
+  heroFilms = pickHeroFilms();
+  if (heroFilms.length === 0) { hero.style.display = 'none'; return; }
+  hero.style.display = '';
+  hero.setAttribute('aria-hidden', 'false');
+  heroIndex = 0;
+  // dots
+  const dotsEl = $('hero-dots');
+  if (dotsEl) dotsEl.innerHTML = heroFilms.map((_, i) => `<button class="hero__dot${i === 0 ? ' active' : ''}" data-i="${i}" aria-label="Slide ${i+1}"></button>`).join('');
+  showHeroSlide(0);
+  startHeroRotation();
+}
+
+function showHeroSlide(i) {
+  if (!heroFilms.length) return;
+  heroIndex = (i + heroFilms.length) % heroFilms.length;
+  const m = heroFilms[heroIndex];
+  if (!m) return;
+
+  const backdrop = hero.querySelector('.hero__backdrop');
+  if (backdrop && m.poster) {
+    backdrop.style.backgroundImage = `url("${m.poster}")`;
+    // toggle loaded class after image actually loads for a clean fade
+    const img = new Image();
+    img.onload = () => backdrop.classList.add('loaded');
+    img.src = m.poster;
+  }
+
+  const titleEl = $('hero-title'); if (titleEl) titleEl.textContent = m.title;
+
+  const maturity = normalizeMaturity(m.maturityRating);
+  const metaEl = $('hero-meta');
+  if (metaEl) metaEl.innerHTML = `
+    <span>${m.year || '—'}</span>
+    <span class="card-sep">·</span>
+    <span class="card-rating ${ratingClass(maturity)}">${maturity}</span>
+    <span class="card-sep">·</span>
+    <span>${m.runtime || '—'}</span>
+    <span class="card-sep">·</span>
+    <span class="card-imdb">${m.imdbRating ? '★ ' + m.imdbRating : ''}</span>
+  `;
+
+  const plotEl = $('hero-plot'); if (plotEl) plotEl.textContent = m.plot || '';
+
+  const badgesEl = $('hero-badges');
+  if (badgesEl) {
+    const badges = [];
+    if (m.resolution && /4k|2160/i.test(m.resolution)) badges.push('<span class="badge badge-gold">4K</span>');
+    else if (m.resolution) badges.push(`<span class="badge">${escHtml(m.resolution)}</span>`);
+    if (m.imdbRating && parseFloat(m.imdbRating) >= 8) badges.push('<span class="badge badge-accent">Top Rated</span>');
+    if (m.genres && m.genres[0]) badges.push(`<span class="badge">${escHtml(m.genres[0])}</span>`);
+    badgesEl.innerHTML = badges.join('');
+  }
+
+  const playText = $('hero-play-text');
+  const progObj = getVideoProgress(m.title);
+  if (playText) playText.textContent = (progObj.time > 10 && progObj.duration > 0) ? 'Resume' : 'Play';
+
+  document.querySelectorAll('.hero__dot').forEach((d, idx) => d.classList.toggle('active', idx === heroIndex));
+}
+
+function startHeroRotation() {
+  if (heroTimer) clearInterval(heroTimer);
+  if (heroFilms.length <= 1) return;
+  heroTimer = setInterval(() => showHeroSlide(heroIndex + 1), 8000);
+}
+
+// Hero interactions (bound once)
+(function initHeroEvents() {
+  document.addEventListener('click', (e) => {
+    const dot = e.target.closest('.hero__dot');
+    if (dot) { showHeroSlide(parseInt(dot.dataset.i, 10)); startHeroRotation(); return; }
+    if (e.target.closest('#hero-play-btn')) {
+      if (heroFilms[heroIndex]) openMovieViewer(heroFilms[heroIndex]);
+      return;
+    }
+    if (e.target.closest('#hero-info-btn')) {
+      if (heroFilms[heroIndex]) openMovieViewer(heroFilms[heroIndex]);
+      return;
+    }
+  });
+})();
+
 function renderRows() {
   if (!rowView) return;
+  renderHero();
   let html = '';
-  
+
   const continueMovies = allMovies.filter(m => {
     const p = getVideoProgress(m.title);
     return p.time > 10 && p.duration > 0;
@@ -676,9 +779,33 @@ async function openMovieViewer(m, fromParty = false) {
   viewer.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
-  $('viewer-poster').src = m.poster || '';
+  const vPoster = $('viewer-poster'); if (vPoster) vPoster.src = m.poster || '';
+
+  // Apple-TV detail hero: blurred backdrop from poster + quality badges
+  const heroBackdrop = $('viewer-hero-backdrop');
+  if (heroBackdrop) {
+    heroBackdrop.classList.remove('loaded');
+    if (m.poster) {
+      heroBackdrop.style.backgroundImage = `url("${m.poster}")`;
+      const img = new Image();
+      img.onload = () => heroBackdrop.classList.add('loaded');
+      img.src = m.poster;
+    } else {
+      heroBackdrop.style.backgroundImage = '';
+    }
+  }
+  const vBadges = $('viewer-badges');
+  if (vBadges) {
+    const badges = [];
+    if (m.resolution && /4k|2160/i.test(m.resolution)) badges.push('<span class="badge badge-gold">4K</span>');
+    else if (m.resolution) badges.push(`<span class="badge">${escHtml(m.resolution)}</span>`);
+    if (m.imdbRating && parseFloat(m.imdbRating) >= 8) badges.push('<span class="badge badge-accent">Top Rated</span>');
+    if (m.genres && m.genres[0]) badges.push(`<span class="badge">${escHtml(m.genres[0])}</span>`);
+    vBadges.innerHTML = badges.join('');
+  }
+
   $('viewer-title').textContent = m.title;
-  
+
   const maturity = normalizeMaturity(m.maturityRating);
   $('viewer-meta').innerHTML = `
     <span>${m.year || '—'}</span>
@@ -693,7 +820,7 @@ async function openMovieViewer(m, fromParty = false) {
   `;
   $('viewer-plot').textContent = m.plot || 'No plot available.';
   $('viewer-cast').innerHTML = m.cast.length ? `<b>CAST:</b> ${m.cast.join(', ')}` : '';
-  
+
   const progObj = getVideoProgress(m.title);
   const progress = progObj.time || 0;
   const duration = progObj.duration || 0;
@@ -1362,6 +1489,61 @@ partyInputs.forEach((inp, index) => {
     }
   });
 });
+
+// ─── APPLE TV UI ENHANCEMENTS (user menu, nav scroll, parallax) ─
+(function initAppleTVUI() {
+  // User / settings dropdown
+  const menuBtn = $('user-menu-btn');
+  const menu = $('user-menu');
+  if (menuBtn && menu) {
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = menu.hasAttribute('hidden') ? false : menu.hidden;
+      menu.hidden = !open;
+      menuBtn.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', (e) => {
+      if (menu.hidden) return;
+      if (!menu.contains(e.target) && e.target !== menuBtn) {
+        menu.hidden = true;
+        menuBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+    // Close menu after a settings click
+    menu.addEventListener('click', (e) => {
+      if (e.target.closest('.nav-btn')) { menu.hidden = true; menuBtn.setAttribute('aria-expanded', 'false'); }
+    });
+  }
+
+  // Nav darkens on scroll
+  const topNav = $('top-nav');
+  if (topNav) {
+    const onScroll = () => topNav.classList.toggle('scrolled', window.scrollY > 24);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  }
+
+  // Subtle parallax tilt on poster cards (pointer-driven). The tilt is applied
+  // to .card-poster while the hover scale lives on .movie-card, so they compose.
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && window.matchMedia('(hover: hover)').matches) {
+    let activePoster = null;
+    document.addEventListener('mousemove', (e) => {
+      const card = e.target.closest && e.target.closest('.movie-card .card-poster');
+      if (card !== activePoster) {
+        if (activePoster) activePoster.style.transform = '';
+        activePoster = card;
+      }
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      card.style.transform = `perspective(600px) rotateY(${px * 6}deg) rotateX(${-py * 6}deg)`;
+    }, { passive: true });
+    document.addEventListener('mouseleave', () => {
+      if (activePoster) { activePoster.style.transform = ''; activePoster = null; }
+    });
+  }
+})();
 
 // ─── MAIN INIT ────────────────────────────────────────────────
 (async function init() {
