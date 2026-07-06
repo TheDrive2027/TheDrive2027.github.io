@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>THE DRIVE</title>
-    
-    <!-- Fonts -->
+
+    <!-- Fonts: Inter (body/UI, free SF-Pro alternative) + Bebas Neue (hero titles) + DM Mono (tiny labels) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <!-- Styles -->
     <link rel="stylesheet" href="style.css">
 </head>
@@ -26,87 +26,71 @@
                 <span class="gate-logo-text">THE DRIVE</span>
             </div>
             <div class="gate-byline">AUSTIN BORCHARDT</div>
-            
+
             <h2 class="modal-title gate-title">ACCESS REQUIRED</h2>
             <p class="modal-desc gate-desc">Enter your access key to unlock the archive.</p>
-            
+
             <div class="modal-field">
                 <label for="gate-key-input">ACCESS KEY</label>
                 <input id="gate-key-input" type="text" autocomplete="off" spellcheck="false" />
                 <span id="gate-error" class="gate-error" hidden></span>
             </div>
-            
+
             <button id="gate-submit" class="modal-btn gate-submit-btn">ENTER THE DRIVE</button>
         </div>
     </div>
 
     <div class="app-layout">
-        <!-- ─── STREMIO-STYLE MAIN SIDEBAR ─── -->
-        <nav class="main-nav">
-            <div class="nav-logo">
-                <span class="logo-mark">▶</span>
-            </div>
-            <ul class="nav-items">
-                <li class="nav-btn active" data-view="home">
-                    <svg viewBox="0 0 512 512"><path d="M260.4 99a7.983 7.983 0 0 0-5.55-2.25c-2.072 0-4.063 0.81-5.55 2.25l-184.8 176.5a7.944 7.944 0 0 0-2.5 5.8v165.7a32.137 32.137 0 0 0 9.41 22.69 32.133 32.133 0 0 0 22.69 9.41h96.5a16.1 16.1 0 0 0 11.384-4.72 16.071 16.071 0 0 0 4.716-11.38v-136.5a8.024 8.024 0 0 1 8-8H295a8.024 8.024 0 0 1 8 8v136.5c-0.002 2.12 0.412 4.21 1.22 6.16a16.004 16.004 0 0 0 3.49 5.23 16.091 16.091 0 0 0 11.39 4.71h96.4c8.51-0.01 16.67-3.39 22.69-9.41s9.4-14.18 9.41-22.69v-165.7c0-1.09-0.22-2.16-0.65-3.16-0.43-1-1.06-1.9-1.85-2.64l-184.7-176.5Z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Home</span>
-                </li>
-                <li class="nav-btn" data-view="movies">
-                    <svg viewBox="0 0 512 512"><path d="M435.79999999999995 80.19999999999982h-360a44.028 44.028 0 0 0-31.1 12.9 44.028 44.028 0 0 0-12.9 31.1v264a44.028 44.028 0 0 0 12.9 31.1 44.028 44.028 0 0 0 31.1 12.9h360a44.028 44.028 0 0 0 31.1-12.9 44.028 44.028 0 0 0 12.9-31.1v-264a44.028 44.028 0 0 0-12.9-31.1 44.028 44.028 0 0 0-31.1-12.9Zm-324 308a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Zm0-80a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Zm0-80a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Zm0-80a11.997 11.997 0 0 1-12 12h-24c-1.58 0-3.14-0.31-4.6-0.91a12.02 12.02 0 0 1-3.89-2.6c-1.12-1.11-2-2.44-2.6-3.9-0.6-1.45-0.91-3.01-0.91-4.59v-24c0-1.58 0.31-3.14 0.91-4.59 0.6-1.46 1.48-2.79 2.6-3.9 1.11-1.11 2.44-2 3.89-2.6 1.46-0.6 3.02-0.91 4.6-0.91h24a11.997 11.997 0 0 1 12 12v24Z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Movies</span>
-                </li>
-                <li class="nav-btn" data-view="shows">
-                    <svg viewBox="0 0 512 512"><path d="M419.0999999999999 448h-326.3a45.06 45.06 0 0 1-31.7-13.2 45.042 45.042 0 0 1-13.2-31.7v-198.3a45.06 45.06 0 0 1 13.2-31.7 45.102 45.102 0 0 1 31.7-13.2h326.3a44.484 44.484 0 0 1 31.7 13.2 45.309 45.309 0 0 1 13.2 31.7V403.0999999999999a45.042 45.042 0 0 1-13.2 31.7 45.06 45.06 0 0 1-31.7 13.2Z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Shows</span>
-                </li>
-                <li class="nav-btn" data-view="library">
-                    <svg viewBox="0 0 512 512"><path d="M416 208H272V64c0-17.67-14.33-32-32-32s-32 14.33-32 32v144H64c-17.67 0-32 14.33-32 32s14.33 32 32 32h144v144c0 17.67 14.33 32 32 32s32-14.33 32-32V272h144c17.67 0 32-14.33 32-32s-14.33-32-32-32z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Library</span>
-                </li>
-                <li class="nav-btn" data-view="updates">
-                    <svg viewBox="0 0 512 512"><path d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zM256 464c-114.7 0-208-93.31-208-208S141.3 48 256 48s208 93.31 208 208S370.7 464 256 464zM352 224h-64V160c0-17.67-14.33-32-32-32s-32 14.33-32 32v96c0 17.67 14.33 32 32 32h96c17.67 0 32-14.33 32-32S369.7 224 352 224z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Updates</span>
-                </li>
-            </ul>
-            <ul class="nav-items-bottom">
-                <li class="nav-btn" data-view="settings">
-                    <svg viewBox="0 0 512 512"><path d="M483.13 245.38l-31.68-5.34c-3.71-18.54-10.52-36.12-19.97-52.03l18.74-25.64c7.7-10.54 6.74-25.36-2.72-34.83l-21.41-21.41c-9.47-9.47-24.29-10.43-34.83-2.72l-25.64 18.74c-15.91-9.45-33.49-16.26-52.03-19.97l-5.34-31.68C306.39 5.34 295.34 0 283.66 0h-30.32c-11.68 0-22.73 5.34-24.59 17.08l-5.34 31.68c-18.54 3.71-36.12 10.52-52.03 19.97l-25.64-18.74c-10.54-7.7-25.36-6.74-34.83 2.72l-21.41 21.41c-9.47 9.47-10.43 24.29-2.72 34.83l18.74 25.64c-9.45 15.91-16.26 33.49-19.97 52.03l-31.68 5.34C5.34 226.61 0 237.66 0 249.34v30.32c0 11.68 5.34 22.73 17.08 24.59l31.68 5.34c3.71 18.54 10.52 36.12 19.97 52.03l-18.74 25.64c-7.7 10.54-6.74 25.36 2.72 34.83l21.41 21.41c9.47 9.47 24.29 10.43 34.83 2.72l25.64-18.74c15.91 9.45 33.49 16.26 52.03 19.97l5.34 31.68C226.61 506.66 237.66 512 249.34 512h30.32c11.68 0 22.73-5.34 24.59-17.08l5.34-31.68c18.54-3.71 36.12-10.52 52.03-19.97l25.64 18.74c10.54 7.7 25.36 6.74 34.83-2.72l21.41-21.41c9.47-9.47 10.43-24.29 2.72-34.83l-18.74-25.64c9.45-15.91 16.26-33.49 19.97-52.03l31.68-5.34C506.66 285.39 512 274.34 512 262.66v-30.32c0-11.68-5.34-22.73-17.08-24.59zM256 352c-53.02 0-96-42.98-96-96s42.98-96 96-96 96 42.98 96 96-42.98 96-96 96z" style="fill:currentcolor"></path></svg>
-                    <span class="label">Settings</span>
-                </li>
-            </ul>
-        </nav>
+        <!-- ─── APPLE TV-STYLE TOP NAV (replaces left rail) ─── -->
+        <nav class="top-nav" id="top-nav">
+            <div class="top-nav__inner">
+                <div class="top-nav__brand">
+                    <span class="logo-mark">▶</span>
+                    <span class="brand-text">THE DRIVE</span>
+                </div>
 
-        <div class="main-area">
-            <!-- ─── HEADER ─── -->
-            <header class="site-header">
-                <div class="header-inner">
-                    <div class="logo-wrap">
-                        <span class="logo-byline">AUSTIN BORCHARDT</span>
-                        <a class="logo" href="#">
-                            <span class="logo-mark">▶</span>
-                            <span class="logo-text">THE DRIVE</span>
-                        </a>
-                    </div>
-                    
-                    <div class="header-center">
-                        <div class="search-wrap">
-                            <span class="search-icon">⌕</span>
-                            <input id="search-input" type="text" placeholder="Search films..." autocomplete="off" />
-                            <button id="clear-search" class="clear-search" aria-label="Clear search">✕</button>
-                        </div>
+                <div class="top-nav__tabs" role="tablist">
+                    <button class="nav-btn active" data-view="home" role="tab">Home</button>
+                    <button class="nav-btn" data-view="movies" role="tab">Movies</button>
+                    <button class="nav-btn" data-view="shows" role="tab">Shows</button>
+                    <button class="nav-btn" data-view="library" role="tab">Library</button>
+                    <button class="nav-btn" data-view="updates" role="tab">Updates</button>
+                </div>
+
+                <div class="top-nav__right">
+                    <div class="search-wrap">
+                        <span class="search-icon">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                        </span>
+                        <input id="search-input" type="text" placeholder="Search" autocomplete="off" />
+                        <button id="clear-search" class="clear-search" aria-label="Clear search">✕</button>
                     </div>
 
                     <div class="header-meta">
                         <span class="meta-updated">Updated <span id="last-updated">—</span></span>
-                        <span class="dot">·</span>
                         <div class="online-wrap">
                             <span class="online-dot"></span>
-                            <span id="online-count">0</span> ONLINE
+                            <span id="online-count">0</span>
+                        </div>
+                    </div>
+
+                    <!-- User / Settings menu -->
+                    <div class="user-menu-wrap">
+                        <button id="user-menu-btn" class="user-menu-btn" aria-label="Settings" aria-haspopup="true" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                        </button>
+                        <div id="user-menu" class="user-menu" hidden>
+                            <button class="user-menu__item nav-btn" data-view="settings">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                <span>Settings</span>
+                            </button>
                         </div>
                     </div>
                 </div>
-            </header>
+            </div>
+        </nav>
 
+        <div class="main-area">
             <!-- ─── SCAN BAR ─── -->
             <div id="scan-bar" class="scan-bar hidden">
                 <span class="scan-patience">SCANNING DRIVE</span>
@@ -118,9 +102,32 @@
 
             <!-- ─── CONTENT AREA ─── -->
             <main class="content-area">
-                
-                <!-- HOME TAB (Row View) -->
+
+                <!-- HOME TAB (Hero + Shelves) -->
                 <div id="tab-home" class="tab-panel active">
+                    <!-- Apple TV superhero hero -->
+                    <section id="hero" class="hero" aria-hidden="true">
+                        <div class="hero__backdrop"></div>
+                        <div class="hero__gradient"></div>
+                        <div class="hero__content">
+                            <div class="hero__badges" id="hero-badges"></div>
+                            <h1 class="hero__title" id="hero-title"></h1>
+                            <p class="hero__meta" id="hero-meta"></p>
+                            <p class="hero__plot" id="hero-plot"></p>
+                            <div class="hero__actions">
+                                <button class="hero__play-btn" id="hero-play-btn">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                    <span id="hero-play-text">Play</span>
+                                </button>
+                                <button class="hero__info-btn" id="hero-info-btn">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+                                    <span>More Info</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="hero__dots" id="hero-dots"></div>
+                    </section>
+
                     <div id="row-view" class="view-panel active"></div>
                 </div>
 
@@ -145,12 +152,12 @@
                                         <button id="sort-dir-btn" class="sort-dir-btn">↓</button>
                                     </div>
                                 </div>
-                                
+
                                 <div class="sidebar-section">
                                     <div class="sidebar-heading">MATURITY</div>
                                     <div id="filter-maturity-checks" class="sidebar-checks"></div>
                                 </div>
-                                
+
                                 <div class="sidebar-section">
                                     <div class="sidebar-heading">RESOLUTION</div>
                                     <div id="filter-resolution-checks" class="sidebar-checks"></div>
@@ -160,7 +167,7 @@
                                     <div class="sidebar-heading">GENRES</div>
                                     <div id="filter-genre-checks" class="sidebar-checks"></div>
                                 </div>
-                                
+
                                 <button id="sidebar-clear-btn" class="sidebar-clear-btn" hidden>CLEAR FILTERS</button>
                             </div>
                         </aside>
@@ -246,8 +253,8 @@
                                 <span id="settings-first-seen" class="settings-value">—</span>
                             </div>
                         </div>
-                        
-                                                <!-- WATCH PARTY SECTION -->
+
+                        <!-- WATCH PARTY SECTION -->
                         <div class="settings-area">
                             <h2>WATCH PARTY</h2>
                             <div id="party-controls">
@@ -301,60 +308,62 @@
         </div>
     </div>
 
-    <!-- ─── MOVIE VIEWER & PLAYER (Centered Pop-up) ─── -->
+    <!-- ─── MOVIE DETAIL VIEW (Apple TV-style full takeover) ─── -->
     <div id="movie-viewer" style="display: none;">
         <div id="viewer-backdrop"></div>
         <div id="viewer-content">
             <button id="viewer-close" aria-label="Close">&times;</button>
-            
+
             <!-- Details View -->
             <div id="viewer-details">
-                <div class="viewer-main">
-                    <div class="viewer-hero">
-                        <img id="viewer-poster" src="" alt="">
-                        <div class="viewer-info">
-                            <h1 id="viewer-title"></h1>
-                            <div id="viewer-meta"></div>
-                            <p id="viewer-plot"></p>
-                            <div id="viewer-cast"></div>
-                            
-                            <div id="viewer-progress-container" style="display:none; margin-top: 20px; max-width: 400px;">
-                                <div style="display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--text-muted); margin-bottom:5px;">
-                                    <span>PROGRESS</span>
-                                    <span id="viewer-progress-time">0:00 / 0:00</span>
-                                </div>
-                                <div style="height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;">
-                                    <div id="viewer-progress-fill" style="height: 100%; background: var(--accent); width: 0%;"></div>
-                                </div>
-                            </div>
+                <!-- Hero backdrop with title + actions -->
+                <div class="viewer-hero">
+                    <div class="viewer-hero__backdrop" id="viewer-hero-backdrop"></div>
+                    <div class="viewer-hero__gradient"></div>
+                    <div class="viewer-hero__content">
+                        <div class="viewer-badges" id="viewer-badges"></div>
+                        <h1 id="viewer-title" class="viewer-hero__title"></h1>
+                        <div id="viewer-meta" class="viewer-hero__meta"></div>
+                        <p id="viewer-plot" class="viewer-hero__plot"></p>
+                        <p id="viewer-cast" class="viewer-hero__cast"></p>
 
-                            <div class="viewer-actions" style="margin-top: 24px; display: flex; gap: 12px; align-items: center;">
-                                <button id="viewer-play-btn">
-                                    <span class="play-icon">&#9654;</span> <span id="play-btn-text">Play</span>
-                                </button>
-                                <button id="viewer-library-btn">
-                                    <span class="library-icon">+</span> <span id="library-btn-text">Add to Library</span>
-                                </button>
+                        <div id="viewer-progress-container" class="viewer-progress-container">
+                            <div class="viewer-progress-labels">
+                                <span>PROGRESS</span>
+                                <span id="viewer-progress-time">0:00 / 0:00</span>
                             </div>
+                            <div class="viewer-progress-track">
+                                <div id="viewer-progress-fill" class="viewer-progress-fill"></div>
+                            </div>
+                        </div>
+
+                        <div class="viewer-actions">
+                            <button id="viewer-play-btn" class="viewer-play-btn">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                <span id="play-btn-text">Play</span>
+                            </button>
+                            <button id="viewer-library-btn" class="viewer-library-btn">
+                                <span class="library-icon">+</span> <span id="library-btn-text">Add to Library</span>
+                            </button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Reviews Side Panel -->
+
+                <!-- Reviews section (below hero) -->
                 <div class="viewer-reviews">
                     <div class="review-form">
                         <h3>REVIEWS & REPORTS</h3>
-                        <select id="review-type" class="sidebar-select" style="width: 100%; margin-bottom: 10px; height: 34px;">
+                        <select id="review-type" class="sidebar-select">
                             <option value="Comment">Comment</option>
                             <option value="Error">Report Error</option>
                             <option value="Other">Other</option>
                         </select>
-                        <textarea id="review-text" placeholder="Leave your thoughts..." rows="3" style="width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 8px; font-family: var(--font-body); font-size: 13px; resize: none; margin-bottom: 10px;"></textarea>
-                        <button id="submit-review-btn" class="sidebar-clear-btn" style="width: 100%; background: var(--accent); color: var(--bg); border-color: var(--accent);">SUBMIT</button>
+                        <textarea id="review-text" placeholder="Leave your thoughts..." rows="3"></textarea>
+                        <button id="submit-review-btn" class="review-submit-btn">SUBMIT</button>
                     </div>
-                    <div style="padding: 10px 15px 0; display: flex; gap: 10px; align-items: center;">
-                        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);">FILTER:</span>
-                        <select id="review-filter" class="sidebar-select" style="flex: 1; height: 28px; font-size: 11px;">
+                    <div class="review-filter-row">
+                        <span class="review-filter-label">FILTER</span>
+                        <select id="review-filter" class="sidebar-select">
                             <option value="All">All</option>
                             <option value="Comment">Comments</option>
                             <option value="Error">Errors</option>
@@ -383,7 +392,7 @@
     <!-- ─── TOASTS & TOOLTIPS ─── -->
     <div id="toast" class="toast"></div>
     <div id="req-tooltip" class="req-tooltip" hidden></div>
-    
+
     <!-- Remote Cursors Container for Watch Party -->
     <div id="remote-cursors-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1999; overflow: hidden;"></div>
 
