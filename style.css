@@ -285,6 +285,21 @@ body {
   margin-bottom: 14px;
   text-shadow: 0 2px 24px rgba(0,0,0,0.5);
 }
+/* Clearlogo image title (used when a movie has a clearlogo.png) */
+.hero__title-logo {
+  display: block;
+  max-width: 420px;
+  max-height: 150px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: left bottom;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 2px 16px rgba(0,0,0,0.6));
+}
+@media (max-width: 820px) {
+  .hero__title-logo { max-width: 70vw; max-height: 90px; }
+}
 .hero__meta {
   font-size: 13px; color: var(--text-muted);
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -716,6 +731,21 @@ body {
   font-size: clamp(40px, 6vw, 72px);
   line-height: 0.95; letter-spacing: 1.5px;
   margin-bottom: 14px;
+}
+/* Clearlogo image title for the detail view */
+.viewer-hero__title-logo {
+  display: block;
+  max-width: 380px;
+  max-height: 130px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: left bottom;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 2px 14px rgba(0,0,0,0.6));
+}
+@media (max-width: 820px) {
+  .viewer-hero__title-logo { max-width: 72vw; max-height: 80px; }
 }
 .viewer-hero__meta {
   font-size: 14px; color: var(--text-muted);
