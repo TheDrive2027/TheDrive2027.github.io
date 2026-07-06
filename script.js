@@ -190,7 +190,9 @@ async function loadShowsData() {
     allShows = videos.map(v => ({
       title: v.title, runtime: v.runtime || '', resolution: v.resolution || '', maturityRating: v.maturityRating || '',
       year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
-      driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null
+      driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null,
+      fanart: v.fanart ? (API_BASE + v.fanart) : null,
+      clearlogo: v.clearlogo ? (API_BASE + v.clearlogo) : null
     }));
   } catch(e) {
     allShows = [];
@@ -352,15 +354,19 @@ let heroIndex = 0;
 let heroTimer = null;
 
 function pickHeroFilms() {
-  // Prefer a blend of recently-added and top-rated films for variety
+  // Prefer a blend of recently-added and top-rated films that have fanart backdrops
   const byImdb = [...allMovies].filter(m => parseFloat(m.imdbRating) > 0)
     .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
   const byRecent = [...allMovies].sort((a, b) => new Date(b.added_date || 0) - new Date(a.added_date || 0));
   const seen = new Set();
   const picks = [];
-  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && picks.length < 3) { seen.add(k); picks.push(m); } }
-  for (const m of byImdb) { const k = normalize(m.title); if (!seen.has(k) && picks.length < 6) { seen.add(k); picks.push(m); } }
-  return picks.filter(m => m.poster).slice(0, 6);
+  // First pass: recently-added films that have fanart
+  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && m.fanart && picks.length < 3) { seen.add(k); picks.push(m); } }
+  // Second pass: top-rated films that have fanart
+  for (const m of byImdb) { const k = normalize(m.title); if (!seen.has(k) && m.fanart && picks.length < 6) { seen.add(k); picks.push(m); } }
+  // Fallback: films with at least a poster if we don't have enough fanart films
+  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && m.poster && picks.length < 6) { seen.add(k); picks.push(m); } }
+  return picks.filter(m => m.fanart || m.poster).slice(0, 6);
 }
 
 function renderHero() {
@@ -385,15 +391,35 @@ function showHeroSlide(i) {
   if (!m) return;
 
   const backdrop = hero.querySelector('.hero__backdrop');
-  if (backdrop && m.poster) {
-    backdrop.style.backgroundImage = `url("${m.poster}")`;
-    // toggle loaded class after image actually loads for a clean fade
-    const img = new Image();
-    img.onload = () => backdrop.classList.add('loaded');
-    img.src = m.poster;
+  const bgImg = m.fanart || m.poster;
+  if (backdrop) {
+    backdrop.classList.remove('loaded');
+    if (bgImg) {
+      backdrop.style.backgroundImage = `url("${bgImg}")`;
+      // toggle loaded class after image actually loads for a clean fade
+      const img = new Image();
+      img.onload = () => backdrop.classList.add('loaded');
+      img.src = bgImg;
+    } else {
+      backdrop.style.backgroundImage = '';
+    }
   }
 
-  const titleEl = $('hero-title'); if (titleEl) titleEl.textContent = m.title;
+  // Title: prefer the clearlogo image, fall back to text
+  const titleEl = $('hero-title');
+  if (titleEl) {
+    titleEl.innerHTML = '';
+    if (m.clearlogo) {
+      const logoImg = document.createElement('img');
+      logoImg.className = 'hero__title-logo';
+      logoImg.alt = m.title;
+      logoImg.src = m.clearlogo;
+      logoImg.onerror = () => { titleEl.textContent = m.title; };
+      titleEl.appendChild(logoImg);
+    } else {
+      titleEl.textContent = m.title;
+    }
+  }
 
   const maturity = normalizeMaturity(m.maturityRating);
   const metaEl = $('hero-meta');
@@ -781,15 +807,16 @@ async function openMovieViewer(m, fromParty = false) {
 
   const vPoster = $('viewer-poster'); if (vPoster) vPoster.src = m.poster || '';
 
-  // Apple-TV detail hero: blurred backdrop from poster + quality badges
+  // Apple-TV detail hero: prefer fanart for the backdrop, fall back to poster
   const heroBackdrop = $('viewer-hero-backdrop');
+  const detailBg = m.fanart || m.poster;
   if (heroBackdrop) {
     heroBackdrop.classList.remove('loaded');
-    if (m.poster) {
-      heroBackdrop.style.backgroundImage = `url("${m.poster}")`;
+    if (detailBg) {
+      heroBackdrop.style.backgroundImage = `url("${detailBg}")`;
       const img = new Image();
       img.onload = () => heroBackdrop.classList.add('loaded');
-      img.src = m.poster;
+      img.src = detailBg;
     } else {
       heroBackdrop.style.backgroundImage = '';
     }
@@ -804,7 +831,21 @@ async function openMovieViewer(m, fromParty = false) {
     vBadges.innerHTML = badges.join('');
   }
 
-  $('viewer-title').textContent = m.title;
+  // Title: prefer the clearlogo image, fall back to text
+  const vTitle = $('viewer-title');
+  if (vTitle) {
+    vTitle.innerHTML = '';
+    if (m.clearlogo) {
+      const logoImg = document.createElement('img');
+      logoImg.className = 'viewer-hero__title-logo';
+      logoImg.alt = m.title;
+      logoImg.src = m.clearlogo;
+      logoImg.onerror = () => { vTitle.textContent = m.title; };
+      vTitle.appendChild(logoImg);
+    } else {
+      vTitle.textContent = m.title;
+    }
+  }
 
   const maturity = normalizeMaturity(m.maturityRating);
   $('viewer-meta').innerHTML = `
@@ -1086,6 +1127,8 @@ async function loadData() {
       title: v.title, runtime: v.runtime || '', resolution: v.resolution || '', maturityRating: v.maturityRating || '',
       year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
       driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null,
+      fanart: v.fanart ? (API_BASE + v.fanart) : null,
+      clearlogo: v.clearlogo ? (API_BASE + v.clearlogo) : null,
       added_date: v.added_date || '2024-01-01'
     }));
     try { const rR = await fetch(`${API_BASE}/api/ratings`); if (rR.ok) ratingCounts = await rR.json(); } catch(e) {}
