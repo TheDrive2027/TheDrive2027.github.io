@@ -569,8 +569,13 @@ function updateRowScrollBtns(scroller) {
   const maxScroll = scroller.scrollWidth - scroller.clientWidth;
   // Only show arrows when the row actually overflows
   const canScroll = maxScroll > 4;
-  if (lBtn) lBtn.dataset.hidden = (!canScroll || scroller.scrollLeft <= 4) ? '1' : '0';
-  if (rBtn) rBtn.dataset.hidden = (!canScroll || scroller.scrollLeft >= maxScroll - 4) ? '1' : '0';
+  // Tolerance accounts for the scroller's left/right padding (e.g. 48px) so
+  // the button doesn't show when the row is resting at its padded start, and
+  // the right button hides when we're within padding of the end.
+  const pad = parseInt(getComputedStyle(scroller).paddingLeft || '0', 10) || 0;
+  const tol = Math.max(pad, 4) + 4;
+  if (lBtn) lBtn.dataset.hidden = (!canScroll || scroller.scrollLeft <= tol) ? '1' : '0';
+  if (rBtn) rBtn.dataset.hidden = (!canScroll || scroller.scrollLeft >= maxScroll - tol) ? '1' : '0';
 }
 function renderGrid() {
   if (!movieGrid) return; movieGrid.innerHTML = '';
