@@ -333,6 +333,7 @@
                                 <span id="viewer-progress-time">0:00 / 0:00</span>
                             </div>
                             <div class="viewer-progress-track">
+                                <div id="viewer-progress-buffered" class="viewer-progress-buffered"></div>
                                 <div id="viewer-progress-fill" class="viewer-progress-fill"></div>
                             </div>
                         </div>
@@ -348,6 +349,15 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Metadata info strip (Director, Genres, Cast, etc.) -->
+                <div class="viewer-info" id="viewer-info"></div>
+
+                <!-- More Like This (related films by genre) -->
+                <section class="viewer-related" id="viewer-related" style="display:none;">
+                    <h3 class="viewer-related__title">More Like This</h3>
+                    <div class="viewer-related__scroll" id="viewer-related-scroll"></div>
+                </section>
 
                 <!-- Reviews section (below hero) -->
                 <div class="viewer-reviews">
@@ -380,6 +390,7 @@
                 <div class="custom-controls">
                     <button id="ctrl-play-pause" class="ctrl-btn">&#9654;</button>
                     <div id="ctrl-progress-track">
+                        <div id="ctrl-progress-buffered"></div>
                         <div id="ctrl-progress-played"></div>
                     </div>
                     <span id="ctrl-time">0:00 / 0:00</span>
