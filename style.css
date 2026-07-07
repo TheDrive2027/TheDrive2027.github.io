@@ -33,7 +33,7 @@
   --blur:         saturate(180%) blur(20px);
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; color-scheme: dark; }
 
 body {
   background: var(--bg);
@@ -349,7 +349,7 @@ body {
 .movie-row-section { padding: 22px 0 8px; }
 .row-header {
   display: flex; align-items: baseline; gap: 12px;
-  padding: 0 28px; margin-bottom: 14px;
+  padding: 0 48px; margin-bottom: 14px;
 }
 .row-title {
   font-family: var(--font-body);
@@ -368,7 +368,7 @@ body {
   overflow-x: auto; overflow-y: hidden;
   scroll-behavior: smooth;
   scroll-snap-type: x proximity;
-  padding: 8px 28px 18px;
+  padding: 8px 48px 18px;
   scrollbar-width: none;
 }
 .movie-row-scroll::-webkit-scrollbar { display: none; }
@@ -377,21 +377,27 @@ body {
 
 .row-scroll-btn {
   position: absolute; top: 50%; transform: translateY(-50%);
-  z-index: 5;
-  width: 44px; height: 64px;
-  background: rgba(0,0,0,0.6);
+  z-index: 6;
+  width: 40px; height: 64px;
+  background: rgba(0,0,0,0.72);
   backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--border2);
   border-radius: 10px;
   color: var(--text); font-size: 22px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  opacity: 0; transition: opacity var(--transition), background var(--transition);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--transition), background var(--transition);
 }
-.row-scroll-wrapper:hover .row-scroll-btn { opacity: 1; }
-.row-scroll-btn:hover { background: rgba(0,0,0,0.85); }
-.row-scroll-btn[data-hidden="1"] { opacity: 0 !important; pointer-events: none; }
-.row-scroll-btn--left { left: 8px; }
+/* Show the buttons while the row is hovered (buttons included, so no flicker) */
+.row-scroll-wrapper:hover .row-scroll-btn:not([data-hidden="1"]) {
+  opacity: 1;
+  pointer-events: auto;
+}
+.row-scroll-btn:hover { background: rgba(0,0,0,0.92); }
+/* Hidden buttons stay gone even on hover */
+.row-scroll-btn[data-hidden="1"] { opacity: 0 !important; pointer-events: none !important; }
+.row-scroll-btn--left { left: 6px; }
 .row-scroll-btn--right { right: 8px; }
 
 /* =============================================================
@@ -512,18 +518,36 @@ body {
   padding: 24px 20px;
   border-right: 1px solid var(--border);
   background: rgba(0,0,0,0.3);
+  color-scheme: dark; /* makes native <select> dropdowns + scrollbar render dark */
 }
+/* Sidebar scrollbar — styled to match the rest of the UI */
+.sidebar::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 99px; border: 2px solid transparent; background-clip: padding-box; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.26); background-clip: padding-box; }
+.sidebar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
 .sidebar-inner { display: flex; flex-direction: column; gap: 22px; }
 .sidebar-section { display: flex; flex-direction: column; gap: 10px; }
 .sidebar-heading { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; color: var(--text-dim); text-transform: uppercase; }
 .sidebar-select {
   width: 100%; height: 34px;
-  background: var(--surface2); border: 1px solid var(--border2);
+  background-color: var(--surface2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2398989d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  border: 1px solid var(--border2);
   border-radius: 8px; color: var(--text);
   font-family: var(--font-body); font-size: 13px;
-  padding: 0 10px; outline: none; cursor: pointer;
+  padding: 0 28px 0 10px; outline: none; cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  transition: border-color var(--transition), background-color var(--transition);
 }
+.sidebar-select:hover { background-color: rgba(255,255,255,0.1); }
 .sidebar-select:focus { border-color: var(--accent); }
+.sidebar-select option { background: #1c1c1e; color: var(--text); }
 .sidebar-sort-wrap { display: flex; gap: 8px; }
 .sidebar-sort-wrap .sidebar-select { flex: 1; }
 .sort-dir-btn {
@@ -694,6 +718,15 @@ body {
   overflow-y: auto; overflow-x: hidden;
   animation: viewerIn 360ms cubic-bezier(.2,.7,.2,1);
 }
+/* When the player is active, break out of the 1200px column and go fullscreen */
+#viewer-content.player-active {
+  max-width: none;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+#viewer-content.player-active #viewer-details { display: none; }
 @keyframes viewerIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
 
 #viewer-close {
@@ -807,7 +840,8 @@ body {
 .review-type-error .review-meta span:first-child { color: var(--red); }
 
 /* Player view */
-#viewer-player { display: none; flex-direction: column; background: #000; min-height: 100vh; }
+#viewer-player { display: none; background: #000; width: 100%; height: 100vh; }
+#viewer-content.player-active #viewer-player { display: block; }
 #video-el { width: 100%; height: 100vh; object-fit: contain; background: #000; display: block; }
 .custom-controls {
   position: fixed; bottom: 0; left: 0; right: 0;
