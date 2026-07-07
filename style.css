@@ -389,16 +389,13 @@ body {
   color: var(--text); font-size: 22px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  opacity: 0; pointer-events: none;
+  /* Always visible when not hidden — no hover dependency, so no flicker */
+  opacity: 0.55;
   transition: opacity var(--transition), background var(--transition);
 }
-/* Show the buttons while the row is hovered (buttons included, so no flicker) */
-.row-scroll-wrapper:hover .row-scroll-btn:not([data-hidden="1"]) {
-  opacity: 1;
-  pointer-events: auto;
-}
+.row-scroll-wrapper:hover .row-scroll-btn { opacity: 1; }
 .row-scroll-btn:hover { background: rgba(0,0,0,0.92); }
-/* Hidden buttons stay gone even on hover */
+/* Hidden buttons stay gone */
 .row-scroll-btn[data-hidden="1"] { opacity: 0 !important; pointer-events: none !important; }
 .row-scroll-btn--left { left: 6px; }
 .row-scroll-btn--right { right: 8px; }
