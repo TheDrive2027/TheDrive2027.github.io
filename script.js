@@ -955,7 +955,11 @@ function playVideo() {
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
   videoEl.src = currentViewerMovie.driveLink;
-  
+
+  // Reset buffered bars for the new video
+  const cb = $('ctrl-progress-buffered'); if (cb) cb.style.width = '0%';
+  const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
+
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
   videoEl.addEventListener('loadedmetadata', () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
@@ -970,13 +974,42 @@ function updateProgressBar() {
     const pct = (videoEl.currentTime / videoEl.duration) * 100;
     $('ctrl-progress-played').style.width = pct + '%';
     $('ctrl-time').textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
+    updateBufferedBar();
   }
   progressRaf = requestAnimationFrame(updateProgressBar);
+}
+
+// YouTube-style buffered bar: show how much of the video is downloaded ahead
+// of the playhead. Uses the video element's buffered TimeRanges.
+function updateBufferedBar() {
+  if (!videoEl.duration) return;
+  const bufferedEl = $('ctrl-progress-buffered');
+  const vBufferedEl = $('viewer-progress-buffered');
+  // Find the buffered range that contains (or is just ahead of) the playhead
+  let bufEnd = 0;
+  for (let i = 0; i < videoEl.buffered.length; i++) {
+    const start = videoEl.buffered.start(i);
+    const end = videoEl.buffered.end(i);
+    if (start <= videoEl.currentTime + 0.5 && end >= videoEl.currentTime) {
+      bufEnd = end;
+      break;
+    }
+  }
+  // Fallback: use the last buffered end if none contains the playhead
+  if (bufEnd === 0 && videoEl.buffered.length > 0) {
+    bufEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
+  }
+  const bufPct = Math.min(100, (bufEnd / videoEl.duration) * 100);
+  if (bufferedEl) bufferedEl.style.width = bufPct + '%';
+  if (vBufferedEl) vBufferedEl.style.width = bufPct + '%';
 }
 
 videoEl.addEventListener('timeupdate', () => {
   if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime, videoEl.duration);
 });
+
+// Browser downloaded more media — refresh the buffered bar immediately
+videoEl.addEventListener('progress', updateBufferedBar);
 
 videoEl.addEventListener('click', (e) => {
   e.stopPropagation();
