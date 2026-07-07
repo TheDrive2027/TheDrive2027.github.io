@@ -801,8 +801,9 @@ body {
 .viewer-progress-container { max-width: 420px; margin-bottom: 22px; }
 .viewer-progress-container[style*="display: none"], .viewer-progress-container.hidden { display: none !important; }
 .viewer-progress-labels { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 0.5px; }
-.viewer-progress-track { height: 4px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden; }
-.viewer-progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width 300ms ease; }
+.viewer-progress-track { position: relative; height: 4px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden; }
+.viewer-progress-buffered { position: absolute; inset: 0; width: 0%; background: rgba(255,255,255,0.25); border-radius: 99px; transition: width 400ms linear; }
+.viewer-progress-fill { position: relative; height: 100%; background: var(--accent); border-radius: 99px; transition: width 300ms ease; }
 
 .viewer-actions { display: flex; gap: 12px; flex-wrap: wrap; }
 .viewer-play-btn, .viewer-library-btn {
@@ -897,8 +898,9 @@ body {
   transition: background var(--transition);
 }
 .ctrl-btn:hover { background: rgba(255,255,255,0.26); }
-#ctrl-progress-track { flex: 1; height: 5px; background: rgba(255,255,255,0.2); border-radius: 99px; cursor: pointer; position: relative; }
-#ctrl-progress-played { height: 100%; background: var(--accent); border-radius: 99px; width: 0%; }
+#ctrl-progress-track { flex: 1; height: 5px; background: rgba(255,255,255,0.2); border-radius: 99px; cursor: pointer; position: relative; overflow: hidden; }
+#ctrl-progress-buffered { position: absolute; inset: 0; width: 0%; background: rgba(255,255,255,0.35); border-radius: 99px; transition: width 400ms linear; }
+#ctrl-progress-played { position: relative; height: 100%; background: var(--accent); border-radius: 99px; width: 0%; }
 #ctrl-time { font-family: var(--font-mono); font-size: 12px; color: var(--text); white-space: nowrap; }
 
 @media (max-width: 820px) {
