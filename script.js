@@ -523,26 +523,54 @@ function renderRowCards(container, movies) {
   container.appendChild(frag);
   const scroller = container.closest('.movie-row-scroll');
   if (scroller) {
+    // Update button visibility now and after layout settles (images loading
+    // changes the row width, which affects whether the arrows should show).
     updateRowScrollBtns(scroller);
-    // Layout may not be final yet (images loading) — re-check shortly after.
     requestAnimationFrame(() => updateRowScrollBtns(scroller));
-    setTimeout(() => updateRowScrollBtns(scroller), 250);
+    setTimeout(() => updateRowScrollBtns(scroller), 200);
+    setTimeout(() => updateRowScrollBtns(scroller), 600);
+    // When each poster image finishes loading, the row width changes — re-check.
+    scroller.querySelectorAll('img').forEach(img => {
+      if (img.complete) return;
+      img.addEventListener('load', () => updateRowScrollBtns(scroller), { once: true });
+      img.addEventListener('error', () => updateRowScrollBtns(scroller), { once: true });
+    });
   }
 }
+
 (function initRowScrollBtns() {
+  // Click → scroll by ~3 card widths (based on the actual first card size)
   document.addEventListener('click', function(e) {
     const btn = e.target.closest('.row-scroll-btn'); if (!btn) return;
     const track = document.getElementById(btn.dataset.target); if (!track) return;
     const scroller = track.closest('.movie-row-scroll'); if (!scroller) return;
-    scroller.scrollBy({ left: parseInt(btn.dataset.dir, 10) * (214 * 3), behavior: 'smooth' });
+    const firstCard = scroller.querySelector('.row-card');
+    const cardW = firstCard ? (firstCard.offsetWidth + 14) : 200; // card + gap
+    scroller.scrollBy({ left: parseInt(btn.dataset.dir, 10) * cardW * 3, behavior: 'smooth' });
   });
-  document.addEventListener('scroll', (e) => { if (e.target.classList && e.target.classList.contains('movie-row-scroll')) updateRowScrollBtns(e.target); }, true);
+  // Update buttons on scroll (capture so we catch the scroll event on the scroller)
+  document.addEventListener('scroll', (e) => {
+    if (e.target.classList && e.target.classList.contains('movie-row-scroll')) updateRowScrollBtns(e.target);
+  }, true);
+  // Update all rows on resize — a row can become scrollable/unscrollable
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      document.querySelectorAll('.movie-row-scroll').forEach(updateRowScrollBtns);
+    }, 100);
+  });
 })();
+
 function updateRowScrollBtns(scroller) {
   const wrapper = scroller.closest('.row-scroll-wrapper'); if (!wrapper) return;
-  const lBtn = wrapper.querySelector('.row-scroll-btn--left'), rBtn = wrapper.querySelector('.row-scroll-btn--right');
-  if (lBtn) lBtn.dataset.hidden = scroller.scrollLeft <= 4 ? '1' : '0';
-  if (rBtn) rBtn.dataset.hidden = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 4 ? '1' : '0';
+  const lBtn = wrapper.querySelector('.row-scroll-btn--left');
+  const rBtn = wrapper.querySelector('.row-scroll-btn--right');
+  const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+  // Only show arrows when the row actually overflows
+  const canScroll = maxScroll > 4;
+  if (lBtn) lBtn.dataset.hidden = (!canScroll || scroller.scrollLeft <= 4) ? '1' : '0';
+  if (rBtn) rBtn.dataset.hidden = (!canScroll || scroller.scrollLeft >= maxScroll - 4) ? '1' : '0';
 }
 function renderGrid() {
   if (!movieGrid) return; movieGrid.innerHTML = '';
