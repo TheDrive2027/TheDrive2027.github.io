@@ -414,6 +414,8 @@ function showHeroSlide(i) {
       logoImg.className = 'hero__title-logo';
       logoImg.alt = m.title;
       logoImg.src = m.clearlogo;
+      // Fade in once decoded — avoids the jarring top-to-bottom progressive load
+      logoImg.onload = () => logoImg.classList.add('loaded');
       logoImg.onerror = () => { titleEl.textContent = m.title; };
       titleEl.appendChild(logoImg);
     } else {
@@ -846,6 +848,8 @@ async function openMovieViewer(m, fromParty = false) {
       logoImg.className = 'viewer-hero__title-logo';
       logoImg.alt = m.title;
       logoImg.src = m.clearlogo;
+      // Fade in once decoded — avoids the jarring top-to-bottom progressive load
+      logoImg.onload = () => logoImg.classList.add('loaded');
       logoImg.onerror = () => { vTitle.textContent = m.title; };
       vTitle.appendChild(logoImg);
     } else {
@@ -886,10 +890,55 @@ async function openMovieViewer(m, fromParty = false) {
   currentViewerComments = await fetchComments(m.title);
   renderComments();
   updateViewerLibraryButton();
+  renderViewerInfo(m);
+  renderViewerRelated(m);
 
   if (partyWS && !fromParty) {
     sendParty({ type: 'load_video', movie: m });
   }
+}
+
+// Metadata info strip below the hero — fills the page out with real details
+function renderViewerInfo(m) {
+  const info = $('viewer-info');
+  if (!info) return;
+  const fields = [];
+  if (m.director) fields.push({ label: 'Director', value: m.director });
+  if (m.cast && m.cast.length) fields.push({ label: 'Starring', value: m.cast.slice(0, 6).join(', ') });
+  if (m.genres && m.genres.length) fields.push({ label: 'Genres', chips: m.genres });
+  fields.push({ label: 'Released', value: m.year || '—' });
+  fields.push({ label: 'Runtime', value: m.runtime || '—' });
+  if (m.resolution) fields.push({ label: 'Quality', value: m.resolution });
+  if (m.imdbRating) fields.push({ label: 'IMDb Rating', value: '★ ' + m.imdbRating });
+  info.innerHTML = fields.map(f => {
+    if (f.chips) {
+      return `<div class="viewer-info__field">
+        <span class="viewer-info__label">${escHtml(f.label)}</span>
+        <div class="viewer-info__chips">${f.chips.map(c => `<span class="viewer-info__chip">${escHtml(c)}</span>`).join('')}</div>
+      </div>`;
+    }
+    return `<div class="viewer-info__field">
+      <span class="viewer-info__label">${escHtml(f.label)}</span>
+      <span class="viewer-info__value">${escHtml(f.value)}</span>
+    </div>`;
+  }).join('');
+}
+
+// "More Like This" — same-genre films, excluding the current one
+function renderViewerRelated(m) {
+  const section = $('viewer-related');
+  const scroll = $('viewer-related-scroll');
+  if (!section || !scroll) return;
+  const norm = normalize(m.title);
+  const related = allMovies.filter(x => normalize(x.title) !== norm && x.genres && x.genres.some(g => m.genres && m.genres.includes(g)))
+    .sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title))
+    .slice(0, 14);
+  if (related.length === 0) { section.style.display = 'none'; scroll.innerHTML = ''; return; }
+  section.style.display = '';
+  scroll.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  related.forEach((movie, i) => frag.appendChild(buildCard(movie, i, false)));
+  scroll.appendChild(frag);
 }
 
 function closeMovieViewer() {
@@ -1132,6 +1181,7 @@ async function loadData() {
     allMovies = videos.map(v => ({
       title: v.title, runtime: v.runtime || '', resolution: v.resolution || '', maturityRating: v.maturityRating || '',
       year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
+      director: v.director || '',
       driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null,
       fanart: v.fanart ? (API_BASE + v.fanart) : null,
       clearlogo: v.clearlogo ? (API_BASE + v.clearlogo) : null,
