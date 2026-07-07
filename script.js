@@ -519,7 +519,13 @@ function renderRowCards(container, movies) {
   const frag = document.createDocumentFragment();
   movies.forEach((m, i) => frag.appendChild(buildCard(m, i, true)));
   container.appendChild(frag);
-  const scroller = container.closest('.movie-row-scroll'); if (scroller) updateRowScrollBtns(scroller);
+  const scroller = container.closest('.movie-row-scroll');
+  if (scroller) {
+    updateRowScrollBtns(scroller);
+    // Layout may not be final yet (images loading) — re-check shortly after.
+    requestAnimationFrame(() => updateRowScrollBtns(scroller));
+    setTimeout(() => updateRowScrollBtns(scroller), 250);
+  }
 }
 (function initRowScrollBtns() {
   document.addEventListener('click', function(e) {
