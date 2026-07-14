@@ -181,6 +181,41 @@ function formatTime(sec) {
   return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
 }
 
+// ─── LAZY IMAGE LOADING ───────────────────────────────────────
+// Only download poster images when the card is near the viewport. This avoids
+// downloading hundreds of high-res posters the user will never see.
+let _lazyObserver = null;
+function initLazyImages() {
+  if (_lazyObserver) return;
+  if (!('IntersectionObserver' in window)) {
+    // Fallback: just load everything immediately
+    document.querySelectorAll('img[data-src]').forEach(img => { img.src = img.dataset.src; img.classList.add('loaded'); });
+    return;
+  }
+  _lazyObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+          img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
+          img.addEventListener('error', () => img.classList.add('loaded'), { once: true });
+          delete img.dataset.src;
+        }
+        _lazyObserver.unobserve(img);
+      }
+    });
+  }, { rootMargin: '300px 0px', threshold: 0.01 });
+}
+function observeLazyImages() {
+  if (!_lazyObserver) initLazyImages();
+  if (!_lazyObserver) return;
+  document.querySelectorAll('img[data-src]:not([data-watched])').forEach(img => {
+    img.setAttribute('data-watched', '1');
+    _lazyObserver.observe(img);
+  });
+}
+
 // ─── SHOWS DATA ───────────────────────────────────────────────
 async function loadShowsData() {
   try {
@@ -213,6 +248,7 @@ function renderShows() {
   const frag = document.createDocumentFragment();
   allShows.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
   container.appendChild(frag);
+  observeLazyImages();
   updateCounts();
 }
 
@@ -559,6 +595,7 @@ function renderRowCards(container, movies) {
       img.addEventListener('error', () => updateRowScrollBtns(scroller), { once: true });
     });
   }
+  observeLazyImages();
 }
 
 (function initRowScrollBtns() {
@@ -607,6 +644,7 @@ function renderGrid() {
   const frag = document.createDocumentFragment();
   filtered.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
   movieGrid.appendChild(frag);
+  observeLazyImages();
 }
 
 function renderLibrary() {
@@ -648,6 +686,7 @@ function renderLibrary() {
     unwatchedMovies.forEach((m, i) => frag.appendChild(buildCard(m, i, false)));
     unwatchedGrid.appendChild(frag);
   }
+  observeLazyImages();
 }
 
 function updateLibraryButtons() {
@@ -675,7 +714,7 @@ function buildCard(m, i, isRowCard) {
 
   card.innerHTML = `
     <div class="card-poster card-poster--playable">
-      ${m.poster ? `<img src="${m.poster}" alt="${escHtml(m.title)}" loading="lazy" onload="this.classList.add('loaded')" />` : ''}
+      ${m.poster ? `<img data-src="${m.poster}" alt="${escHtml(m.title)}" />` : ''}
       <div class="card-play-overlay"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></div>
       ${progressHtml}
     </div>
@@ -999,6 +1038,7 @@ function renderViewerRelated(m) {
   const frag = document.createDocumentFragment();
   related.forEach((movie, i) => frag.appendChild(buildCard(movie, i, false)));
   scroll.appendChild(frag);
+  observeLazyImages();
 }
 
 function closeMovieViewer() {
