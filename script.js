@@ -181,6 +181,16 @@ function formatTime(sec) {
   return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
 }
 
+// Request images at 2x their display dimensions for sharpness on retina screens.
+// The backend resizes to fit within w×h (maintaining aspect ratio).
+function sizedImg(url, cssW, cssH) {
+  if (!url) return url;
+  const w = Math.round(cssW * 2);
+  const h = Math.round(cssH * 2);
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}w=${w}&h=${h}`;
+}
+
 // ─── LAZY IMAGE LOADING ───────────────────────────────────────
 // Only download poster images when the card is near the viewport. This avoids
 // downloading hundreds of high-res posters the user will never see.
@@ -431,7 +441,7 @@ function showHeroSlide(i) {
   if (!m) return;
 
   // Two-layer crossfade: load new image into the inactive layer, then swap
-  const bgImg = m.fanart || m.poster;
+  const bgImg = m.fanart ? sizedImg(m.fanart, 1400, 700) : (m.poster ? sizedImg(m.poster, 1400, 700) : null);
   const activeCls = _heroActiveLayer === 'a' ? 'hero__backdrop--a' : 'hero__backdrop--b';
   const inactiveCls = _heroActiveLayer === 'a' ? 'hero__backdrop--b' : 'hero__backdrop--a';
   const activeLayer = hero.querySelector('.' + activeCls);
@@ -473,7 +483,7 @@ function showHeroSlide(i) {
       const logoImg = document.createElement('img');
       logoImg.className = 'hero__title-logo';
       logoImg.alt = m.title;
-      logoImg.src = m.clearlogo;
+      logoImg.src = sizedImg(m.clearlogo, 420, 150);
       logoImg.onload = () => logoImg.classList.add('loaded');
       logoImg.onerror = () => { titleEl.textContent = m.title; };
       titleEl.appendChild(logoImg);
@@ -714,7 +724,7 @@ function buildCard(m, i, isRowCard) {
 
   card.innerHTML = `
     <div class="card-poster card-poster--playable">
-      ${m.poster ? `<img data-src="${m.poster}" alt="${escHtml(m.title)}" />` : ''}
+      ${m.poster ? `<img data-src="${sizedImg(m.poster, 168, 252)}" alt="${escHtml(m.title)}" />` : ''}
       <div class="card-play-overlay"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></div>
       ${progressHtml}
     </div>
@@ -909,11 +919,11 @@ async function openMovieViewer(m, fromParty = false) {
   viewer.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 
-  const vPoster = $('viewer-poster'); if (vPoster) vPoster.src = m.poster || '';
+  const vPoster = $('viewer-poster'); if (vPoster) vPoster.src = m.poster ? sizedImg(m.poster, 200, 300) : '';
 
   // Apple-TV detail hero: prefer fanart for the backdrop, fall back to poster
   const heroBackdrop = $('viewer-hero-backdrop');
-  const detailBg = m.fanart || m.poster;
+  const detailBg = m.fanart ? sizedImg(m.fanart, 1400, 600) : (m.poster ? sizedImg(m.poster, 1400, 600) : null);
   if (heroBackdrop) {
     heroBackdrop.classList.remove('loaded');
     if (detailBg) {
@@ -943,7 +953,7 @@ async function openMovieViewer(m, fromParty = false) {
       const logoImg = document.createElement('img');
       logoImg.className = 'viewer-hero__title-logo';
       logoImg.alt = m.title;
-      logoImg.src = m.clearlogo;
+      logoImg.src = sizedImg(m.clearlogo, 380, 130);
       // Fade in once decoded — avoids the jarring top-to-bottom progressive load
       logoImg.onload = () => logoImg.classList.add('loaded');
       logoImg.onerror = () => { vTitle.textContent = m.title; };
@@ -1048,7 +1058,25 @@ function closeMovieViewer() {
   if (!videoEl.paused) videoEl.pause();
   videoEl.removeAttribute('src'); videoEl.load();
   document.body.style.overflow = '';
-  render();
+  // Don't re-render — preserve the user's scroll position and view state.
+  // Targeted updates (ratings, library buttons) already happened in real-time.
+  updateLibraryButtons();
+}
+
+// Close just the trailer/player and return to the info card (with a fade-out)
+function closeTrailer() {
+  if (!_playing_trailer) return;
+  _playing_trailer = false;
+  videoEl.pause();
+  const player = $('viewer-player');
+  if (player) player.style.opacity = '0';
+  setTimeout(() => {
+    videoEl.removeAttribute('src'); videoEl.load();
+    viewerContent.classList.remove('player-active');
+    $('viewer-details').style.display = 'flex';
+    $('viewer-player').style.display = 'none';
+    if (player) player.style.opacity = '';
+  }, 400);
 }
 
 function playVideo() {
@@ -1169,8 +1197,20 @@ videoEl.addEventListener('seeked', () => {
    if (currentViewerMovie) toggleLibrary(currentViewerMovie.title);
  });
  $('viewer-trailer-btn').addEventListener('click', playTrailer);
- $('viewer-close').addEventListener('click', closeMovieViewer);
- $('viewer-backdrop').addEventListener('click', closeMovieViewer);
+ // Close button: if a trailer is playing, go back to info card; else close everything
+ $('viewer-close').addEventListener('click', () => {
+  if (_playing_trailer) closeTrailer();
+  else closeMovieViewer();
+ });
+ // Backdrop click: same logic
+ $('viewer-backdrop').addEventListener('click', () => {
+  if (_playing_trailer) closeTrailer();
+  else closeMovieViewer();
+ });
+ // Trailer ended → fade out and return to info card
+ videoEl.addEventListener('ended', () => {
+  if (_playing_trailer) closeTrailer();
+ });
 
 let seekInterval = null;
 let seekTimeout = null;
