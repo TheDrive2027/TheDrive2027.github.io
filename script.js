@@ -355,18 +355,18 @@ let heroIndex = 0;
 let heroTimer = null;
 
 function pickHeroFilms() {
-  // Prefer a blend of recently-added and top-rated films that have fanart backdrops
-  const byImdb = [...allMovies].filter(m => parseFloat(m.imdbRating) > 0)
-    .sort((a, b) => (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0));
+  // Top-rated by USER ratings (thumbs up minus thumbs down), then recently added
+  const byUserRating = [...allMovies]
+    .sort((a, b) => getRatingScore(b.title) - getRatingScore(a.title));
   const byRecent = [...allMovies].sort((a, b) => new Date(b.added_date || 0) - new Date(a.added_date || 0));
   const seen = new Set();
   const picks = [];
-  // First pass: recently-added films that have fanart
-  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && m.fanart && picks.length < 3) { seen.add(k); picks.push(m); } }
-  // Second pass: top-rated films that have fanart
-  for (const m of byImdb) { const k = normalize(m.title); if (!seen.has(k) && m.fanart && picks.length < 6) { seen.add(k); picks.push(m); } }
+  // First pass: top-user-rated films that have fanart
+  for (const m of byUserRating) { const k = normalize(m.title); if (!seen.has(k) && m.fanart && picks.length < 4) { seen.add(k); picks.push(m); } }
+  // Second pass: recently-added films that have fanart (for variety)
+  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && m.fanart && picks.length < 6) { seen.add(k); picks.push(m); } }
   // Fallback: films with at least a poster if we don't have enough fanart films
-  for (const m of byRecent) { const k = normalize(m.title); if (!seen.has(k) && m.poster && picks.length < 6) { seen.add(k); picks.push(m); } }
+  for (const m of byUserRating) { const k = normalize(m.title); if (!seen.has(k) && m.poster && picks.length < 6) { seen.add(k); picks.push(m); } }
   return picks.filter(m => m.fanart || m.poster).slice(0, 6);
 }
 
@@ -385,25 +385,48 @@ function renderHero() {
   startHeroRotation();
 }
 
+// Track which backdrop layer is currently visible for the crossfade
+let _heroActiveLayer = 'a';
+
 function showHeroSlide(i) {
   if (!heroFilms.length) return;
   heroIndex = (i + heroFilms.length) % heroFilms.length;
   const m = heroFilms[heroIndex];
   if (!m) return;
 
-  const backdrop = hero.querySelector('.hero__backdrop');
+  // Two-layer crossfade: load new image into the inactive layer, then swap
   const bgImg = m.fanart || m.poster;
-  if (backdrop) {
-    backdrop.classList.remove('loaded');
-    if (bgImg) {
-      backdrop.style.backgroundImage = `url("${bgImg}")`;
-      // toggle loaded class after image actually loads for a clean fade
-      const img = new Image();
-      img.onload = () => backdrop.classList.add('loaded');
-      img.src = bgImg;
-    } else {
-      backdrop.style.backgroundImage = '';
-    }
+  const activeCls = _heroActiveLayer === 'a' ? 'hero__backdrop--a' : 'hero__backdrop--b';
+  const inactiveCls = _heroActiveLayer === 'a' ? 'hero__backdrop--b' : 'hero__backdrop--a';
+  const activeLayer = hero.querySelector('.' + activeCls);
+  const inactiveLayer = hero.querySelector('.' + inactiveCls);
+
+  if (bgImg && inactiveLayer) {
+    // Preload the image, then crossfade once it's ready
+    const img = new Image();
+    img.onload = () => {
+      inactiveLayer.style.backgroundImage = `url("${bgImg}")`;
+      // Start the glide on the new layer
+      inactiveLayer.classList.add('active');
+      inactiveLayer.classList.remove('leaving');
+      // Fade out the old layer
+      if (activeLayer) {
+        activeLayer.classList.remove('active');
+        activeLayer.classList.add('leaving');
+      }
+      // Swap active layer for next time
+      _heroActiveLayer = _heroActiveLayer === 'a' ? 'b' : 'a';
+      // Clean up the leaving class after the fade completes
+      setTimeout(() => { if (activeLayer) activeLayer.classList.remove('leaving'); }, 1300);
+    };
+    img.onerror = () => {
+      // No image — just clear and swap
+      if (activeLayer) { activeLayer.classList.remove('active'); activeLayer.classList.add('leaving'); }
+      inactiveLayer.style.backgroundImage = '';
+      inactiveLayer.classList.add('active');
+      _heroActiveLayer = _heroActiveLayer === 'a' ? 'b' : 'a';
+    };
+    img.src = bgImg;
   }
 
   // Title: prefer the clearlogo image, fall back to text
@@ -415,7 +438,6 @@ function showHeroSlide(i) {
       logoImg.className = 'hero__title-logo';
       logoImg.alt = m.title;
       logoImg.src = m.clearlogo;
-      // Fade in once decoded — avoids the jarring top-to-bottom progressive load
       logoImg.onload = () => logoImg.classList.add('loaded');
       logoImg.onerror = () => { titleEl.textContent = m.title; };
       titleEl.appendChild(logoImg);
@@ -1739,13 +1761,21 @@ partyInputs.forEach((inp, index) => {
   currentSort = 'title'; currentDir = 'asc';
   if (sortBy) sortBy.value = 'title'; if (sortDirBtn) sortDirBtn.textContent = '↓';
   try { const cR = await fetch('config.json?t=' + Date.now()); if (cR.ok) { const c = await cR.json(); API_BASE = c.API_BASE || ''; } } catch(e) { API_BASE = ''; }
+
+  // Show the scan bar immediately so the user sees loading activity
+  if (scanBar) scanBar.classList.remove('hidden');
+
   await initWithGate();
-  await Promise.all([loadData(), hydrateProgress(), loadLibrary()]);
+
+  // Load movie data first and render immediately — don't make the user stare
+  // at a black screen while library/progress data loads in parallel.
+  await loadData();
+  // These can finish in the background; the home page is already usable
+  hydrateProgress().then(() => { if (activeTab === 'home') renderRows(); });
+  loadLibrary().then(() => { if (activeTab === 'library') renderLibrary(); });
   loadShowsData();
 
   pushPresencePing(); setInterval(pushPresencePing, 5000);
-
-  renderRows();
   
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
