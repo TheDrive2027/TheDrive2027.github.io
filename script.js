@@ -192,7 +192,8 @@ async function loadShowsData() {
       year: v.year || '—', imdbRating: v.imdbRating || '', plot: v.plot || '', cast: v.cast || [], genres: v.genres || [],
       driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null,
       fanart: v.fanart ? (API_BASE + v.fanart) : null,
-      clearlogo: v.clearlogo ? (API_BASE + v.clearlogo) : null
+      clearlogo: v.clearlogo ? (API_BASE + v.clearlogo) : null,
+      trailer: v.trailer ? (API_BASE + v.trailer) : null
     }));
   } catch(e) {
     allShows = [];
@@ -837,6 +838,7 @@ const viewerContent = $('viewer-content');
 const videoEl = $('video-el');
 let progressRaf = null;
 let _applying_party_action = false; // Flag to prevent WS echo loops
+let _playing_trailer = false; // True while the trailer (not the movie) is loaded
 
 async function openMovieViewer(m, fromParty = false) {
   currentViewerMovie = m;
@@ -923,6 +925,9 @@ async function openMovieViewer(m, fromParty = false) {
   currentViewerComments = await fetchComments(m.title);
   renderComments();
   updateViewerLibraryButton();
+  // Show the Trailer button only when a trailer file exists for this movie
+  const trailerBtn = $('viewer-trailer-btn');
+  if (trailerBtn) trailerBtn.style.display = m.trailer ? '' : 'none';
   renderViewerInfo(m);
   renderViewerRelated(m);
 
@@ -977,6 +982,7 @@ function renderViewerRelated(m) {
 function closeMovieViewer() {
   viewer.style.display = 'none';
   viewerContent.classList.remove('player-active');
+  _playing_trailer = false;
   if (!videoEl.paused) videoEl.pause();
   videoEl.removeAttribute('src'); videoEl.load();
   document.body.style.overflow = '';
@@ -984,6 +990,7 @@ function closeMovieViewer() {
 }
 
 function playVideo() {
+  _playing_trailer = false;
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
@@ -1000,6 +1007,20 @@ function playVideo() {
     }
     videoEl.play();
   }, { once: true });
+}
+
+function playTrailer() {
+  if (!currentViewerMovie || !currentViewerMovie.trailer) return;
+  _playing_trailer = true;
+  $('viewer-details').style.display = 'none';
+  $('viewer-player').style.display = 'flex';
+  viewerContent.classList.add('player-active');
+  videoEl.src = currentViewerMovie.trailer;
+  // Reset buffered bars for the trailer
+  const cb = $('ctrl-progress-buffered'); if (cb) cb.style.width = '0%';
+  const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
+  // Trailers start from the beginning — no progress restore
+  videoEl.addEventListener('loadedmetadata', () => { videoEl.play(); }, { once: true });
 }
 
 function updateProgressBar() {
@@ -1038,6 +1059,7 @@ function updateBufferedBar() {
 }
 
 videoEl.addEventListener('timeupdate', () => {
+  if (_playing_trailer) return; // don't save progress while playing a trailer
   if (!videoEl.paused) saveVideoProgress(currentViewerMovie.title, videoEl.currentTime, videoEl.duration);
 });
 
@@ -1084,6 +1106,7 @@ videoEl.addEventListener('seeked', () => {
  $('viewer-library-btn').addEventListener('click', () => {
    if (currentViewerMovie) toggleLibrary(currentViewerMovie.title);
  });
+ $('viewer-trailer-btn').addEventListener('click', playTrailer);
  $('viewer-close').addEventListener('click', closeMovieViewer);
  $('viewer-backdrop').addEventListener('click', closeMovieViewer);
 
@@ -1251,6 +1274,7 @@ async function loadData() {
       driveLink: API_BASE + v.video, poster: v.poster ? (API_BASE + v.poster) : null,
       fanart: v.fanart ? (API_BASE + v.fanart) : null,
       clearlogo: v.clearlogo ? (API_BASE + v.clearlogo) : null,
+      trailer: v.trailer ? (API_BASE + v.trailer) : null,
       added_date: v.added_date || '2024-01-01'
     }));
     try { const rR = await fetch(`${API_BASE}/api/ratings`); if (rR.ok) ratingCounts = await rR.json(); } catch(e) {}
