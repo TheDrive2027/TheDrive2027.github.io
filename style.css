@@ -388,17 +388,17 @@ body {
   display: flex; gap: 14px;
   overflow-x: auto; overflow-y: hidden;
   scroll-behavior: smooth;
-  scroll-snap-type: x proximity;
+  /* NOTE: scroll-snap-type intentionally omitted — it blocks programmatic
+     scrollBy/scrollLeft calls, which breaks the arrow buttons. */
   padding: 8px 48px 18px;
   scrollbar-width: none;
 }
 .movie-row-scroll::-webkit-scrollbar { display: none; }
 .movie-row { display: flex; gap: 14px; }
-.movie-row-scroll.snap .row-card { scroll-snap-align: start; }
 
 .row-scroll-btn {
   position: absolute; top: 50%; transform: translateY(-50%);
-  z-index: 6;
+  z-index: 50; /* well above hovered cards (z-index: 10) so they never cover the arrows */
   width: 40px; height: 64px;
   background: rgba(0,0,0,0.72);
   backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
@@ -407,13 +407,13 @@ body {
   color: var(--text); font-size: 22px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  /* Always visible when not hidden — no hover dependency, so no flicker */
-  opacity: 0.55;
-  transition: opacity var(--transition), background var(--transition);
+  /* No opacity transition — buttons are either fully visible or fully hidden.
+     This eliminates the "fades out when I try to click" behavior. */
+  opacity: 1;
+  transition: background var(--transition);
 }
-.row-scroll-wrapper:hover .row-scroll-btn { opacity: 1; }
 .row-scroll-btn:hover { background: rgba(0,0,0,0.92); }
-/* Hidden buttons stay gone */
+/* Hidden buttons: fully gone, no pointer events */
 .row-scroll-btn[data-hidden="1"] { opacity: 0 !important; pointer-events: none !important; }
 .row-scroll-btn--left { left: 6px; }
 .row-scroll-btn--right { right: 8px; }
@@ -898,7 +898,7 @@ body {
 .review-type-error .review-meta span:first-child { color: var(--red); }
 
 /* Player view */
-#viewer-player { display: none; background: #000; width: 100%; height: 100vh; }
+#viewer-player { display: none; background: #000; width: 100%; height: 100vh; opacity: 1; transition: opacity 400ms ease; }
 #viewer-content.player-active #viewer-player { display: block; }
 #video-el { width: 100%; height: 100vh; object-fit: contain; background: #000; display: block; }
 .custom-controls {
