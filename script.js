@@ -912,6 +912,45 @@ let progressRaf = null;
 let _applying_party_action = false; // Flag to prevent WS echo loops
 let _playing_trailer = false; // True while the trailer (not the movie) is loaded
 
+// ─── PREFETCH (warm the browser cache before the user clicks Play) ──
+// When the detail view opens, we start fetching the movie (at the resume
+// position) and the trailer into hidden video elements. The browser caches
+// those bytes, so when the user clicks Play/Trailer the main video element
+// gets the data instantly from cache → near-zero buffering time.
+let _moviePrefetchEl = null;
+let _trailerPrefetchEl = null;
+
+function prefetchVideo(url) {
+  if (!url) return null;
+  const v = document.createElement('video');
+  v.preload = 'auto';
+  v.muted = true;
+  v.src = url;
+  // Some browsers won't fetch without the element being in the DOM
+  v.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;';
+  document.body.appendChild(v);
+  return v;
+}
+
+function startPrefetch(m) {
+  // Movie: fetch at the resume position by appending a byte-range hint via #t
+  // (the #t fragment tells the browser to seek there, which influences which
+  // byte ranges it requests first). Even without it, preload=auto fetches
+  // metadata + initial chunks.
+  stopPrefetch();
+  const startTime = getVideoProgress(m.title).time || 0;
+  const movieUrl = startTime > 10 ? `${m.driveLink}#t=${Math.floor(startTime)}` : m.driveLink;
+  _moviePrefetchEl = prefetchVideo(movieUrl);
+  if (m.trailer) {
+    _trailerPrefetchEl = prefetchVideo(m.trailer);
+  }
+}
+
+function stopPrefetch() {
+  if (_moviePrefetchEl) { _moviePrefetchEl.removeAttribute('src'); _moviePrefetchEl.load(); _moviePrefetchEl.remove(); _moviePrefetchEl = null; }
+  if (_trailerPrefetchEl) { _trailerPrefetchEl.removeAttribute('src'); _trailerPrefetchEl.load(); _trailerPrefetchEl.remove(); _trailerPrefetchEl = null; }
+}
+
 async function openMovieViewer(m, fromParty = false) {
   currentViewerMovie = m;
   viewerContent.classList.remove('player-active');
@@ -1012,6 +1051,10 @@ async function openMovieViewer(m, fromParty = false) {
   renderViewerInfo(m);
   renderViewerRelated(m);
 
+  // Prefetch the movie (at resume position) and trailer into the browser cache
+  // so playback starts near-instantly when the user clicks Play/Trailer.
+  startPrefetch(m);
+
   if (partyWS && !fromParty) {
     sendParty({ type: 'load_video', movie: m });
   }
@@ -1067,6 +1110,7 @@ function closeMovieViewer() {
   _playing_trailer = false;
   if (!videoEl.paused) videoEl.pause();
   videoEl.removeAttribute('src'); videoEl.load();
+  stopPrefetch(); // clean up prefetch elements + free their cache pressure
   document.body.style.overflow = '';
   // Don't re-render — preserve the user's scroll position and view state.
   // Targeted updates (ratings, library buttons) already happened in real-time.
