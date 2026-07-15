@@ -1012,3 +1012,33 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ─── DEBUG OVERLAY (Konami code) ── */
+.debug-overlay {
+  position: fixed; top: 16px; right: 16px;
+  z-index: 9998;
+  background: rgba(10, 10, 14, 0.92);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.7;
+  min-width: 260px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+.debug-overlay__title {
+  font-family: var(--font-body); font-size: 10px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+  border-bottom: 1px solid var(--border2); padding-bottom: 6px;
+}
+.debug-overlay__row { display: flex; justify-content: space-between; gap: 16px; }
+.debug-overlay__label { color: var(--text-dim); }
+.debug-overlay__value { color: var(--text); font-weight: 500; }
+.debug-overlay__value.good { color: var(--green); }
+.debug-overlay__value.warn { color: var(--gold); }
+.debug-overlay__value.bad { color: var(--red); }
