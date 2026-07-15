@@ -1133,31 +1133,41 @@ function closeTrailer() {
   }, 400);
 }
 
+// Reset the video element + progress UI when switching videos, so stale data
+// from the previous video (duration, currentTime, buffered ranges) doesn't
+// leak into the new one.
+function resetVideoForNewSrc() {
+  // Fully clear the old video so the browser doesn't reuse its state
+  videoEl.pause();
+  videoEl.removeAttribute('src');
+  videoEl.load();
+  // Reset all progress UI to zeros
+  const played = $('ctrl-progress-played'); if (played) played.style.width = '0%';
+  const cb = $('ctrl-progress-buffered'); if (cb) cb.style.width = '0%';
+  const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
+  const time = $('ctrl-time'); if (time) time.textContent = '0:00 / 0:00';
+}
+
 function playVideo() {
   _playing_trailer = false;
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
+  resetVideoForNewSrc();
   videoEl.preload = 'auto';
   videoEl.src = currentViewerMovie.driveLink;
 
-  // Reset buffered bars for the new video
-  const cb = $('ctrl-progress-buffered'); if (cb) cb.style.width = '0%';
-  const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
-
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
-  // Use canplay (fires as soon as the browser has enough to start) instead of
-  // loadedmetadata (fires only after full metadata is parsed). This shaves
-  // time off the "click play → video starts" gap.
+  // Always wait for canplay — the readyState from the previous video is stale
+  // and can't be trusted. canplay fires as soon as the browser has enough data
+  // to begin playback.
   const startPlayback = () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
       try { videoEl.currentTime = startTime; } catch(e) {}
     }
     videoEl.play().catch(() => {});
   };
-  // If metadata already loaded, start now; otherwise wait for canplay
-  if (videoEl.readyState >= 1) startPlayback();
-  else videoEl.addEventListener('canplay', startPlayback, { once: true });
+  videoEl.addEventListener('canplay', startPlayback, { once: true });
 }
 
 function playTrailer() {
@@ -1166,15 +1176,12 @@ function playTrailer() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
+  resetVideoForNewSrc();
   videoEl.preload = 'auto';
   videoEl.src = currentViewerMovie.trailer;
-  // Reset buffered bars for the trailer
-  const cb = $('ctrl-progress-buffered'); if (cb) cb.style.width = '0%';
-  const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
   // Trailers start from the beginning — no progress restore
   const startPlayback = () => { videoEl.play().catch(() => {}); };
-  if (videoEl.readyState >= 1) startPlayback();
-  else videoEl.addEventListener('canplay', startPlayback, { once: true });
+  videoEl.addEventListener('canplay', startPlayback, { once: true });
 }
 
 // ─── TRAILER DOWNLOAD (Request Trailer) ───────────────────────
@@ -1276,7 +1283,10 @@ function finishTrailerDownload(title, trailerUrl) {
 }
 
 function updateProgressBar() {
-  if (videoEl.duration) {
+  // Only update when we have real metadata for the CURRENT video (readyState > 0
+  // means metadata is loaded). This prevents stale duration/currentTime from the
+  // previous video leaking into the progress bar while the new one loads.
+  if (videoEl.readyState > 0 && videoEl.duration && isFinite(videoEl.duration)) {
     const pct = (videoEl.currentTime / videoEl.duration) * 100;
     $('ctrl-progress-played').style.width = pct + '%';
     $('ctrl-time').textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration)}`;
@@ -2005,6 +2015,103 @@ partyInputs.forEach((inp, index) => {
       if (activePoster) { activePoster.style.transform = ''; activePoster = null; }
     });
   }
+})();
+
+// ─── DEBUG OVERLAY (Konami code: ↑↑↓↓←→←→) ───────────────────
+(function initDebugOverlay() {
+  const SEQUENCE = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight'];
+  let _konmiIdx = 0;
+  let _debugActive = false;
+  let _debugTimer = null;
+  const overlay = document.getElementById('debug-overlay');
+
+  function fmtBytes(n) {
+    if (!n || n < 1) return '0 B';
+    const units = ['B','KB','MB','GB'];
+    let i = 0; while (n >= 1024 && i < units.length-1) { n /= 1024; i++; }
+    return n.toFixed(1) + ' ' + units[i];
+  }
+  function fmtRate(n) { return fmtBytes(n) + '/s'; }
+
+  async function updateDebugOverlay() {
+    if (!_debugActive) return;
+    // Fetch server-side stats
+    let server = {};
+    try {
+      const res = await fetch(`${API_BASE}/api/debug?t=${Date.now()}`);
+      if (res.ok) server = await res.json();
+    } catch(e) {}
+
+    // Client-side video stats
+    const v = videoEl;
+    const watchPos = v && v.duration ? formatTime(v.currentTime) : '—';
+    const duration = v && v.duration ? formatTime(v.duration) : '—';
+    const readyState = v ? v.readyState : '—';
+    let bufInfo = '—';
+    if (v && v.buffered.length > 0 && v.duration) {
+      // Find buffered range containing playhead
+      let end = 0;
+      for (let i = 0; i < v.buffered.length; i++) {
+        if (v.currentTime >= v.buffered.start(i) - 0.5 && v.currentTime <= v.buffered.end(i) + 0.5) {
+          end = v.buffered.end(i);
+          break;
+        }
+      }
+      const bufPct = v.duration ? ((end / v.duration) * 100).toFixed(1) : 0;
+      const aheadSec = Math.max(0, end - v.currentTime);
+      bufInfo = `${bufPct}% (+${aheadSec.toFixed(0)}s)`;
+    }
+    const networkState = v ? ['EMPTY','IDLE','LOADING','NO_SOURCE'][v.networkState] || v.networkState : '—';
+
+    // Connection stats (if available via Navigation Timing API)
+    let connInfo = '—';
+    if (navigator.connection) {
+      const c = navigator.connection;
+      connInfo = `${c.downlink || '?'} Mbps (${c.effectiveType || '?'})`;
+    }
+
+    const rows = [
+      { label: 'Server Upload', value: fmtRate(server.upload_rate || 0), cls: 'good' },
+      { label: 'Server Download', value: fmtRate(server.download_rate || 0) },
+      { label: 'Upload Cap', value: fmtRate(server.upload_cap || 0) },
+      { label: 'Stream Share', value: fmtRate(server.stream_share || 0) + ` (${server.active_streams||0} stream${(server.active_streams||0)!==1?'s':''})` },
+      { label: 'Peak Upload', value: fmtRate(server.peak_up || 0) },
+      { label: 'Total Up/Down', value: `${fmtBytes(server.total_up||0)} / ${fmtBytes(server.total_down||0)}` },
+      { label: 'Online', value: server.online || 0 },
+      { label: '─ Player ─', value: '' },
+      { label: 'Watch Position', value: `${watchPos} / ${duration}` },
+      { label: 'Buffered', value: bufInfo, cls: bufInfo !== '—' && bufInfo.startsWith('0%') ? 'bad' : 'good' },
+      { label: 'Ready State', value: readyState + (v && v.paused ? ' (paused)' : ' (playing)') },
+      { label: 'Network State', value: networkState, cls: networkState === 'LOADING' ? 'warn' : '' },
+      { label: 'Your Connection', value: connInfo },
+    ];
+
+    if (overlay) {
+      overlay.innerHTML = `<div class="debug-overlay__title">Debug (↑↑↓↓←→←→ to close)</div>` +
+        rows.map(r => `<div class="debug-overlay__row"><span class="debug-overlay__label">${r.label}</span><span class="debug-overlay__value ${r.cls||''}">${r.value}</span></div>`).join('');
+    }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    // Only watch arrow keys for the Konami sequence
+    if (e.key === SEQUENCE[_konmiIdx]) {
+      _konmiIdx++;
+      if (_konmiIdx === SEQUENCE.length) {
+        _konmiIdx = 0;
+        _debugActive = !_debugActive;
+        if (overlay) overlay.style.display = _debugActive ? '' : 'none';
+        if (_debugActive) {
+          updateDebugOverlay();
+          _debugTimer = setInterval(updateDebugOverlay, 1000);
+        } else {
+          if (_debugTimer) { clearInterval(_debugTimer); _debugTimer = null; }
+        }
+      }
+    } else {
+      // Reset on wrong key (but allow arrow keys to restart matching)
+      _konmiIdx = (e.key === SEQUENCE[0]) ? 1 : 0;
+    }
+  });
 })();
 
 // ─── MAIN INIT ────────────────────────────────────────────────
