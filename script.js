@@ -8,8 +8,9 @@ const SHEET_CSV_URL    = '';
 const SHOWS_CSV_URL    = '';
 const DRIVE_SCRIPT_URL = '';
 
-const AUTO_RELOAD_MS = 30 * 60 * 1000;
-setTimeout(() => location.reload(), AUTO_RELOAD_MS);
+// Auto page reload disabled — it was resetting users' scroll positions and view state.
+// const AUTO_RELOAD_MS = 30 * 60 * 1000;
+// setTimeout(() => location.reload(), AUTO_RELOAD_MS);
 
 // ─── ACCESS KEY GATE ──────────────────────────────────────────
 const LOCAL_DEVICE_ID = 'thedrive_device_id_v1';
@@ -996,9 +997,18 @@ async function openMovieViewer(m, fromParty = false) {
   currentViewerComments = await fetchComments(m.title);
   renderComments();
   updateViewerLibraryButton();
-  // Show the Trailer button only when a trailer file exists for this movie
+  // Trailer button: "Trailer" (playable) if a trailer exists, else "Request Trailer"
   const trailerBtn = $('viewer-trailer-btn');
-  if (trailerBtn) trailerBtn.style.display = m.trailer ? '' : 'none';
+  const trailerBtnText = $('viewer-trailer-btn-text');
+  const trailerProgress = $('viewer-trailer-progress');
+  if (trailerBtn) {
+    trailerBtn.style.display = ''; // always show now
+    trailerBtn.dataset.mode = m.trailer ? 'play' : 'request';
+    if (trailerBtnText) trailerBtnText.textContent = m.trailer ? 'Trailer' : 'Request Trailer';
+    if (trailerProgress) trailerProgress.classList.remove('active');
+    // Check if there's an in-progress download for this movie
+    if (!m.trailer) checkTrailerDownloadStatus(m.title);
+  }
   renderViewerInfo(m);
   renderViewerRelated(m);
 
@@ -1113,6 +1123,104 @@ function playTrailer() {
   videoEl.addEventListener('loadedmetadata', () => { videoEl.play(); }, { once: true });
 }
 
+// ─── TRAILER DOWNLOAD (Request Trailer) ───────────────────────
+let _trailerPollTimer = null;
+
+async function requestTrailer() {
+  if (!currentViewerMovie) return;
+  const m = currentViewerMovie;
+  const btn = $('viewer-trailer-btn');
+  const btnText = $('viewer-trailer-btn-text');
+  const progressEl = $('viewer-trailer-progress');
+  if (btnText) btnText.textContent = 'Searching...';
+  btn.disabled = true;
+  if (progressEl) { progressEl.classList.add('active'); progressEl.style.setProperty('--trailer-progress', '0%'); }
+  try {
+    const res = await fetch(`${API_BASE}/api/trailer/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ did: getDeviceId(), title: m.title, year: m.year })
+    });
+    const data = await res.json();
+    if (!data.started) {
+      if (btnText) btnText.textContent = data.error || 'Failed';
+      btn.disabled = false;
+      if (progressEl) progressEl.classList.remove('active');
+      setTimeout(() => { if (btnText) btnText.textContent = 'Request Trailer'; }, 3000);
+      return;
+    }
+    // Start polling for progress
+    pollTrailerDownload(m.title);
+  } catch(e) {
+    if (btnText) btnText.textContent = 'Failed';
+    btn.disabled = false;
+    if (progressEl) progressEl.classList.remove('active');
+    setTimeout(() => { if (btnText) btnText.textContent = 'Request Trailer'; }, 3000);
+  }
+}
+
+async function checkTrailerDownloadStatus(title) {
+  // If a download is already in progress for this movie, resume polling
+  try {
+    const res = await fetch(`${API_BASE}/api/trailer/status?title=${encodeURIComponent(title)}`);
+    const data = await res.json();
+    if (data.status === 'downloading' || data.status === 'searching') {
+      pollTrailerDownload(title);
+    } else if (data.status === 'done') {
+      // Trailer was downloaded since the page loaded — update the movie + button
+      finishTrailerDownload(title, data.trailer_url);
+    }
+  } catch(e) {}
+}
+
+function pollTrailerDownload(title) {
+  if (_trailerPollTimer) clearInterval(_trailerPollTimer);
+  const btn = $('viewer-trailer-btn');
+  const btnText = $('viewer-trailer-btn-text');
+  const progressEl = $('viewer-trailer-progress');
+  if (progressEl) progressEl.classList.add('active');
+  _trailerPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/trailer/status?title=${encodeURIComponent(title)}`);
+      const data = await res.json();
+      if (data.status === 'searching') {
+        if (btnText) btnText.textContent = 'Searching...';
+        if (progressEl) progressEl.style.setProperty('--trailer-progress', '5%');
+      } else if (data.status === 'downloading') {
+        if (btnText) btnText.textContent = 'Downloading...';
+        if (progressEl) progressEl.style.setProperty('--trailer-progress', (data.progress || 0) + '%');
+      } else if (data.status === 'done') {
+        clearInterval(_trailerPollTimer); _trailerPollTimer = null;
+        finishTrailerDownload(title, data.trailer_url);
+      } else if (data.status === 'error') {
+        clearInterval(_trailerPollTimer); _trailerPollTimer = null;
+        if (btnText) btnText.textContent = 'Failed';
+        if (progressEl) progressEl.classList.remove('active');
+        if (btn) btn.disabled = false;
+        setTimeout(() => { if (btnText) btnText.textContent = 'Request Trailer'; }, 3000);
+      }
+    } catch(e) {}
+  }, 1500);
+}
+
+function finishTrailerDownload(title, trailerUrl) {
+  const btn = $('viewer-trailer-btn');
+  const btnText = $('viewer-trailer-btn-text');
+  const progressEl = $('viewer-trailer-progress');
+  if (btnText) btnText.textContent = 'Trailer';
+  if (btn) { btn.disabled = false; btn.dataset.mode = 'play'; }
+  if (progressEl) { progressEl.classList.remove('active'); progressEl.style.setProperty('--trailer-progress', '100%'); }
+  // Update the movie object so playTrailer() works
+  if (currentViewerMovie && currentViewerMovie.title === title && trailerUrl) {
+    currentViewerMovie.trailer = trailerUrl;
+  }
+  // Also update allMovies so re-opening the viewer has the trailer
+  const movie = allMovies.find(m => m.title === title);
+  if (movie && trailerUrl) movie.trailer = trailerUrl;
+  showToast('✓ Trailer downloaded');
+  setTimeout(() => { if (progressEl) progressEl.style.setProperty('--trailer-progress', '0%'); }, 1000);
+}
+
 function updateProgressBar() {
   if (videoEl.duration) {
     const pct = (videoEl.currentTime / videoEl.duration) * 100;
@@ -1196,7 +1304,14 @@ videoEl.addEventListener('seeked', () => {
  $('viewer-library-btn').addEventListener('click', () => {
    if (currentViewerMovie) toggleLibrary(currentViewerMovie.title);
  });
- $('viewer-trailer-btn').addEventListener('click', playTrailer);
+ $('viewer-trailer-btn').addEventListener('click', () => {
+   const btn = $('viewer-trailer-btn');
+   if (btn && btn.dataset.mode === 'play') {
+     playTrailer();
+   } else {
+     requestTrailer();
+   }
+ });
  // Close button: if a trailer is playing, go back to info card; else close everything
  $('viewer-close').addEventListener('click', () => {
   if (_playing_trailer) closeTrailer();
