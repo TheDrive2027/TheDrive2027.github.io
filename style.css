@@ -830,8 +830,17 @@ body {
 }
 .viewer-play-btn { background: #fff; color: #000; }
 .viewer-play-btn:hover { background: rgba(255,255,255,0.85); transform: translateY(-1px); }
-.viewer-trailer-btn { background: rgba(255,255,255,0.18); color: var(--text); }
+.viewer-trailer-btn { background: rgba(255,255,255,0.18); color: var(--text); position: relative; overflow: hidden; }
 .viewer-trailer-btn:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+/* Progress bar at the very bottom of the Request Trailer button */
+.viewer-trailer-progress {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 3px; width: 0%;
+  background: var(--accent);
+  border-radius: 0;
+  transition: width 300ms ease;
+}
+.viewer-trailer-progress.active { width: var(--trailer-progress, 0%); }
 .viewer-library-btn { background: rgba(255,255,255,0.18); color: var(--text); }
 .viewer-library-btn:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
 
