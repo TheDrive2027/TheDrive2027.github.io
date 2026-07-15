@@ -933,14 +933,12 @@ function prefetchVideo(url) {
 }
 
 function startPrefetch(m) {
-  // Movie: fetch at the resume position by appending a byte-range hint via #t
-  // (the #t fragment tells the browser to seek there, which influences which
-  // byte ranges it requests first). Even without it, preload=auto fetches
-  // metadata + initial chunks.
+  // Prefetch the movie + trailer using the EXACT same URLs that playVideo/
+  // playTrailer will use, so the browser's HTTP cache applies when the user
+  // clicks Play. We don't use #t= fragments because playVideo doesn't — using
+  // a different URL would bypass the cache.
   stopPrefetch();
-  const startTime = getVideoProgress(m.title).time || 0;
-  const movieUrl = startTime > 10 ? `${m.driveLink}#t=${Math.floor(startTime)}` : m.driveLink;
-  _moviePrefetchEl = prefetchVideo(movieUrl);
+  _moviePrefetchEl = prefetchVideo(m.driveLink);
   if (m.trailer) {
     _trailerPrefetchEl = prefetchVideo(m.trailer);
   }
@@ -1153,6 +1151,9 @@ function playVideo() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
+  // Stop the movie prefetch — the main video element takes over. Keep the
+  // trailer prefetch running in case the user watches the trailer next.
+  if (_moviePrefetchEl) { _moviePrefetchEl.removeAttribute('src'); _moviePrefetchEl.load(); _moviePrefetchEl.remove(); _moviePrefetchEl = null; }
   resetVideoForNewSrc();
   videoEl.preload = 'auto';
   videoEl.src = currentViewerMovie.driveLink;
@@ -1176,6 +1177,8 @@ function playTrailer() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
+  // Stop the trailer prefetch — the main video element takes over.
+  if (_trailerPrefetchEl) { _trailerPrefetchEl.removeAttribute('src'); _trailerPrefetchEl.load(); _trailerPrefetchEl.remove(); _trailerPrefetchEl = null; }
   resetVideoForNewSrc();
   videoEl.preload = 'auto';
   videoEl.src = currentViewerMovie.trailer;
