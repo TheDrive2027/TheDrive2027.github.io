@@ -1094,6 +1094,7 @@ function playVideo() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
+  videoEl.preload = 'auto';
   videoEl.src = currentViewerMovie.driveLink;
 
   // Reset buffered bars for the new video
@@ -1101,12 +1102,18 @@ function playVideo() {
   const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
 
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
-  videoEl.addEventListener('loadedmetadata', () => {
+  // Use canplay (fires as soon as the browser has enough to start) instead of
+  // loadedmetadata (fires only after full metadata is parsed). This shaves
+  // time off the "click play → video starts" gap.
+  const startPlayback = () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
-      videoEl.currentTime = startTime;
+      try { videoEl.currentTime = startTime; } catch(e) {}
     }
-    videoEl.play();
-  }, { once: true });
+    videoEl.play().catch(() => {});
+  };
+  // If metadata already loaded, start now; otherwise wait for canplay
+  if (videoEl.readyState >= 1) startPlayback();
+  else videoEl.addEventListener('canplay', startPlayback, { once: true });
 }
 
 function playTrailer() {
@@ -1115,12 +1122,15 @@ function playTrailer() {
   $('viewer-details').style.display = 'none';
   $('viewer-player').style.display = 'flex';
   viewerContent.classList.add('player-active');
+  videoEl.preload = 'auto';
   videoEl.src = currentViewerMovie.trailer;
   // Reset buffered bars for the trailer
   const cb = $('ctrl-progress-buffered'); if (cb) cb.style.width = '0%';
   const vb = $('viewer-progress-buffered'); if (vb) vb.style.width = '0%';
   // Trailers start from the beginning — no progress restore
-  videoEl.addEventListener('loadedmetadata', () => { videoEl.play(); }, { once: true });
+  const startPlayback = () => { videoEl.play().catch(() => {}); };
+  if (videoEl.readyState >= 1) startPlayback();
+  else videoEl.addEventListener('canplay', startPlayback, { once: true });
 }
 
 // ─── TRAILER DOWNLOAD (Request Trailer) ───────────────────────
@@ -1237,21 +1247,23 @@ function updateBufferedBar() {
   if (!videoEl.duration) return;
   const bufferedEl = $('ctrl-progress-buffered');
   const vBufferedEl = $('viewer-progress-buffered');
-  // Find the buffered range that contains (or is just ahead of) the playhead
-  let bufEnd = 0;
+  // Find the buffered range that contains the playhead, and report its end.
+  // If the playhead is in a gap (unlikely but possible after a seek), report 0
+  // so the bar accurately reflects "nothing buffered ahead right now."
+  let bufEnd = -1;
+  const ct = videoEl.currentTime;
   for (let i = 0; i < videoEl.buffered.length; i++) {
     const start = videoEl.buffered.start(i);
     const end = videoEl.buffered.end(i);
-    if (start <= videoEl.currentTime + 0.5 && end >= videoEl.currentTime) {
+    if (ct >= start - 0.5 && ct <= end + 0.5) {
       bufEnd = end;
       break;
     }
   }
-  // Fallback: use the last buffered end if none contains the playhead
-  if (bufEnd === 0 && videoEl.buffered.length > 0) {
-    bufEnd = videoEl.buffered.end(videoEl.buffered.length - 1);
-  }
-  const bufPct = Math.min(100, (bufEnd / videoEl.duration) * 100);
+  // If no range contains the playhead, show the bar at the playhead position
+  // (flat) rather than jumping to some unrelated range.
+  const effectiveEnd = bufEnd >= 0 ? bufEnd : ct;
+  const bufPct = Math.min(100, Math.max(0, (effectiveEnd / videoEl.duration) * 100));
   if (bufferedEl) bufferedEl.style.width = bufPct + '%';
   if (vBufferedEl) vBufferedEl.style.width = bufPct + '%';
 }
