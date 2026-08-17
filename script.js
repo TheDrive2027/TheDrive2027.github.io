@@ -912,6 +912,36 @@ let progressRaf = null;
 let _applying_party_action = false; // Flag to prevent WS echo loops
 let _playing_trailer = false; // True while the trailer (not the movie) is loaded
 
+// ─── BUFFERING SPINNER ──────────────────────────────────────
+// Shows a spinner any time the video is not immediately playable: initial
+// load (waiting for canplay), and any mid-playback stall/rebuffer (waiting).
+// Hides on playing/canplay/canplaythrough, and always on pause/error/ended
+// so it never gets stuck visible.
+const bufferingSpinnerEl = $('viewer-buffering-spinner');
+function showBufferingSpinner() { if (bufferingSpinnerEl) bufferingSpinnerEl.hidden = false; }
+function hideBufferingSpinner() { if (bufferingSpinnerEl) bufferingSpinnerEl.hidden = true; }
+videoEl.addEventListener('waiting', showBufferingSpinner);      // ran out of buffer mid-playback
+videoEl.addEventListener('loadstart', showBufferingSpinner);    // new src just set
+videoEl.addEventListener('playing', hideBufferingSpinner);      // actually resumed/started producing frames
+videoEl.addEventListener('canplaythrough', hideBufferingSpinner);
+videoEl.addEventListener('pause', hideBufferingSpinner);
+videoEl.addEventListener('ended', hideBufferingSpinner);
+videoEl.addEventListener('error', hideBufferingSpinner);
+
+// ─── DISABLE EMBEDDED SUBTITLES ─────────────────────────────
+// Some video files have a subtitle/caption track muxed into the container
+// itself. We never add a <track> element or turn subtitles on ourselves,
+// but certain browsers (Safari in particular) auto-enable an embedded text
+// track by default. Force every text track off whenever the track list
+// changes so subtitles never show up uninvited.
+function disableAllTextTracks() {
+  const tracks = videoEl.textTracks;
+  if (!tracks) return;
+  for (let i = 0; i < tracks.length; i++) tracks[i].mode = 'disabled';
+}
+videoEl.textTracks.addEventListener('addtrack', disableAllTextTracks);
+videoEl.addEventListener('loadedmetadata', disableAllTextTracks);
+
 // ─── PREFETCH (warm the browser cache before the user clicks Play) ──
 // When the detail view opens, we start fetching the movie (at the resume
 // position) and the trailer into hidden video elements. The browser caches
