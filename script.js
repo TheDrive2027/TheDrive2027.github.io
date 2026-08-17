@@ -785,6 +785,138 @@ function getVideoProgress(title) {
   return progressCache[normalize(title)] || {};
 }
 
+// ─── MOVIE REQUESTS ─────────────────────────────────────────
+let _requestsSearchDebounce = null;
+let _requestingIds = new Set(); // in-flight requests, prevents double-click spam
+
+function tmdbPosterUrl(posterPath) {
+  if (!posterPath) return '';
+  return `https://image.tmdb.org/t/p/w342${posterPath}`;
+}
+
+async function loadMostRequested() {
+  const grid = $('requests-top-grid');
+  const empty = $('requests-top-empty');
+  if (!grid) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/requests/list?limit=10`);
+    const entries = res.ok ? await res.json() : [];
+    grid.innerHTML = '';
+    if (!entries.length) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    const frag = document.createDocumentFragment();
+    entries.forEach(e => frag.appendChild(buildTopRequestCard(e)));
+    grid.appendChild(frag);
+  } catch (e) {
+    empty.hidden = false;
+  }
+}
+
+function buildTopRequestCard(entry) {
+  const card = document.createElement('div');
+  card.className = 'request-top-card';
+  const posterSrc = entry.poster ? `${API_BASE}/requests/posters/${entry.poster}` : '';
+  card.innerHTML = `
+    <div class="request-top-card__poster">${posterSrc ? `<img src="${posterSrc}" alt="${escHtml(entry.title)}" />` : ''}</div>
+    <div class="request-top-card__body">
+      <div>
+        <div class="request-top-card__title">${escHtml(entry.title)}</div>
+        <div class="request-top-card__meta">${escHtml(entry.year || '')}${entry.rating ? ' · ★ ' + entry.rating : ''}</div>
+      </div>
+      <div class="request-top-card__count">${entry.count}</div>
+    </div>
+  `;
+  return card;
+}
+
+async function searchTmdbForRequests(query) {
+  const grid = $('requests-search-grid');
+  const empty = $('requests-search-empty');
+  if (!grid) return;
+  query = query.trim();
+  if (!query) {
+    grid.innerHTML = '';
+    empty.hidden = false;
+    empty.querySelector('p').textContent = 'Search for a movie above to request it.';
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/requests/search?q=${encodeURIComponent(query)}`);
+    const results = res.ok ? await res.json() : [];
+    grid.innerHTML = '';
+    if (!results.length) {
+      empty.hidden = false;
+      empty.querySelector('p').textContent = 'No movies found.';
+      return;
+    }
+    empty.hidden = true;
+    const frag = document.createDocumentFragment();
+    results.forEach((m, i) => frag.appendChild(buildRequestCard(m, i)));
+    grid.appendChild(frag);
+  } catch (e) {
+    empty.hidden = false;
+    empty.querySelector('p').textContent = 'Search failed — try again.';
+  }
+}
+
+function buildRequestCard(m, i) {
+  const card = document.createElement('div');
+  card.className = 'movie-card request-card';
+  card.style.animationDelay = Math.min(i * 30, 400) + 'ms';
+  const posterSrc = tmdbPosterUrl(m.poster);
+  card.innerHTML = `
+    <div class="card-poster">
+      ${posterSrc ? `<img src="${posterSrc}" alt="${escHtml(m.title)}" class="loaded" />` : ''}
+      <span class="request-card__requested-badge">Requested ✓</span>
+    </div>
+    <div class="card-title">${escHtml(m.title)}</div>
+    <div class="card-meta">
+      <span class="card-year">${escHtml(m.year || '—')}</span><span class="card-sep">·</span>
+      <span class="card-rating">${m.rating ? '★ ' + m.rating : '—'}</span>
+    </div>
+  `;
+  card.addEventListener('click', () => requestMovie(m, card));
+  return card;
+}
+
+async function requestMovie(m, cardEl) {
+  if (_requestingIds.has(m.tmdbId)) return;
+  _requestingIds.add(m.tmdbId);
+  try {
+    await fetch(`${API_BASE}/api/requests/add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tmdbId: m.tmdbId, title: m.title, poster: m.poster, year: m.year, rating: m.rating }),
+    });
+    if (cardEl) {
+      cardEl.classList.add('just-requested');
+      setTimeout(() => cardEl.classList.remove('just-requested'), 1200);
+    }
+    showToast(`Requested "${m.title}"`);
+    loadMostRequested();
+  } catch (e) {
+    showToast('Request failed — try again');
+  } finally {
+    _requestingIds.delete(m.tmdbId);
+  }
+}
+
+function initRequestsTab() {
+  loadMostRequested();
+  const input = $('requests-search-input');
+  if (input && !input.dataset.wired) {
+    input.dataset.wired = '1';
+    input.addEventListener('input', () => {
+      clearTimeout(_requestsSearchDebounce);
+      const q = input.value;
+      _requestsSearchDebounce = setTimeout(() => searchTmdbForRequests(q), 350);
+    });
+  }
+}
+
 // ─── LIBRARY ───────────────────────────────────────────────────
 function isInLibrary(title) {
   const norm = normalize(title);
@@ -948,11 +1080,13 @@ videoEl.addEventListener('loadedmetadata', disableAllTextTracks);
 // streaming service. Reappear instantly on any activity, and stay visible
 // whenever the video is paused (nothing to "get out of the way" of then).
 const playerControlsEl = document.querySelector('.custom-controls');
+const viewerCloseEl = $('viewer-close');
 const viewerPlayerEl = $('viewer-player');
 let _controlsHideTimer = null;
 
 function showPlayerControls() {
   if (playerControlsEl) playerControlsEl.classList.remove('controls-hidden');
+  if (viewerCloseEl) viewerCloseEl.classList.remove('controls-hidden');
   if (viewerPlayerEl) viewerPlayerEl.classList.remove('controls-hidden');
   clearTimeout(_controlsHideTimer);
   // Only start the auto-hide countdown while actually playing — keep
@@ -963,6 +1097,7 @@ function showPlayerControls() {
 }
 function hidePlayerControls() {
   if (playerControlsEl) playerControlsEl.classList.add('controls-hidden');
+  if (viewerCloseEl) viewerCloseEl.classList.add('controls-hidden');
   if (viewerPlayerEl) viewerPlayerEl.classList.add('controls-hidden');
 }
 if (viewerPlayerEl) {
@@ -2226,6 +2361,7 @@ partyInputs.forEach((inp, index) => {
       else if (view === 'movies') { if(hasActiveFilters()) applyFilters(); else { filtered = [...allMovies]; applySort(); } }
       else if (view === 'shows') renderShows();
       else if (view === 'library') loadLibrary().then(() => renderLibrary());
+      else if (view === 'requests') initRequestsTab();
       else if (view === 'updates') loadUpdates(); 
     });
   });
