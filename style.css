@@ -76,8 +76,14 @@ body {
   top: 0;
   z-index: 1000;
   background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: var(--blur);
-  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  /* Force onto its own GPU compositing layer — some browsers (Safari in
+     particular) can fail to apply backdrop-filter reliably on a sticky
+     element without this, especially once other layered content (video,
+     transforms) is on the page. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
   border-bottom: 1px solid var(--border);
   transition: background var(--transition), border-color var(--transition);
 }
