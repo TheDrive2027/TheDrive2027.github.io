@@ -1786,6 +1786,76 @@ if (searchInput) {
   });
 }
 if (clearSearch) clearSearch.addEventListener('click', () => { searchInput.value = ''; clearSearch.classList.remove('visible'); render(); searchInput.focus(); });
+
+// ─── MOBILE NAV (hamburger drawer + search toggle) ─────────────
+(function initMobileNav() {
+  const menuBtn = $('mobile-menu-btn');
+  const drawer = $('mobile-nav-drawer');
+  const overlay = $('mobile-nav-overlay');
+  const closeBtn = $('mobile-nav-close');
+  const searchBtn = $('mobile-search-btn');
+  const mobileSearchBar = $('mobile-search-bar');
+  const mobileSearchInput = $('mobile-search-input');
+  const mobileSearchClose = $('mobile-search-close');
+
+  function openDrawer() {
+    if (!drawer || !overlay) return;
+    drawer.hidden = false; overlay.hidden = false;
+    requestAnimationFrame(() => { drawer.classList.add('open'); overlay.classList.add('open'); });
+    if (menuBtn) menuBtn.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    if (!drawer || !overlay) return;
+    drawer.classList.remove('open'); overlay.classList.remove('open');
+    if (menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+    setTimeout(() => { drawer.hidden = true; overlay.hidden = true; }, 300);
+  }
+  if (menuBtn) menuBtn.addEventListener('click', openDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  if (overlay) overlay.addEventListener('click', closeDrawer);
+  // Close the drawer whenever any nav button inside it is chosen — the
+  // existing global .nav-btn click handler (wired elsewhere) still fires
+  // and handles the actual view switch, since these buttons share that class.
+  document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+    btn.addEventListener('click', closeDrawer);
+  });
+
+  function openMobileSearch() {
+    if (!mobileSearchBar) return;
+    mobileSearchBar.hidden = false;
+    requestAnimationFrame(() => mobileSearchBar.classList.add('open'));
+    if (mobileSearchInput) { mobileSearchInput.value = searchInput ? searchInput.value : ''; mobileSearchInput.focus(); }
+  }
+  function closeMobileSearch() {
+    if (!mobileSearchBar) return;
+    mobileSearchBar.classList.remove('open');
+    setTimeout(() => { mobileSearchBar.hidden = true; }, 220);
+  }
+  if (searchBtn) searchBtn.addEventListener('click', openMobileSearch);
+  if (mobileSearchClose) mobileSearchClose.addEventListener('click', closeMobileSearch);
+  // Mirror the mobile search input into the real (desktop) search input and
+  // reuse its existing input-handling logic rather than duplicating it.
+  if (mobileSearchInput && searchInput) {
+    mobileSearchInput.addEventListener('input', () => {
+      searchInput.value = mobileSearchInput.value;
+      searchInput.dispatchEvent(new Event('input'));
+    });
+  }
+
+  // Keep the drawer's duplicate stat displays (online count / last updated)
+  // in sync with the desktop header versions whenever those update.
+  const onlineEl = $('online-count'), mobileOnlineEl = $('mobile-online-count');
+  const updatedEl = $('last-updated'), mobileUpdatedEl = $('mobile-last-updated');
+  if (onlineEl && mobileOnlineEl) {
+    new MutationObserver(() => { mobileOnlineEl.textContent = onlineEl.textContent; }).observe(onlineEl, { childList: true, characterData: true, subtree: true });
+  }
+  if (updatedEl && mobileUpdatedEl) {
+    new MutationObserver(() => { mobileUpdatedEl.textContent = updatedEl.textContent; }).observe(updatedEl, { childList: true, characterData: true, subtree: true });
+  }
+})();
+
 if (sortBy) sortBy.addEventListener('change', () => { currentSort = sortBy.value; if (hasActiveFilters()) applySort(); saveSettings(); });
 if (sortDirBtn) sortDirBtn.addEventListener('click', () => { currentDir = currentDir === 'desc' ? 'asc' : 'desc'; sortDirBtn.textContent = currentDir === 'desc' ? '↓' : '↑'; if (hasActiveFilters()) applySort(); saveSettings(); });
 if (sidebarClearBtn) sidebarClearBtn.addEventListener('click', clearAllFilters);
