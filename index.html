@@ -44,10 +44,6 @@
         <!-- ─── APPLE TV-STYLE TOP NAV (replaces left rail) ─── -->
         <nav class="top-nav" id="top-nav">
             <div class="top-nav__inner">
-                <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Menu" aria-expanded="false">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-                </button>
-
                 <div class="top-nav__brand">
                     <span class="logo-mark">▶</span>
                     <span class="brand-text">THE DRIVE</span>
@@ -63,10 +59,6 @@
                 </div>
 
                 <div class="top-nav__right">
-                    <button id="mobile-search-btn" class="mobile-search-btn" aria-label="Search">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                    </button>
-
                     <div class="search-wrap">
                         <span class="search-icon">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -96,45 +88,7 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Mobile-only full-width search bar, toggled by the search icon -->
-            <div id="mobile-search-bar" class="mobile-search-bar" hidden>
-                <span class="search-icon">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                </span>
-                <input id="mobile-search-input" type="text" placeholder="Search" autocomplete="off" />
-                <button id="mobile-search-close" class="clear-search" aria-label="Close search">✕</button>
-            </div>
         </nav>
-
-        <!-- Mobile nav drawer: tabs list, opened via the hamburger button -->
-        <div id="mobile-nav-overlay" class="mobile-nav-overlay" hidden></div>
-        <div id="mobile-nav-drawer" class="mobile-nav-drawer" hidden>
-            <div class="mobile-nav-drawer__header">
-                <div class="top-nav__brand">
-                    <span class="logo-mark">▶</span>
-                    <span class="brand-text">THE DRIVE</span>
-                </div>
-                <button id="mobile-nav-close" class="mobile-menu-btn" aria-label="Close menu">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                </button>
-            </div>
-            <div class="mobile-nav-drawer__tabs" role="tablist">
-                <button class="mobile-nav-btn nav-btn active" data-view="home" role="tab">Home</button>
-                <button class="mobile-nav-btn nav-btn" data-view="movies" role="tab">Movies</button>
-                <button class="mobile-nav-btn nav-btn" data-view="shows" role="tab">Shows</button>
-                <button class="mobile-nav-btn nav-btn" data-view="library" role="tab">Library</button>
-                <button class="mobile-nav-btn nav-btn" data-view="requests" role="tab">Requests</button>
-                <button class="mobile-nav-btn nav-btn" data-view="updates" role="tab">Updates</button>
-                <button class="mobile-nav-btn nav-btn" data-view="settings" role="tab">Settings</button>
-            </div>
-            <div class="mobile-nav-drawer__footer">
-                <div class="online-wrap">
-                    <span id="mobile-online-count">0</span> online
-                </div>
-                <span class="meta-updated">Updated <span id="mobile-last-updated">—</span></span>
-            </div>
-        </div>
 
         <div class="main-area">
             <!-- ─── SCAN BAR ─── -->
