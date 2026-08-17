@@ -799,7 +799,7 @@ async function loadMostRequested() {
   const empty = $('requests-top-empty');
   if (!grid) return;
   try {
-    const res = await fetch(`${API_BASE}/api/requests/list?limit=10`);
+    const res = await fetch(`${API_BASE}/api/requests/list?limit=10&did=${encodeURIComponent(getDeviceId())}`);
     const entries = res.ok ? await res.json() : [];
     grid.innerHTML = '';
     if (!entries.length) {
@@ -817,10 +817,15 @@ async function loadMostRequested() {
 
 function buildTopRequestCard(entry) {
   const card = document.createElement('div');
-  card.className = 'request-top-card';
+  card.className = 'request-top-card request-card' + (entry.alreadyVoted ? ' already-voted' : '');
   const posterSrc = entry.poster ? `${API_BASE}/requests/posters/${entry.poster}` : '';
   card.innerHTML = `
-    <div class="request-top-card__poster">${posterSrc ? `<img src="${posterSrc}" alt="${escHtml(entry.title)}" />` : ''}</div>
+    <div class="request-top-card__poster">
+      ${posterSrc ? `<img src="${posterSrc}" alt="${escHtml(entry.title)}" />` : ''}
+      <div class="request-card__hover-overlay">
+        <div class="request-card__plus-btn">${entry.alreadyVoted ? '✓' : '+'}</div>
+      </div>
+    </div>
     <div class="request-top-card__body">
       <div>
         <div class="request-top-card__title">${escHtml(entry.title)}</div>
@@ -829,6 +834,9 @@ function buildTopRequestCard(entry) {
       <div class="request-top-card__count">${entry.count}</div>
     </div>
   `;
+  card.addEventListener('click', () => requestMovie({
+    tmdbId: entry.tmdbId, title: entry.title, poster: null, year: entry.year, rating: entry.rating,
+  }, card, /*posterAlreadyLocal=*/true));
   return card;
 }
 
@@ -870,6 +878,9 @@ function buildRequestCard(m, i) {
   card.innerHTML = `
     <div class="card-poster">
       ${posterSrc ? `<img src="${posterSrc}" alt="${escHtml(m.title)}" class="loaded" />` : ''}
+      <div class="request-card__hover-overlay">
+        <div class="request-card__plus-btn">+</div>
+      </div>
       <span class="request-card__requested-badge">Requested ✓</span>
     </div>
     <div class="card-title">${escHtml(m.title)}</div>
@@ -882,20 +893,31 @@ function buildRequestCard(m, i) {
   return card;
 }
 
-async function requestMovie(m, cardEl) {
+async function requestMovie(m, cardEl, posterAlreadyLocal = false) {
   if (_requestingIds.has(m.tmdbId)) return;
   _requestingIds.add(m.tmdbId);
   try {
-    await fetch(`${API_BASE}/api/requests/add`, {
+    const res = await fetch(`${API_BASE}/api/requests/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tmdbId: m.tmdbId, title: m.title, poster: m.poster, year: m.year, rating: m.rating }),
+      body: JSON.stringify({
+        tmdbId: m.tmdbId, title: m.title,
+        // Top-10 cards already have a locally-cached poster server-side —
+        // don't send a TMDb path for those (would be null anyway).
+        poster: posterAlreadyLocal ? undefined : m.poster,
+        year: m.year, rating: m.rating, did: getDeviceId(),
+      }),
     });
+    const data = res.ok ? await res.json() : null;
     if (cardEl) {
-      cardEl.classList.add('just-requested');
-      setTimeout(() => cardEl.classList.remove('just-requested'), 1200);
+      if (data && data.alreadyVoted) {
+        showToast(`You already requested "${m.title}"`);
+      } else {
+        cardEl.classList.add('just-requested');
+        setTimeout(() => cardEl.classList.remove('just-requested'), 1200);
+        showToast(`Requested "${m.title}"`);
+      }
     }
-    showToast(`Requested "${m.title}"`);
     loadMostRequested();
   } catch (e) {
     showToast('Request failed — try again');
