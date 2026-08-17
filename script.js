@@ -862,6 +862,7 @@ function buildTopRequestCard(entry) {
   const card = document.createElement('div');
   card.className = 'request-top-card request-card' + (entry.alreadyVoted ? ' already-voted' : '');
   const posterSrc = entry.poster ? `${API_BASE}/requests/posters/${entry.poster}` : '';
+  const maturity = normalizeMaturity(entry.maturityRating);
   card.innerHTML = `
     <div class="request-top-card__poster">
       ${posterSrc ? `<img src="${posterSrc}" alt="${escHtml(entry.title)}" />` : ''}
@@ -872,7 +873,10 @@ function buildTopRequestCard(entry) {
     <div class="request-top-card__body">
       <div>
         <div class="request-top-card__title">${escHtml(entry.title)}</div>
-        <div class="request-top-card__meta">${escHtml(entry.year || '')}${entry.rating ? ' · ★ ' + entry.rating : ''}</div>
+        <div class="request-top-card__meta">
+          ${escHtml(entry.year || '')}${entry.rating ? ' · ★ ' + entry.rating : ''}
+          ${entry.maturityRating ? ` <span class="card-rating ${ratingClass(maturity)}">${escHtml(maturity)}</span>` : ''}
+        </div>
       </div>
       <div class="request-top-card__count">${entry.count}</div>
     </div>
