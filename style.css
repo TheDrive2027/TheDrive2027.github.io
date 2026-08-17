@@ -561,8 +561,9 @@ body {
   overflow: hidden;
 }
 .request-top-card__poster {
-  flex: 0 0 64px; width: 64px; height: 96px;
+  flex: 0 0 96px; width: 96px; height: 144px;
   border-radius: 6px; overflow: hidden; background: var(--surface-solid);
+  position: relative;
 }
 .request-top-card__poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .request-top-card__body {
@@ -591,9 +592,13 @@ body {
 .requests-search-wrap input::placeholder { color: var(--text-muted); }
 .requests-search-wrap input:focus { background: rgba(255,255,255,0.1); border-color: var(--accent); }
 
+#requests-search-grid.movie-grid {
+  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+}
+
 .request-card { position: relative; cursor: pointer; }
 .request-card .card-poster { cursor: pointer; position: relative; }
-.request-top-card__poster { position: relative; }
+.request-top-card { position: relative; }
 
 /* Hover: blur the poster and show a yellow circular +/✓ button, signaling
    "click to request" — same spirit as the home page's play-button overlay. */
@@ -624,7 +629,7 @@ body {
 }
 .request-card:hover .request-card__plus-btn,
 .request-top-card:hover .request-card__plus-btn { transform: scale(1); }
-.request-top-card__poster .request-card__plus-btn { width: 32px; height: 32px; font-size: 18px; }
+.request-top-card__poster .request-card__plus-btn { width: 40px; height: 40px; font-size: 20px; }
 
 .request-top-card.already-voted .request-card__plus-btn,
 .request-card.already-voted .request-card__plus-btn { background: var(--green); color: #fff; box-shadow: 0 4px 14px rgba(52,199,89,0.35); }
