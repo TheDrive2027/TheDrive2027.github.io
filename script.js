@@ -1196,16 +1196,17 @@ function playVideo() {
   videoEl.src = currentViewerMovie.driveLink;
 
   const startTime = getVideoProgress(currentViewerMovie.title).time || 0;
-  // Always wait for canplay — the readyState from the previous video is stale
-  // and can't be trusted. canplay fires as soon as the browser has enough data
-  // to begin playback.
+  // Start as soon as the very first frame is available (loadeddata) rather
+  // than waiting for canplay, which holds off until the browser estimates
+  // it has "enough" buffered to play through smoothly. We want playback to
+  // begin immediately on whatever data has arrived, buffering handles the rest.
   const startPlayback = () => {
     if (startTime > 10 && startTime < videoEl.duration - 10) {
       try { videoEl.currentTime = startTime; } catch(e) {}
     }
     videoEl.play().catch(() => {});
   };
-  videoEl.addEventListener('canplay', startPlayback, { once: true });
+  videoEl.addEventListener('loadeddata', startPlayback, { once: true });
 }
 
 function playTrailer() {
@@ -1221,7 +1222,7 @@ function playTrailer() {
   videoEl.src = currentViewerMovie.trailer;
   // Trailers start from the beginning — no progress restore
   const startPlayback = () => { videoEl.play().catch(() => {}); };
-  videoEl.addEventListener('canplay', startPlayback, { once: true });
+  videoEl.addEventListener('loadeddata', startPlayback, { once: true });
 }
 
 // ─── TRAILER DOWNLOAD (Request Trailer) ───────────────────────
