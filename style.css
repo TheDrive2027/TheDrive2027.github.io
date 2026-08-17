@@ -592,10 +592,6 @@ body {
 .requests-search-wrap input::placeholder { color: var(--text-muted); }
 .requests-search-wrap input:focus { background: rgba(255,255,255,0.1); border-color: var(--accent); }
 
-#requests-search-grid.movie-grid {
-  grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
-}
-
 .request-card { position: relative; cursor: pointer; }
 .request-card .card-poster { cursor: pointer; position: relative; }
 .request-top-card { position: relative; }
