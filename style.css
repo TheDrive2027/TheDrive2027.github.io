@@ -535,6 +535,18 @@ body {
   color: var(--text-dim); text-transform: uppercase; margin-bottom: 16px;
 }
 
+.requests-view-all-btn {
+  display: block;
+  margin: 16px auto 0;
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--font-body); font-size: 13px; font-weight: 500;
+  padding: 9px 22px; border-radius: var(--radius-pill); cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.requests-view-all-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--border); }
+.requests-view-all-btn.expanded { margin-bottom: 20px; }
+#requests-remaining-grid { margin-top: 4px; }
+
 /* Most-requested: 2 rows x 5 columns */
 .requests-top-grid {
   display: grid;
