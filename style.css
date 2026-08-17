@@ -579,8 +579,44 @@ body {
 .requests-search-wrap input::placeholder { color: var(--text-muted); }
 .requests-search-wrap input:focus { background: rgba(255,255,255,0.1); border-color: var(--accent); }
 
-.request-card { position: relative; }
-.request-card .card-poster { cursor: pointer; }
+.request-card { position: relative; cursor: pointer; }
+.request-card .card-poster { cursor: pointer; position: relative; }
+.request-top-card__poster { position: relative; }
+
+/* Hover: blur the poster and show a yellow circular +/✓ button, signaling
+   "click to request" — same spirit as the home page's play-button overlay. */
+.request-card__hover-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.35);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  border-radius: inherit;
+}
+.request-card:hover .request-card__hover-overlay,
+.request-top-card:hover .request-card__hover-overlay { opacity: 1; }
+.request-card:hover .card-poster img,
+.request-top-card:hover .request-top-card__poster img {
+  filter: blur(3px);
+  transition: filter 220ms ease;
+}
+.card-poster img, .request-top-card__poster img { transition: filter 220ms ease; }
+.request-card__plus-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--gold); color: #000;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700; line-height: 1;
+  transform: scale(0.85);
+  transition: transform 220ms ease;
+  box-shadow: 0 4px 14px rgba(255,214,10,0.4);
+}
+.request-card:hover .request-card__plus-btn,
+.request-top-card:hover .request-card__plus-btn { transform: scale(1); }
+.request-top-card__poster .request-card__plus-btn { width: 32px; height: 32px; font-size: 18px; }
+
+.request-top-card.already-voted .request-card__plus-btn,
+.request-card.already-voted .request-card__plus-btn { background: var(--green); color: #fff; box-shadow: 0 4px 14px rgba(52,199,89,0.35); }
+
 .request-card__requested-badge {
   position: absolute; top: 8px; right: 8px;
   background: var(--accent); color: #fff;
