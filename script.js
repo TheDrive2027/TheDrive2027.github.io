@@ -942,6 +942,37 @@ function disableAllTextTracks() {
 videoEl.textTracks.addEventListener('addtrack', disableAllTextTracks);
 videoEl.addEventListener('loadedmetadata', disableAllTextTracks);
 
+// ─── AUTO-HIDE CONTROLS ──────────────────────────────────────
+// Fade the custom controls bar out after 3s of no mouse/keyboard/touch
+// activity so the video can be watched unobstructed, like any normal
+// streaming service. Reappear instantly on any activity, and stay visible
+// whenever the video is paused (nothing to "get out of the way" of then).
+const playerControlsEl = document.querySelector('.custom-controls');
+const viewerPlayerEl = $('viewer-player');
+let _controlsHideTimer = null;
+
+function showPlayerControls() {
+  if (playerControlsEl) playerControlsEl.classList.remove('controls-hidden');
+  if (viewerPlayerEl) viewerPlayerEl.classList.remove('controls-hidden');
+  clearTimeout(_controlsHideTimer);
+  // Only start the auto-hide countdown while actually playing — keep
+  // controls visible while paused, buffering, or not in the player at all.
+  if (!videoEl.paused && !videoEl.ended && viewerContent.classList.contains('player-active')) {
+    _controlsHideTimer = setTimeout(hidePlayerControls, 3000);
+  }
+}
+function hidePlayerControls() {
+  if (playerControlsEl) playerControlsEl.classList.add('controls-hidden');
+  if (viewerPlayerEl) viewerPlayerEl.classList.add('controls-hidden');
+}
+if (viewerPlayerEl) {
+  ['mousemove', 'mousedown', 'touchstart', 'keydown'].forEach(evt => {
+    viewerPlayerEl.addEventListener(evt, showPlayerControls);
+  });
+}
+videoEl.addEventListener('play', showPlayerControls);
+videoEl.addEventListener('pause', showPlayerControls); // re-show and cancel countdown while paused
+
 // ─── PREFETCH (warm the browser cache before the user clicks Play) ──
 // When the detail view opens, we start fetching the movie (at the resume
 // position) and the trailer into hidden video elements. The browser caches
