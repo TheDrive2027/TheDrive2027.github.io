@@ -794,25 +794,68 @@ function tmdbPosterUrl(posterPath) {
   return `https://image.tmdb.org/t/p/w342${posterPath}`;
 }
 
+let _allRequestEntries = [];
+let _requestsExpanded = false;
+
 async function loadMostRequested() {
   const grid = $('requests-top-grid');
   const empty = $('requests-top-empty');
+  const viewAllBtn = $('requests-view-all-btn');
+  const remainingGrid = $('requests-remaining-grid');
   if (!grid) return;
   try {
-    const res = await fetch(`${API_BASE}/api/requests/list?limit=10&did=${encodeURIComponent(getDeviceId())}`);
+    const res = await fetch(`${API_BASE}/api/requests/list?did=${encodeURIComponent(getDeviceId())}`);
     const entries = res.ok ? await res.json() : [];
+    _allRequestEntries = entries;
     grid.innerHTML = '';
     if (!entries.length) {
       empty.hidden = false;
+      viewAllBtn.hidden = true;
+      remainingGrid.hidden = true;
+      remainingGrid.innerHTML = '';
       return;
     }
     empty.hidden = true;
+    const top = entries.slice(0, 10);
+    const rest = entries.slice(10);
     const frag = document.createDocumentFragment();
-    entries.forEach(e => frag.appendChild(buildTopRequestCard(e)));
+    top.forEach(e => frag.appendChild(buildTopRequestCard(e)));
     grid.appendChild(frag);
+
+    if (rest.length > 0) {
+      viewAllBtn.hidden = false;
+      renderRequestsToggleState(rest);
+    } else {
+      viewAllBtn.hidden = true;
+      remainingGrid.hidden = true;
+      remainingGrid.innerHTML = '';
+      _requestsExpanded = false;
+    }
   } catch (e) {
     empty.hidden = false;
   }
+}
+
+function renderRequestsToggleState(rest) {
+  const viewAllBtn = $('requests-view-all-btn');
+  const remainingGrid = $('requests-remaining-grid');
+  viewAllBtn.textContent = _requestsExpanded ? 'Hide All' : 'View All';
+  viewAllBtn.classList.toggle('expanded', _requestsExpanded);
+  if (_requestsExpanded) {
+    remainingGrid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    rest.forEach(e => frag.appendChild(buildTopRequestCard(e)));
+    remainingGrid.appendChild(frag);
+    remainingGrid.hidden = false;
+  } else {
+    remainingGrid.hidden = true;
+    remainingGrid.innerHTML = '';
+  }
+}
+
+function toggleViewAllRequests() {
+  _requestsExpanded = !_requestsExpanded;
+  renderRequestsToggleState(_allRequestEntries.slice(10));
 }
 
 function buildTopRequestCard(entry) {
@@ -928,6 +971,11 @@ async function requestMovie(m, cardEl, posterAlreadyLocal = false) {
 
 function initRequestsTab() {
   loadMostRequested();
+  const viewAllBtn = $('requests-view-all-btn');
+  if (viewAllBtn && !viewAllBtn.dataset.wired) {
+    viewAllBtn.dataset.wired = '1';
+    viewAllBtn.addEventListener('click', toggleViewAllRequests);
+  }
   const input = $('requests-search-input');
   if (input && !input.dataset.wired) {
     input.dataset.wired = '1';
