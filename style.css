@@ -1057,6 +1057,9 @@ body {
   pointer-events: none;
   z-index: 5;
 }
+.buffering-spinner[hidden] {
+  display: none;
+}
 .buffering-spinner .spinner-circle {
   width: 56px;
   height: 56px;
