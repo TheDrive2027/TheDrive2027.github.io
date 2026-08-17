@@ -953,7 +953,14 @@ let _trailerPrefetchEl = null;
 function prefetchVideo(url) {
   if (!url) return null;
   const v = document.createElement('video');
-  v.preload = 'auto';
+  // IMPORTANT: 'auto' tells the browser to eagerly download as much of the
+  // file as it can in the background. On a fast connection that's a nice
+  // head start; on a slow/constrained connection (1-2MB/s) it competes for
+  // real bandwidth with actual playback and gets counted server-side as a
+  // second "active stream", cutting the real stream's bandwidth share.
+  // 'metadata' only fetches enough to get duration/dimensions — near-zero
+  // bandwidth cost, no competing stream.
+  v.preload = 'metadata';
   v.muted = true;
   v.src = url;
   // Some browsers won't fetch without the element being in the DOM
