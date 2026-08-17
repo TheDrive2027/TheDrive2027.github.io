@@ -920,6 +920,16 @@ body {
   padding: 14px 24px;
   background: linear-gradient(to top, rgba(0,0,0,0.85), transparent);
   z-index: 5;
+  opacity: 1;
+  transition: opacity 400ms ease;
+  pointer-events: auto;
+}
+.custom-controls.controls-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+#viewer-player.controls-hidden {
+  cursor: none;
 }
 .ctrl-btn {
   background: rgba(255,255,255,0.14); border: 0; color: var(--text);
