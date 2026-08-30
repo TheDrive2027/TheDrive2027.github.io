@@ -184,36 +184,70 @@ function formatTime(sec) {
 
 // Request images at 2x their display dimensions for sharpness on retina screens.
 // The backend resizes to fit within w×h (maintaining aspect ratio).
-function sizedImg(url, cssW, cssH) {
+function sizedImg(url, cssW, cssH, scale = 2) {
   if (!url) return url;
-  const w = Math.round(cssW * 2);
-  const h = Math.round(cssH * 2);
+  const w = Math.round(cssW * scale);
+  const h = Math.round(cssH * scale);
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}w=${w}&h=${h}`;
+}
+
+// A quarter-size version of the same image (1/4 the width and height of
+// what sizedImg() would normally request). It's a much smaller resize for
+// the server to do and a much smaller file to download, so it arrives
+// almost immediately and gives the poster something to show right away
+// while the full-size version loads in behind it.
+function lowResImg(url, cssW, cssH) {
+  return sizedImg(url, cssW, cssH, 0.5); // 0.5 = (2x retina) * 0.25
 }
 
 // ─── LAZY IMAGE LOADING ───────────────────────────────────────
 // Only download poster images when the card is near the viewport. This avoids
 // downloading hundreds of high-res posters the user will never see.
 let _lazyObserver = null;
+
+// Loads an <img> progressively: if a quarter-size placeholder URL is
+// available (data-src-low), show that immediately — it's cheap enough for
+// the server to generate that it usually beats the full-size image by a
+// wide margin — then fetch the real full-size image in the background and
+// swap it in the moment it's ready. If there's no low-res URL, just load
+// the full-size image directly like before.
+function loadProgressive(img) {
+  const fullSrc = img.dataset.src;
+  if (!fullSrc) return;
+  delete img.dataset.src;
+
+  const lowSrc = img.dataset.srcLow;
+  delete img.dataset.srcLow;
+
+  if (lowSrc) {
+    img.src = lowSrc;
+    img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
+    img.addEventListener('error', () => img.classList.add('loaded'), { once: true });
+
+    const fullImg = new Image();
+    fullImg.onload = () => { img.src = fullSrc; };
+    fullImg.onerror = () => {}; // keep showing the low-res placeholder
+    fullImg.src = fullSrc;
+  } else {
+    img.src = fullSrc;
+    img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
+    img.addEventListener('error', () => img.classList.add('loaded'), { once: true });
+  }
+}
+
 function initLazyImages() {
   if (_lazyObserver) return;
   if (!('IntersectionObserver' in window)) {
     // Fallback: just load everything immediately
-    document.querySelectorAll('img[data-src]').forEach(img => { img.src = img.dataset.src; img.classList.add('loaded'); });
+    document.querySelectorAll('img[data-src]').forEach(loadProgressive);
     return;
   }
   _lazyObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        const img = entry.target;
-        if (img.dataset.src) {
-          img.src = img.dataset.src;
-          img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
-          img.addEventListener('error', () => img.classList.add('loaded'), { once: true });
-          delete img.dataset.src;
-        }
-        _lazyObserver.unobserve(img);
+        loadProgressive(entry.target);
+        _lazyObserver.unobserve(entry.target);
       }
     });
   }, { rootMargin: '300px 0px', threshold: 0.01 });
@@ -725,7 +759,7 @@ function buildCard(m, i, isRowCard) {
 
   card.innerHTML = `
     <div class="card-poster card-poster--playable">
-      ${m.poster ? `<img data-src="${sizedImg(m.poster, 168, 252)}" alt="${escHtml(m.title)}" />` : ''}
+      ${m.poster ? `<img data-src="${sizedImg(m.poster, 168, 252)}" data-src-low="${lowResImg(m.poster, 168, 252)}" alt="${escHtml(m.title)}" />` : ''}
       <div class="card-play-overlay"><div class="card-play-btn"><span class="card-play-icon">&#9654;</span></div></div>
       ${progressHtml}
     </div>
